@@ -1,0 +1,774 @@
+import 'package:flutter/material.dart';
+import '../models/artist_stats.dart';
+import '../models/song.dart';
+
+class ReleaseSongScreen extends StatefulWidget {
+  final ArtistStats artistStats;
+  final Song song;
+
+  const ReleaseSongScreen({
+    super.key,
+    required this.artistStats,
+    required this.song,
+  });
+
+  @override
+  State<ReleaseSongScreen> createState() => _ReleaseSongScreenState();
+}
+
+class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
+  bool _releaseNow = true;
+  DateTime _scheduledDate = DateTime.now().add(const Duration(days: 7));
+  bool _isProcessing = false;
+  String _selectedCoverArtStyle = 'minimalist';
+  String _selectedCoverArtColor = 'cyan';
+
+  final Map<String, String> _coverArtStyles = {
+    'minimalist': '🎨 Minimalist',
+    'abstract': '🌀 Abstract',
+    'photo': '📸 Photo',
+    'illustration': '✏️ Illustration',
+    'graffiti': '🎭 Graffiti',
+    'neon': '💡 Neon',
+  };
+
+  final Map<String, Color> _coverArtColors = {
+    'cyan': const Color(0xFF00D9FF),
+    'pink': const Color(0xFFFF6B9D),
+    'purple': const Color(0xFF9B59B6),
+    'gold': const Color(0xFFFFD700),
+    'green': const Color(0xFF32D74B),
+    'red': const Color(0xFFFF3B30),
+    'orange': const Color(0xFFFF9500),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1117),
+      appBar: AppBar(
+        title: const Row(
+          children: [
+            Text('🚀', style: TextStyle(fontSize: 24)),
+            SizedBox(width: 8),
+            Text(
+              'Release Song',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF21262D),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSongPreview(),
+            const SizedBox(height: 32),
+            _buildCoverArtDesigner(),
+            const SizedBox(height: 32),
+            _buildReleaseOptions(),
+            const SizedBox(height: 32),
+            _buildExpectedResults(),
+            const SizedBox(height: 32),
+            _buildReleaseButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSongPreview() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFFFFD700).withOpacity(0.2),
+            const Color(0xFF9B59B6).withOpacity(0.2),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.5), width: 2),
+      ),
+      child: Column(
+        children: [
+          Text(
+            widget.song.genreEmoji,
+            style: const TextStyle(fontSize: 64),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            widget.song.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            widget.song.genre,
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD700).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star, color: Color(0xFFFFD700), size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Quality: ${widget.song.finalQuality} - ${widget.song.qualityRating}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoverArtDesigner() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF21262D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.palette, color: Color(0xFF00D9FF), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Design Cover Art',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Cover art preview
+          Center(
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _coverArtColors[_selectedCoverArtColor]!,
+                    _coverArtColors[_selectedCoverArtColor]!.withOpacity(0.6),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: _coverArtColors[_selectedCoverArtColor]!.withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    widget.song.genreEmoji,
+                    style: const TextStyle(fontSize: 48),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      widget.song.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.artistStats.name,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Style selection
+          const Text(
+            'Art Style',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _coverArtStyles.entries.map((entry) {
+              final isSelected = _selectedCoverArtStyle == entry.key;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedCoverArtStyle = entry.key),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF00D9FF).withOpacity(0.2)
+                        : const Color(0xFF30363D),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF00D9FF) : Colors.white30,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: isSelected ? const Color(0xFF00D9FF) : Colors.white60,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+          // Color selection
+          const Text(
+            'Color Theme',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: _coverArtColors.entries.map((entry) {
+              final isSelected = _selectedCoverArtColor == entry.key;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedCoverArtColor = entry.key),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: entry.value,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      width: 3,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: entry.value.withOpacity(0.5),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReleaseOptions() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF21262D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Release Schedule',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () => setState(() => _releaseNow = true),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _releaseNow 
+                    ? const Color(0xFF00D9FF).withOpacity(0.2)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _releaseNow ? const Color(0xFF00D9FF) : Colors.white30,
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.flash_on,
+                    color: _releaseNow ? const Color(0xFF00D9FF) : Colors.white60,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Release Now',
+                          style: TextStyle(
+                            color: _releaseNow ? Colors.white : Colors.white60,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Go live immediately',
+                          style: TextStyle(
+                            color: _releaseNow ? Colors.white60 : Colors.white30,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_releaseNow)
+                    const Icon(Icons.check_circle, color: Color(0xFF00D9FF)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => setState(() => _releaseNow = false),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: !_releaseNow 
+                    ? const Color(0xFF9B59B6).withOpacity(0.2)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: !_releaseNow ? const Color(0xFF9B59B6) : Colors.white30,
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.schedule,
+                    color: !_releaseNow ? const Color(0xFF9B59B6) : Colors.white60,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Schedule Release',
+                          style: TextStyle(
+                            color: !_releaseNow ? Colors.white : Colors.white60,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Set a future release date',
+                          style: TextStyle(
+                            color: !_releaseNow ? Colors.white60 : Colors.white30,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!_releaseNow)
+                    const Icon(Icons.check_circle, color: Color(0xFF9B59B6)),
+                ],
+              ),
+            ),
+          ),
+          if (!_releaseNow) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF30363D),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Release Date',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: _selectDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF21262D),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF9B59B6).withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: Color(0xFF9B59B6), size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            '${_scheduledDate.day}/${_scheduledDate.month}/${_scheduledDate.year}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.edit, color: Color(0xFF9B59B6), size: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9B59B6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, color: Color(0xFF9B59B6), size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Building anticipation can boost initial streams by up to 25%',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpectedResults() {
+    final estimatedStreams = widget.song.estimatedStreams;
+    final estimatedRevenue = (estimatedStreams * 0.003).round(); // $0.003 per stream
+    final fameGain = (widget.song.finalQuality * 0.5).round();
+    final fanbaseGain = (widget.song.finalQuality * 2).round();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF21262D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.trending_up, color: Color(0xFF32D74B), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Expected Results',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildExpectedStat(
+            Icons.play_circle_outline,
+            'Estimated Streams',
+            _formatNumber(estimatedStreams),
+            const Color(0xFF00D9FF),
+          ),
+          const SizedBox(height: 12),
+          _buildExpectedStat(
+            Icons.attach_money,
+            'Estimated Revenue',
+            '\$${_formatNumber(estimatedRevenue)}',
+            const Color(0xFF32D74B),
+          ),
+          const SizedBox(height: 12),
+          _buildExpectedStat(
+            Icons.star,
+            'Fame Gain',
+            '+$fameGain',
+            const Color(0xFFFFD700),
+          ),
+          const SizedBox(height: 12),
+          _buildExpectedStat(
+            Icons.people,
+            'New Fans',
+            '+${_formatNumber(fanbaseGain)}',
+            const Color(0xFFFF6B9D),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00D9FF).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.lightbulb_outline, color: Color(0xFF00D9FF), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Higher quality songs perform better and earn more',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpectedStat(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReleaseButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isProcessing ? null : _releaseSong,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFFFD700),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: _isProcessing
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.rocket_launch, color: Colors.black),
+                  const SizedBox(width: 8),
+                  Text(
+                    _releaseNow ? 'Release Now' : 'Schedule Release',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF9B59B6),
+              onPrimary: Colors.white,
+              surface: Color(0xFF21262D),
+              onSurface: Colors.white,
+            ), dialogTheme: DialogThemeData(backgroundColor: const Color(0xFF21262D)),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _scheduledDate) {
+      setState(() {
+        _scheduledDate = picked;
+      });
+    }
+  }
+
+  void _releaseSong() {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    // Simulate processing
+    Future.delayed(const Duration(seconds: 2), () {
+      final releaseDate = _releaseNow ? DateTime.now() : _scheduledDate;
+      final estimatedStreams = widget.song.estimatedStreams;
+      final estimatedRevenue = (estimatedStreams * 0.003).round();
+      final fameGain = (widget.song.finalQuality * 0.5).round();
+      final fanbaseGain = (widget.song.finalQuality * 2).round();
+
+      // Update song state with cover art
+      final updatedSong = widget.song.copyWith(
+        state: SongState.released,
+        releasedDate: releaseDate,
+        streams: _releaseNow ? (estimatedStreams * 0.1).round() : 0, // 10% initial streams if released now
+        likes: _releaseNow ? (estimatedStreams * 0.05).round() : 0,
+        coverArtStyle: _selectedCoverArtStyle,
+        coverArtColor: _selectedCoverArtColor,
+      );
+
+      // Update artist stats
+      final updatedStats = widget.artistStats.copyWith(
+        money: widget.artistStats.money + (_releaseNow ? (estimatedRevenue * 0.1).round() : 0),
+        fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
+        fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
+        songs: widget.artistStats.songs.map((s) => s.id == updatedSong.id ? updatedSong : s).toList(),
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _releaseNow
+                  ? '🚀 "${widget.song.title}" is now live!'
+                  : '📅 "${widget.song.title}" scheduled for ${releaseDate.day}/${releaseDate.month}/${releaseDate.year}',
+            ),
+            backgroundColor: const Color(0xFF32D74B),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        Navigator.pop(context, updatedStats);
+      }
+    });
+  }
+
+  String _formatNumber(int number) {
+    if (number >= 1000000000) {
+      return '${(number / 1000000000).toStringAsFixed(1)}B';
+    } else if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
+}
