@@ -41,7 +41,7 @@ class ArtistStats {
     this.experience = 0,
     this.lyricsSkill = 10,
     this.compositionSkill = 10,
-    this.inspirationLevel = 50,
+    this.inspirationLevel = 0, // No hype for new artists!
     this.songs = const [],
     this.currentRegion = 'usa',
     this.age = 18,

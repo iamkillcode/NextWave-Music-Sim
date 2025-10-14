@@ -120,10 +120,12 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
 
   Widget _buildStudioCard(Studio studio) {
     final regionMultiplier = _currentRegion?.costOfLivingMultiplier ?? 1.0;
-    final baseCost = studio.getTotalCost(false, regionMultiplier);
-    final producerCost = studio.getTotalCost(true, regionMultiplier);
-    final canAffordBasic = _currentStats.money >= baseCost && _currentStats.energy >= 30;
-    final canAffordProducer = _currentStats.money >= producerCost && _currentStats.energy >= 30;
+    final meetsRequirements = studio.meetsRequirements(_currentStats);
+    final attitude = studio.getAttitude(_currentStats);
+    final baseCost = studio.getAdjustedPrice(false, regionMultiplier, attitude);
+    final producerCost = studio.getAdjustedPrice(true, regionMultiplier, attitude);
+    final canAffordBasic = _currentStats.money >= baseCost && _currentStats.energy >= 30 && meetsRequirements;
+    final canAffordProducer = _currentStats.money >= producerCost && _currentStats.energy >= 30 && meetsRequirements;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -131,15 +133,17 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            studio.getTierColor().withOpacity(0.2),
-            const Color(0xFF21262D),
+            studio.getTierColor().withOpacity(meetsRequirements ? 0.2 : 0.1),
+            const Color(0xFF21262D).withOpacity(meetsRequirements ? 1.0 : 0.5),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: studio.getTierColor().withOpacity(0.5),
+          color: meetsRequirements 
+              ? studio.getTierColor().withOpacity(0.5)
+              : Colors.red.withOpacity(0.3),
           width: 2,
         ),
       ),
@@ -148,9 +152,29 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
         children: [
           Row(
             children: [
-              Text(
-                studio.getTierIcon(),
-                style: const TextStyle(fontSize: 32),
+              Stack(
+                children: [
+                  Text(
+                    studio.getTierIcon(),
+                    style: const TextStyle(fontSize: 32),
+                  ),
+                  if (!meetsRequirements)
+                    const Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Icon(
+                        Icons.lock,
+                        color: Colors.red,
+                        size: 16,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black,
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -159,47 +183,230 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                   children: [
                     Text(
                       studio.name,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: meetsRequirements ? Colors.white : Colors.white54,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       studio.location,
-                      style: const TextStyle(
-                        color: Colors.white60,
+                      style: TextStyle(
+                        color: meetsRequirements ? Colors.white60 : Colors.white30,
                         fontSize: 14,
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: studio.getTierColor(),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  studio.tier.name.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: studio.getTierColor(),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      studio.tier.name.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: studio.getAttitudeColor(attitude),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      attitude.name.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             studio.description,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: meetsRequirements ? Colors.white70 : Colors.white38,
               fontSize: 13,
             ),
           ),
+          
+          // Requirements Section
+          if (studio.requirements.minFame > 0 || 
+              studio.requirements.minAlbums > 0 || 
+              studio.requirements.minSongsReleased > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: meetsRequirements 
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: meetsRequirements 
+                      ? Colors.green.withOpacity(0.3)
+                      : Colors.red.withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        meetsRequirements ? Icons.check_circle : Icons.lock,
+                        color: meetsRequirements ? Colors.green : Colors.red,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        meetsRequirements ? 'ACCESS GRANTED' : 'REQUIREMENTS',
+                        style: TextStyle(
+                          color: meetsRequirements ? Colors.green : Colors.red,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (studio.requirements.minFame > 0)
+                    _buildRequirementRow(
+                      'Fame',
+                      studio.requirements.minFame,
+                      _currentStats.fame,
+                      Icons.whatshot,
+                    ),
+                  if (studio.requirements.minAlbums > 0)
+                    _buildRequirementRow(
+                      'Albums',
+                      studio.requirements.minAlbums,
+                      _currentStats.albumsSold > 0 ? (_currentStats.albumsSold / 1000).ceil() : 0,
+                      Icons.album,
+                    ),
+                  if (studio.requirements.minSongsReleased > 0)
+                    _buildRequirementRow(
+                      'Released Songs',
+                      studio.requirements.minSongsReleased,
+                      _currentStats.songs.where((s) => s.state == SongState.released).length,
+                      Icons.music_note,
+                    ),
+                ],
+              ),
+            ),
+          ],
+          
+          // Attitude Description
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: studio.getAttitudeColor(attitude).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _getAttitudeIcon(attitude),
+                  color: studio.getAttitudeColor(attitude),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    studio.getAttitudeDescription(attitude),
+                    style: TextStyle(
+                      color: studio.getAttitudeColor(attitude),
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Exclusive Note
+          if (studio.exclusiveNote.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.purple.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.purple.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: Colors.purple,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      studio.exclusiveNote,
+                      style: const TextStyle(
+                        color: Colors.purple,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
+          // Connection Benefits
+          if (studio.hasConnectionBenefits()) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD700).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFFFD700).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Text('⭐', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      studio.getConnectionBenefit(),
+                      style: const TextStyle(
+                        color: Color(0xFFFFD700),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
           const SizedBox(height: 16),
           Row(
             children: [
@@ -414,15 +621,18 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
 
   void _recordSongAtStudio(Song song, Studio studio, bool useProducer) {
     final regionMultiplier = _currentRegion?.costOfLivingMultiplier ?? 1.0;
-    final cost = studio.getTotalCost(useProducer, regionMultiplier);
+    final attitude = studio.getAttitude(_currentStats);
+    final cost = studio.getAdjustedPrice(useProducer, regionMultiplier, attitude);
 
-    // Calculate recording quality
+    // Calculate recording quality with attitude modifier
     final studioQuality = studio.qualityRating;
     final studioRepBonus = (studio.reputation / 100.0) * 10;
     final producerBonus = useProducer ? (studio.producerSkill / 100.0) * 15 : 0;
     final specialtyBonus = studio.specialties.any((s) => s.toLowerCase() == song.genre.toLowerCase()) ? 10 : 0;
+    final attitudeModifier = studio.getAttitudeQualityModifier(attitude);
     
-    final recordingQuality = (studioQuality + studioRepBonus + producerBonus + specialtyBonus).clamp(1, 100).round();
+    final baseQuality = studioQuality + studioRepBonus + producerBonus + specialtyBonus;
+    final recordingQuality = (baseQuality * attitudeModifier).clamp(1, 100).round();
 
     final updatedSongs = _currentStats.songs.map((s) {
       if (s.id == song.id) {
@@ -448,9 +658,12 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
     widget.onStatsUpdated(_currentStats);
 
     String producerText = useProducer ? '\n🎛️ With studio producer!' : '';
+    String attitudeText = attitude != StudioAttitude.neutral 
+        ? '\n${_getAttitudeEmoji(attitude)} Studio Attitude: ${attitude.name}'
+        : '';
     _showMessage('🎤 Recorded "${song.title}" at ${studio.name}!\n'
                 'Recording Quality: $recordingQuality%'
-                '$producerText\n'
+                '$producerText$attitudeText\n'
                 '+${studio.getFameBonus()} Fame');
   }
 
@@ -472,5 +685,73 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
     return number.toString();
+  }
+
+  Widget _buildRequirementRow(String label, int required, int current, IconData icon) {
+    final met = current >= required;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle : Icons.cancel,
+            color: met ? Colors.green : Colors.red,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Icon(icon, color: Colors.white60, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 11,
+            ),
+          ),
+          Text(
+            '$current/$required',
+            style: TextStyle(
+              color: met ? Colors.green : Colors.red,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getAttitudeIcon(StudioAttitude attitude) {
+    switch (attitude) {
+      case StudioAttitude.welcoming:
+        return Icons.celebration;
+      case StudioAttitude.friendly:
+        return Icons.thumb_up;
+      case StudioAttitude.neutral:
+        return Icons.remove_circle_outline;
+      case StudioAttitude.skeptical:
+        return Icons.help_outline;
+      case StudioAttitude.dismissive:
+        return Icons.thumb_down;
+      case StudioAttitude.closed:
+        return Icons.block;
+    }
+  }
+
+  String _getAttitudeEmoji(StudioAttitude attitude) {
+    switch (attitude) {
+      case StudioAttitude.welcoming:
+        return '🎉';
+      case StudioAttitude.friendly:
+        return '😊';
+      case StudioAttitude.neutral:
+        return '😐';
+      case StudioAttitude.skeptical:
+        return '🤔';
+      case StudioAttitude.dismissive:
+        return '😒';
+      case StudioAttitude.closed:
+        return '🚫';
+    }
   }
 }

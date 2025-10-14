@@ -5,12 +5,10 @@ import 'dashboard_screen_new.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final User user;
-  final bool isGuest;
 
   const OnboardingScreen({
     super.key,
     required this.user,
-    this.isGuest = false,
   });
 
   @override
@@ -100,14 +98,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'id': widget.user.uid,
         'displayName': _artistName.trim(),
         'email': widget.user.email ?? '',
-        'isGuest': widget.isGuest,
         'primaryGenre': _selectedGenre,
         'homeRegion': _selectedRegion,
         'bio': _artistBio.trim(),
         'joinDate': Timestamp.now(),
         'lastActive': Timestamp.now(),
         'isOnline': true,
-        'currentMoney': 5000, // Starting money
+        'currentMoney': 500, // Starting money - minimal budget to start career!
         'currentFame': 0,
         'level': 1,
         'totalStreams': 0,
@@ -121,7 +118,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'experience': 0,
         'age': _selectedAge,
         'careerStartDate': Timestamp.now(),
-        'inspirationLevel': 50,
+        'inspirationLevel': 0, // No hype yet - you're just starting!
       };
 
       // Add timeout to prevent infinite loading

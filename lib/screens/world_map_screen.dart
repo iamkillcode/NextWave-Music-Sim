@@ -58,6 +58,8 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
           children: [
             _buildCurrentLocationCard(),
             const SizedBox(height: 24),
+            _buildTravelInfoCard(),
+            const SizedBox(height: 16),
             const Text(
               'Travel Destinations',
               style: TextStyle(
@@ -70,6 +72,61 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
             ..._buildRegionCards(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTravelInfoCard() {
+    final fame = _currentStats.fame;
+    final money = _currentStats.money;
+    
+    String statusText;
+    Color statusColor;
+    String statusIcon;
+    
+    if (money > 50000) {
+      statusText = 'Elite Traveler - 20% discount on all flights!';
+      statusColor = const Color(0xFFFFD700); // Gold
+      statusIcon = '💎';
+    } else if (money > 20000) {
+      statusText = 'Premium Traveler - 10% discount on flights';
+      statusColor = const Color(0xFF00D9FF); // Cyan
+      statusIcon = '✨';
+    } else if (fame > 50) {
+      statusText = 'Famous Artist - Travel costs scale with your fame';
+      statusColor = const Color(0xFFFF6B9D); // Pink
+      statusIcon = '⭐';
+    } else {
+      statusText = 'Rising Artist - Affordable travel rates available';
+      statusColor = Colors.green;
+      statusIcon = '🎵';
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: statusColor.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(statusIcon, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              statusText,
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -290,22 +347,55 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
   }
 
   int _calculateTravelCost(String from, String to) {
-    // Adjacent regions cost less
+    // Same region = free (shouldn't happen)
+    if (from == to) return 0;
+
+    // Base costs scale with fame (starts low, increases with success)
+    // Early game (0-20 fame): $500-$1,500
+    // Mid game (20-50 fame): $1,500-$5,000
+    // Late game (50-80 fame): $5,000-$15,000
+    // Endgame (80+ fame): $15,000-$30,000
+    
+    final fame = _currentStats.fame;
+    final fameMultiplier = 1.0 + (fame / 100.0); // 1.0x at 0 fame, 2.0x at 100 fame
+    
+    // Distance-based costs
     const adjacentRegions = {
-      'usa': ['latin_america'],
+      'usa': ['canada', 'latin_america', 'uk'],
+      'canada': ['usa', 'uk'],
+      'uk': ['europe', 'usa', 'canada'],
       'europe': ['uk', 'africa', 'asia'],
-      'uk': ['europe', 'usa'],
-      'asia': ['oceania', 'europe'],
-      'africa': ['europe', 'asia'],
-      'latin_america': ['usa'],
+      'asia': ['europe', 'oceania', 'africa'],
+      'africa': ['europe', 'asia', 'latin_america'],
+      'latin_america': ['usa', 'africa'],
       'oceania': ['asia'],
     };
 
+    int baseCost;
     if (adjacentRegions[from]?.contains(to) ?? false) {
-      return 5000;
+      // Adjacent regions base cost
+      baseCost = 500; // Start at $500
+    } else {
+      // Far regions base cost
+      baseCost = 1500; // Start at $1,500
     }
 
-    return 15000;
+    // Apply fame scaling
+    final scaledCost = (baseCost * fameMultiplier).round();
+    
+    // Wealth-based discount (if you're rich, travel is relatively cheaper)
+    // Players with lots of money get slight discount (max 20% off)
+    final wealthMultiplier = _currentStats.money > 50000 
+        ? 0.8 // 20% discount for rich players
+        : _currentStats.money > 20000 
+            ? 0.9 // 10% discount for mid-wealth
+            : 1.0; // No discount for broke players
+    
+    final finalCost = (scaledCost * wealthMultiplier).round();
+    
+    // Minimum cost: $100 (always affordable for new players)
+    // Maximum cost: $50,000 (prevents ridiculous scaling)
+    return finalCost.clamp(100, 50000);
   }
 
   void _showTravelConfirmation(WorldRegion region, int cost) {
@@ -350,21 +440,46 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                   color: const Color(0xFF30363D),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    const Text(
-                      'Travel Cost:',
-                      style: TextStyle(color: Colors.white70),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Travel Cost:',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          '\$${_formatNumber(cost)}',
+                          style: const TextStyle(
+                            color: Color(0xFFFF6B9D),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      '\$${_formatNumber(cost)}',
-                      style: const TextStyle(
-                        color: Color(0xFFFF6B9D),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    if (_currentStats.money > 20000) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            _currentStats.money > 50000
+                                ? '💎 Elite Traveler: 20% discount applied'
+                                : '✨ Premium: 10% discount applied',
+                            style: TextStyle(
+                              color: const Color(0xFF00D9FF).withOpacity(0.8),
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

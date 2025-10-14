@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import '../models/streaming_platform.dart';
 
 class ReleaseSongScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -20,27 +24,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
   bool _releaseNow = true;
   DateTime _scheduledDate = DateTime.now().add(const Duration(days: 7));
   bool _isProcessing = false;
-  String _selectedCoverArtStyle = 'minimalist';
-  String _selectedCoverArtColor = 'cyan';
-
-  final Map<String, String> _coverArtStyles = {
-    'minimalist': '🎨 Minimalist',
-    'abstract': '🌀 Abstract',
-    'photo': '📸 Photo',
-    'illustration': '✏️ Illustration',
-    'graffiti': '🎭 Graffiti',
-    'neon': '💡 Neon',
-  };
-
-  final Map<String, Color> _coverArtColors = {
-    'cyan': const Color(0xFF00D9FF),
-    'pink': const Color(0xFFFF6B9D),
-    'purple': const Color(0xFF9B59B6),
-    'gold': const Color(0xFFFFD700),
-    'green': const Color(0xFF32D74B),
-    'red': const Color(0xFFFF3B30),
-    'orange': const Color(0xFFFF9500),
-  };
+  Set<String> _selectedPlatforms = {'tunify'}; // Can select multiple platforms
+  String? _uploadedCoverArtUrl; // URL of uploaded cover art image
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +57,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
           children: [
             _buildSongPreview(),
             const SizedBox(height: 32),
+            _buildPlatformSelector(),
+            const SizedBox(height: 32),
             _buildCoverArtDesigner(),
             const SizedBox(height: 32),
             _buildReleaseOptions(),
@@ -83,6 +70,39 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _uploadCoverArt() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Read image as bytes and convert to base64
+      final Uint8List imageBytes = await image.readAsBytes();
+      final String base64Image = base64Encode(imageBytes);
+      final String dataUrl = 'data:image/jpeg;base64,$base64Image';
+
+      setState(() {
+        _uploadedCoverArtUrl = dataUrl;
+      });
+    } catch (e) {
+      print('Error uploading cover art: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to upload cover art'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSongPreview() {
@@ -152,6 +172,146 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     );
   }
 
+  Widget _buildPlatformSelector() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF21262D),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.cloud_upload, color: Color(0xFF00D9FF), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Choose Streaming Platforms',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Select one or both platforms to distribute your music',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ...StreamingPlatform.all.map((platform) => _buildPlatformOption(platform)).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlatformOption(StreamingPlatform platform) {
+    final isSelected = _selectedPlatforms.contains(platform.id);
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            // Don't allow deselecting if it's the only one selected
+            if (_selectedPlatforms.length > 1) {
+              _selectedPlatforms.remove(platform.id);
+            }
+          } else {
+            _selectedPlatforms.add(platform.id);
+          }
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Color(platform.getColorValue()).withOpacity(0.2)
+              : const Color(0xFF30363D),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Color(platform.getColorValue()) : Colors.white30,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  platform.emoji,
+                  style: const TextStyle(fontSize: 32),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        platform.name,
+                        style: TextStyle(
+                          color: isSelected ? Color(platform.getColorValue()) : Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        platform.description,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check_circle,
+                    color: Color(platform.getColorValue()),
+                    size: 28,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildPlatformStat('💰', '\$${platform.royaltiesPerStream.toStringAsFixed(3)}/stream', platform),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlatformStat(String emoji, String text, StreamingPlatform platform) {
+    final isSelected = _selectedPlatforms.contains(platform.id);
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 16)),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white60,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildCoverArtDesigner() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -177,6 +337,32 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          const Text(
+            'Upload your cover art image',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Upload Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _uploadCoverArt,
+              icon: const Icon(Icons.upload_file),
+              label: Text(_uploadedCoverArtUrl != null ? 'Change Image' : 'Upload Image'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00D9FF),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 20),
           // Cover art preview
           Center(
@@ -184,144 +370,58 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               width: 200,
               height: 200,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    _coverArtColors[_selectedCoverArtColor]!,
-                    _coverArtColors[_selectedCoverArtColor]!.withOpacity(0.6),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: const Color(0xFF30363D),
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                boxShadow: _uploadedCoverArtUrl != null ? [
                   BoxShadow(
-                    color: _coverArtColors[_selectedCoverArtColor]!.withOpacity(0.3),
+                    color: const Color(0xFF00D9FF).withOpacity(0.3),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
-                ],
+                ] : [],
+                image: _uploadedCoverArtUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(_uploadedCoverArtUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    widget.song.genreEmoji,
-                    style: const TextStyle(fontSize: 48),
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      widget.song.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+              child: _uploadedCoverArtUrl != null
+                  ? null
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_outlined,
+                          color: Colors.white.withOpacity(0.3),
+                          size: 64,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No cover art yet',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.artistStats.name,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 24),
-          // Style selection
-          const Text(
-            'Art Style',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _coverArtStyles.entries.map((entry) {
-              final isSelected = _selectedCoverArtStyle == entry.key;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedCoverArtStyle = entry.key),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF00D9FF).withOpacity(0.2)
-                        : const Color(0xFF30363D),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFF00D9FF) : Colors.white30,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Text(
-                    entry.value,
-                    style: TextStyle(
-                      color: isSelected ? const Color(0xFF00D9FF) : Colors.white60,
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
+          if (_uploadedCoverArtUrl != null)
+            Center(
+              child: Text(
+                '✓ Cover art uploaded',
+                style: TextStyle(
+                  color: const Color(0xFF32D74B),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
                 ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
-          // Color selection
-          const Text(
-            'Color Theme',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: _coverArtColors.entries.map((entry) {
-              final isSelected = _selectedCoverArtColor == entry.key;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedCoverArtColor = entry.key),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: entry.value,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      width: 3,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: entry.value.withOpacity(0.5),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check, color: Colors.white, size: 20)
-                      : null,
-                ),
-              );
-            }).toList(),
-          ),
         ],
       ),
     );
@@ -528,7 +628,15 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
   Widget _buildExpectedResults() {
     final estimatedStreams = widget.song.estimatedStreams;
-    final estimatedRevenue = (estimatedStreams * 0.003).round(); // $0.003 per stream
+    
+    // Calculate combined revenue from all selected platforms
+    double totalRevenue = 0;
+    for (final platformId in _selectedPlatforms) {
+      final platform = StreamingPlatform.getById(platformId);
+      totalRevenue += estimatedStreams * platform.royaltiesPerStream;
+    }
+    final estimatedRevenue = totalRevenue.round();
+    
     final fameGain = (widget.song.finalQuality * 0.5).round();
     final fanbaseGain = (widget.song.finalQuality * 2).round();
 
@@ -719,18 +827,26 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       final releaseDate = _releaseNow ? DateTime.now() : _scheduledDate;
       final estimatedStreams = widget.song.estimatedStreams;
-      final estimatedRevenue = (estimatedStreams * 0.003).round();
+      
+      // Calculate combined revenue from all selected platforms
+      double totalRevenue = 0;
+      for (final platformId in _selectedPlatforms) {
+        final platform = StreamingPlatform.getById(platformId);
+        totalRevenue += estimatedStreams * platform.royaltiesPerStream;
+      }
+      final estimatedRevenue = totalRevenue.round();
+      
       final fameGain = (widget.song.finalQuality * 0.5).round();
       final fanbaseGain = (widget.song.finalQuality * 2).round();
 
-      // Update song state with cover art
+      // Update song state with cover art and platforms
       final updatedSong = widget.song.copyWith(
         state: SongState.released,
         releasedDate: releaseDate,
         streams: _releaseNow ? (estimatedStreams * 0.1).round() : 0, // 10% initial streams if released now
         likes: _releaseNow ? (estimatedStreams * 0.05).round() : 0,
-        coverArtStyle: _selectedCoverArtStyle,
-        coverArtColor: _selectedCoverArtColor,
+        coverArtUrl: _uploadedCoverArtUrl,
+        streamingPlatforms: _selectedPlatforms.toList(),
       );
 
       // Update artist stats
@@ -743,12 +859,13 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
       // Show success message
       if (mounted) {
+        final platformNames = _selectedPlatforms.map((id) => StreamingPlatform.getById(id).name).join(' & ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               _releaseNow
-                  ? '🚀 "${widget.song.title}" is now live!'
-                  : '📅 "${widget.song.title}" scheduled for ${releaseDate.day}/${releaseDate.month}/${releaseDate.year}',
+                  ? '🚀 "${widget.song.title}" is now live on $platformNames!'
+                  : '📅 "${widget.song.title}" scheduled for ${releaseDate.day}/${releaseDate.month}/${releaseDate.year} on $platformNames',
             ),
             backgroundColor: const Color(0xFF32D74B),
             behavior: SnackBarBehavior.floating,

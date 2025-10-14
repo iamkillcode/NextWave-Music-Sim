@@ -8,10 +8,12 @@ import '../services/firebase_service.dart';
 import '../services/demo_firebase_service.dart';
 import '../services/game_time_service.dart';
 import 'leaderboard_screen.dart';
-import 'tunify_screen.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
+import 'media_hub_screen.dart';
+import 'studios_list_screen.dart';
 import '../utils/firebase_status.dart';
+import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,13 +25,18 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late ArtistStats artistStats;
   int _selectedIndex = 0;
-  late Timer gameTimer;
-  late Timer syncTimer;
-  DateTime currentGameDate = DateTime(2020, 1, 1); // Default, will be updated by global time
-  late dynamic _multiplayerService; // Can be FirebaseService or DemoFirebaseService
+  Timer? gameTimer; // Made nullable to prevent dispose errors
+  Timer? syncTimer; // Made nullable to prevent dispose errors
+  DateTime? currentGameDate; // Will be set from Firebase, starts as null to show loading
+  DateTime? _lastSyncTime; // Track when we last synced with Firebase
+  int _lastEnergyReplenishDay = 0; // Track the last day we replenished energy
+  DateTime? _lastPassiveIncomeTime; // Track when we last calculated passive income
+  late dynamic _multiplayerService;
   bool _isOnlineMode = false;
   bool _isInitializing = false;
+  bool _isDateSynced = false; // Track if we've synced the date at least once
   final GameTimeService _gameTimeService = GameTimeService();
+  final List<Map<String, dynamic>> _notifications = []; // Store notifications
 
   @override
   void initState() {
@@ -37,13 +44,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Initialize global game time
     _initializeGameTime();
     
+    // Don't set _lastEnergyReplenishDay until we sync with Firebase
+    
+    // Initialize passive income tracking
+    _lastPassiveIncomeTime = DateTime.now();
+    
     // Initialize with default stats (will be replaced by user profile)
     artistStats = ArtistStats(
       name: "Loading...",
       fame: 0,
-      money: 5000,
+      money: 500, // Starting money - just starting out with minimal budget!
       energy: 100,
-      creativity: 50,
+      creativity: 0, // No hype yet - you're just starting!
       fanbase: 1,
       albumsSold: 0,
       songsWritten: 0,
@@ -52,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       experience: 0,
       lyricsSkill: 10,
       compositionSkill: 10,
-      inspirationLevel: 50,
+      inspirationLevel: 0, // No hype yet - you're just starting!
     );
     
     // Load user profile from Firestore
@@ -61,51 +73,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Initialize Firebase authentication
     _initializeOnlineMode();
     
-    // Start the game world timer - updates every second for live time display
-    gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateGameTime();
+    // Date-only system: Check for day changes every 5 minutes (much more efficient!)
+    gameTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _updateGameDate();
     });
     
-    // Sync with Firebase every 5 minutes to ensure accuracy
-    syncTimer = Timer.periodic(const Duration(minutes: 5), (timer) async {
-      try {
-        final gameDate = await _gameTimeService.getCurrentGameDate();
-        setState(() {
-          currentGameDate = gameDate;
-        });
-        print('🔄 Synced with global time: ${_gameTimeService.formatGameDate(gameDate)}');
-      } catch (e) {
-        print('❌ Error syncing time: $e');
-      }
+    // Sync with Firebase every hour to stay synchronized
+    syncTimer = Timer.periodic(const Duration(hours: 1), (timer) async {
+      await _syncWithFirebase();
     });
   }
 
   /// Initialize the global game time system
   Future<void> _initializeGameTime() async {
     try {
+      print('🔧 Initializing game time system...');
       // Initialize the game time system in Firestore (only happens once)
       await _gameTimeService.initializeGameTime();
-      
-      // Get the current synchronized game date
-      final gameDate = await _gameTimeService.getCurrentGameDate();
-      setState(() {
-        currentGameDate = gameDate;
-      });
-      
-      print('🕐 Global game time loaded: ${_gameTimeService.formatGameDate(gameDate)}');
+      print('✅ Game time system initialized');
+      await _syncWithFirebase(); // Do initial sync
+      print('🕐 Global game time initialized and synced');
     } catch (e) {
       print('❌ Error initializing game time: $e');
-      // Fallback to local calculation
+      // Even on error, try to sync with Firebase to get the date
+      await _syncWithFirebase();
+    }
+  }
+
+  /// Sync with Firebase to get the authoritative game time
+  Future<void> _syncWithFirebase() async {
+    // Check if widget is still mounted
+    if (!mounted) return;
+    
+    try {
+      print('🔄 Starting Firebase sync...');
+      final gameDate = await _gameTimeService.getCurrentGameDate();
+      print('✅ Got game date: ${_gameTimeService.formatGameDate(gameDate)}');
+      
+      // Check again after async operation
+      if (!mounted) return;
+      
+      setState(() {
+        currentGameDate = gameDate;
+        _lastSyncTime = DateTime.now();
+        _isDateSynced = true; // Mark that we've successfully synced
+        // Update the last energy replenish day to match the synced date
+        // This prevents false triggers on first sync
+        _lastEnergyReplenishDay = gameDate.day;
+      });
+      print('🔄 Synced: ${_gameTimeService.formatGameDate(gameDate)} (Day: ${gameDate.day})');
+      print('📅 Energy replenish day set to: $_lastEnergyReplenishDay');
+      print('📊 currentGameDate is now: $currentGameDate');
+    } catch (e) {
+      print('❌ Sync failed: $e');
+      // On sync failure, set a default date so UI can render
+      if (!mounted) return;
       setState(() {
         currentGameDate = DateTime(2020, 1, 1);
+        _lastSyncTime = DateTime.now();
+        _isDateSynced = true;
+        _lastEnergyReplenishDay = 1;
       });
+      print('⚠️ Using fallback date: January 1, 2020');
     }
   }
 
   @override
   void dispose() {
-    gameTimer.cancel();
-    syncTimer.cancel();
+    // Cancel timers if they exist
+    gameTimer?.cancel();
+    syncTimer?.cancel();
     super.dispose();
   }
 
@@ -130,6 +167,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           );
 
+      // Check if widget is still mounted after async operation
+      if (!mounted) return;
+
       if (doc.exists) {
         final data = doc.data()!;
         print('✅ Profile loaded: ${data['displayName']}');
@@ -138,9 +178,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           artistStats = ArtistStats(
             name: data['displayName'] ?? 'Unknown Artist',
             fame: (data['currentFame'] ?? 0).toInt(),
-            money: (data['currentMoney'] ?? 5000).toInt(),
+            money: (data['currentMoney'] ?? 1000).toInt(),
             energy: 100, // Always start with full energy
-            creativity: (data['inspirationLevel'] ?? 50).toInt(),
+            creativity: (data['inspirationLevel'] ?? 0).toInt(),
             fanbase: (data['level'] ?? 1).toInt(),
             albumsSold: (data['albumsReleased'] ?? 0).toInt(),
             songsWritten: (data['songsPublished'] ?? 0).toInt(),
@@ -149,7 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             experience: (data['experience'] ?? 0).toInt(),
             lyricsSkill: (data['lyricsSkill'] ?? 10).toInt(),
             compositionSkill: (data['compositionSkill'] ?? 10).toInt(),
-            inspirationLevel: (data['inspirationLevel'] ?? 50).toInt(),
+            inspirationLevel: (data['inspirationLevel'] ?? 0).toInt(),
             currentRegion: data['homeRegion'] ?? 'usa',
             age: (data['age'] ?? 18).toInt(),
             careerStartDate: (data['careerStartDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -208,13 +248,133 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _updateGameTime() {
-    // Update time locally every second for smooth display
-    // This calculates the game time based on the passage of real time
-    // 1 real second = 24 game seconds (since 1 real hour = 1 game day)
-    setState(() {
-      currentGameDate = currentGameDate.add(const Duration(seconds: 24));
-    });
+  void _updateGameDate() async {
+    // Check if widget is still mounted before doing anything
+    if (!mounted) return;
+    if (_lastSyncTime == null || currentGameDate == null) return;
+    
+    try {
+      // Get the current game date from Firebase (date-only, no time component)
+      final newGameDate = await _gameTimeService.getCurrentGameDate();
+      
+      // Check again if still mounted after async operation
+      if (!mounted) return;
+      
+      // Check if the day has changed
+      if (newGameDate.day != currentGameDate!.day || 
+          newGameDate.month != currentGameDate!.month || 
+          newGameDate.year != currentGameDate!.year) {
+        
+        print('🌅 Day changed! Old: ${currentGameDate!.day} → New: ${newGameDate.day}');
+        
+        // Calculate passive income for the time that has passed
+        final now = DateTime.now();
+        final realSecondsSinceLastUpdate = now.difference(_lastSyncTime!).inSeconds;
+        _calculatePassiveIncome(realSecondsSinceLastUpdate);
+        
+        // Update last sync time
+        _lastSyncTime = now;
+        
+        // Replenish energy for the new day (only if still mounted)
+        if (mounted) {
+          setState(() {
+            currentGameDate = newGameDate;
+            _lastEnergyReplenishDay = newGameDate.day;
+            artistStats = artistStats.copyWith(
+              energy: 100,
+            );
+          });
+          
+          _showMessage('☀️ New day! Energy fully restored to 100');
+          _addNotification(
+            'Energy Restored',
+            'A new day has begun! Your energy has been fully restored to 100.',
+            icon: Icons.wb_sunny,
+          );
+          print('✅ Energy restored to 100 - Game Date: ${_gameTimeService.formatGameDate(newGameDate)}');
+        }
+      } else {
+        // Same day, just update passive income
+        final now = DateTime.now();
+        final realSecondsSinceLastUpdate = now.difference(_lastSyncTime!).inSeconds;
+        
+        // Only calculate if significant time has passed (at least 1 minute)
+        if (realSecondsSinceLastUpdate >= 60) {
+          _calculatePassiveIncome(realSecondsSinceLastUpdate);
+          _lastSyncTime = now;
+        }
+      }
+    } catch (e) {
+      print('❌ Error updating game date: $e');
+    }
+  }
+
+  void _calculatePassiveIncome(int realSecondsPassed) {
+    // Get all released songs
+    final releasedSongs = artistStats.songs.where((s) => s.state == SongState.released).toList();
+    
+    if (releasedSongs.isEmpty) return;
+    
+    // Calculate streams per second for each song based on quality and platforms
+    double totalIncomePerSecond = 0;
+    int totalStreamsGained = 0;
+    
+    for (final song in releasedSongs) {
+      // Streams scale with artist fame and song quality
+      // Early game: very few streams, late game: meaningful income
+      final qualityFactor = song.finalQuality / 100.0; // 0-1 range
+      final fameFactor = (artistStats.fame / 100.0).clamp(0.1, 10.0); // 0.1x to 10x multiplier
+      final fanbaseFactor = (artistStats.fanbase / 1000.0).clamp(0.1, 5.0); // Fanbase matters
+      
+      // Much more conservative streaming - realistic artist journey
+      final baseStreamsPerSecond = 0.01 * qualityFactor; // 0-0.01 streams/sec base
+      final scaledStreams = baseStreamsPerSecond * fameFactor * fanbaseFactor;
+      final streamsGained = (scaledStreams * realSecondsPassed).round();
+      
+      // Calculate income based on platforms (realistic rates)
+      double incomeForThisSong = 0;
+      for (final platformId in song.streamingPlatforms) {
+        if (platformId == 'tunify') {
+          incomeForThisSong += streamsGained * 0.003; // $0.003 per stream (Spotify rate)
+        } else if (platformId == 'maple_music') {
+          incomeForThisSong += streamsGained * 0.01; // $0.01 per stream (premium platform)
+        }
+      }
+      
+      totalIncomePerSecond += incomeForThisSong / realSecondsPassed;
+      totalStreamsGained += streamsGained;
+      
+      // Update song with new stream count
+      final songIndex = artistStats.songs.indexOf(song);
+      if (songIndex != -1) {
+        artistStats.songs[songIndex] = song.copyWith(
+          streams: song.streams + streamsGained,
+        );
+      }
+    }
+    
+    // Only update if we earned something meaningful (avoid tiny fractions)
+    if (totalStreamsGained > 0) {
+      final totalIncome = (totalIncomePerSecond * realSecondsPassed);
+      
+      setState(() {
+        artistStats = artistStats.copyWith(
+          money: artistStats.money + totalIncome.round(),
+          songs: List.from(artistStats.songs), // Create new list to trigger update
+        );
+      });
+      
+      // Show notification for significant income (every $100+)
+      if (totalIncome >= 100 && DateTime.now().difference(_lastPassiveIncomeTime ?? DateTime.now()).inSeconds > 60) {
+        _lastPassiveIncomeTime = DateTime.now();
+        print('💰 Passive income: \$${totalIncome.toStringAsFixed(2)} from $totalStreamsGained streams');
+        _addNotification(
+          'Streaming Income',
+          'Your ${releasedSongs.length} song${releasedSongs.length > 1 ? 's' : ''} earned \$${totalIncome.toStringAsFixed(0)} from $totalStreamsGained streams!',
+          icon: Icons.music_note,
+        );
+      }
+    }
   }
 
   void _showMessage(String message) {
@@ -224,6 +384,166 @@ class _DashboardScreenState extends State<DashboardScreen> {
         duration: const Duration(seconds: 2),
         backgroundColor: const Color(0xFF32FF32),
       ),
+    );
+  }
+
+  void _addNotification(String title, String message, {IconData icon = Icons.info_outline}) {
+    setState(() {
+      _notifications.insert(0, {
+        'title': title,
+        'message': message,
+        'icon': icon,
+        'time': DateTime.now(),
+      });
+      // Keep only last 20 notifications
+      if (_notifications.length > 20) {
+        _notifications.removeLast();
+      }
+    });
+  }
+
+  void _showNotifications() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF21262D),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            constraints: const BoxConstraints(maxHeight: 600, maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.notifications, color: Color(0xFFFF6B9D), size: 24),
+                        SizedBox(width: 8),
+                        Text(
+                          'Notifications',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_notifications.isNotEmpty)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _notifications.clear();
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Clear All',
+                          style: TextStyle(color: Color(0xFFFF6B9D)),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: Colors.white24),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _notifications.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.notifications_none, color: Colors.white38, size: 64),
+                              SizedBox(height: 16),
+                              Text(
+                                'No notifications yet',
+                                style: TextStyle(color: Colors.white38, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _notifications.length,
+                          itemBuilder: (context, index) {
+                            final notification = _notifications[index];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2D333B),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white12),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    notification['icon'] as IconData,
+                                    color: const Color(0xFF00D9FF),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          notification['title'] as String,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          notification['message'] as String,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00D9FF),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -254,143 +574,178 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTopStatusBar() {
-    // Use game time instead of real time
-    final gameTime = currentGameDate;
-    final timeString = '${gameTime.hour.toString().padLeft(2, '0')}:${gameTime.minute.toString().padLeft(2, '0')}';
-    final dateString = '${_getMonthName(gameTime.month)} ${gameTime.day}, ${gameTime.year}';
-    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            '\$${(artistStats.money / 1000000).toStringAsFixed(1)}M',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2D1B69), // Deep purple
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFF00D9FF).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.public,
-                  color: Color(0xFF00D9FF),
-                  size: 14,
+          // Date-only display (simplified!)
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, color: Color(0xFF00D9FF), size: 18),
+              const SizedBox(width: 8),
+              Text(
+                currentGameDate != null
+                    ? _gameTimeService.formatGameDate(currentGameDate!)
+                    : 'Syncing...',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 6),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D9FF).withOpacity(0.2),
+                  border: Border.all(color: const Color(0xFF00D9FF), width: 1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  '1h = 1 day',
+                  style: TextStyle(
+                    color: Color(0xFF00D9FF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // Money and Energy Display
+          Row(
+            children: [
+              // Money
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF32D74B).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF32D74B), width: 1.5),
+                ),
+                child: Row(
                   children: [
+                    const Icon(Icons.attach_money, color: Color(0xFF32D74B), size: 16),
+                    const SizedBox(width: 4),
                     Text(
-                      timeString,
+                      _formatMoney(artistStats.money.toDouble()),
                       style: const TextStyle(
-                        color: Color(0xFF00D9FF), // Cyan blue
-                        fontSize: 16,
+                        color: Color(0xFF32D74B),
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      dateString,
-                      style: TextStyle(
-                        color: const Color(0xFF00D9FF).withOpacity(0.8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    // Time conversion indicator
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF6B9D).withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        '1h = 1 day ⚡',
-                        style: TextStyle(
-                          color: Color(0xFFFF6B9D),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Show global time sync indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF32D74B).withOpacity(0.2), // Green
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.sync,
-                  color: Color(0xFF32D74B),
-                  size: 10,
+              ),
+              const SizedBox(width: 8),
+              // Energy
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B9D).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFF6B9D), width: 1.5),
                 ),
-                SizedBox(width: 4),
-                Text(
-                  'SYNCED',
-                  style: TextStyle(
-                    color: Color(0xFF32D74B),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                child: Row(
+                  children: [
+                    const Icon(Icons.bolt, color: Color(0xFFFF6B9D), size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${artistStats.energy}',
+                      style: const TextStyle(
+                        color: Color(0xFFFF6B9D),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          // Notification and Settings Buttons
+          Row(
+            children: [
+              // Notification Button
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined, color: Colors.white70),
+                    onPressed: () {
+                      _showNotifications();
+                    },
+                  ),
+                  if (_notifications.isNotEmpty)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF6B9D),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '${_notifications.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              // Settings Button
+              IconButton(
+                icon: const Icon(Icons.settings, color: Colors.white70),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SettingsScreen(
+                        artistStats: artistStats,
+                        onStatsUpdated: (updatedStats) {
+                          setState(() {
+                            artistStats = updatedStats;
+                      });
+                      _saveUserProfile();
+                    },
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
-          const SizedBox(width: 8),
-          // Online mode indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: (_isOnlineMode ? const Color(0xFF32D74B) : const Color(0xFF8E8E93)).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isOnlineMode ? Icons.cloud_done : Icons.cloud_off,
-                  color: _isOnlineMode ? const Color(0xFF32D74B) : const Color(0xFF8E8E93),
-                  size: 12,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _isOnlineMode ? 'ONLINE' : 'OFFLINE',
-                  style: TextStyle(
-                    color: _isOnlineMode ? const Color(0xFF32D74B) : const Color(0xFF8E8E93),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  String _formatMoney(double amount) {
+    if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(1)}K';
+    } else {
+      return '\$${amount.toStringAsFixed(0)}';
+    }
   }
 
   String _getMonthName(int month) {
@@ -406,34 +761,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       child: Row(
         children: [
-          _buildAdvancedStatusCard(
-            'Fame',
-            artistStats.fame,
-            100, // Max value for progress bar
-            Icons.stars_rounded,
-            const Color(0xFFE94560), // Red
-            const Color(0xFF16213E), // Dark blue
-            'Rising Star',
+          Expanded(
+            child: _buildAdvancedStatusCard(
+              'Fame',
+              artistStats.fame,
+              100, // Max value for progress bar
+              Icons.stars_rounded,
+              const Color(0xFFE94560), // Red
+              const Color(0xFF16213E), // Dark blue
+              'Rising Star',
+            ),
           ),
           const SizedBox(width: 8),
-          _buildAdvancedStatusCard(
-            'Hype', 
-            artistStats.creativity,
-            500, // Max value for progress bar
-            Icons.whatshot_rounded,
-            const Color(0xFF9B59B6), // Purple
-            const Color(0xFF2C3E50), // Dark slate
-            'Viral',
+          Expanded(
+            child: _buildAdvancedStatusCard(
+              'Hype', 
+              artistStats.creativity,
+              500, // Max value for progress bar
+              Icons.whatshot_rounded,
+              const Color(0xFF9B59B6), // Purple
+              const Color(0xFF2C3E50), // Dark slate
+              'Viral',
+            ),
           ),
           const SizedBox(width: 8),
-          _buildAdvancedStatusCard(
-            'Level',
-            artistStats.fanbase,
-            50, // Max value for progress bar
-            Icons.military_tech_rounded,
-            const Color(0xFFF39C12), // Orange
-            const Color(0xFF1A252F), // Dark navy
-            'Pro',
+          Expanded(
+            child: _buildAdvancedStatusCard(
+              'Level',
+              artistStats.fanbase,
+              50, // Max value for progress bar
+              Icons.military_tech_rounded,
+              const Color(0xFFF39C12), // Orange
+              const Color(0xFF1A252F), // Dark navy
+              'Pro',
+            ),
           ),
         ],
       ),
@@ -550,11 +911,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildAdvancedStatusCard(String title, int value, int maxValue, IconData icon, Color primaryColor, Color backgroundColor, String status) {
     double progress = (value / maxValue).clamp(0.0, 1.0);
     
-    return Expanded(
-      child: Container(
-        height: 110,
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        decoration: BoxDecoration(
+    return Container(
+      height: 110,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [backgroundColor, backgroundColor.withOpacity(0.8)],
             begin: Alignment.topCenter,
@@ -687,7 +1047,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -733,8 +1092,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),                    Text(
-                      '${artistStats.getCurrentAge(currentGameDate)} years old • ${artistStats.careerLevel}',
+                    ),
+                    Text(
+                      currentGameDate != null
+                          ? '${artistStats.getCurrentAge(currentGameDate!)} years old • ${artistStats.careerLevel}'
+                          : '${artistStats.age} years old • ${artistStats.careerLevel}',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.8),
                         fontSize: 14,
@@ -907,7 +1269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _buildCareerCard('Songs Written', '${artistStats.songsWritten}', Icons.music_note, const Color(0xFF00D9FF)),
                 _buildCareerCard('Albums Sold', '${artistStats.albumsSold}K', Icons.album, const Color(0xFFFF6B9D)),
-                _buildCareerCard('Concerts', '${artistStats.concertsPerformed}', Icons.stadium, const Color(0xFF7C3AED)),
+                _buildCareerCard('Fanbase', '${artistStats.fanbase}', Icons.people, const Color(0xFF7C3AED)),
                 _buildCareerCard('Energy', '${artistStats.energy}%', Icons.bolt, const Color(0xFFF59E0B)),
               ],
             ),
@@ -951,7 +1313,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisCount: 3,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.95,
+              childAspectRatio: 2.0,
               children: [
                 _buildActionCard(
                   'Write Song',
@@ -962,18 +1324,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   customCostText: '15-40',
                 ),
                 _buildActionCard(
-                  'Concert',
-                  Icons.mic_rounded,
-                  const Color(0xFFFF6B9D),
-                  energyCost: 30,
-                  onTap: () => _performAction('concert'),
-                ),
-                _buildActionCard(
-                  'Album',
+                  'Studio',
                   Icons.album_rounded,
                   const Color(0xFF9B59B6),
-                  energyCost: 40,
-                  onTap: () => _performAction('record_album'),
+                  energyCost: -1,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StudiosListScreen(
+                          artistStats: artistStats,
+                          onStatsUpdated: (updatedStats) {
+                            setState(() {
+                              artistStats = updatedStats;
+                            });
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  customCostText: 'Record',
                 ),
                 _buildActionCard(
                   'Practice',
@@ -983,18 +1353,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onTap: () => _performAction('practice'),
                 ),
                 _buildActionCard(
-                  'Social',
-                  Icons.share_rounded,
-                  const Color(0xFF32D74B),
+                  'Promote',
+                  Icons.campaign_rounded,
+                  const Color(0xFFFF6B9D),
                   energyCost: 10,
                   onTap: () => _performAction('social_media'),
-                ),
-                _buildActionCard(
-                  'Rest',
-                  Icons.bed_rounded,
-                  const Color(0xFF8E8E93),
-                  energyCost: -50,
-                  onTap: () => _performAction('rest'),
                 ),
               ],
             ),
@@ -1033,46 +1396,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ] : [],
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(canPerform ? 0.2 : 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
                   color: canPerform ? Colors.white : Colors.white.withOpacity(0.5),
-                  size: 22,
+                  size: 18,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  color: canPerform ? Colors.white : Colors.white.withOpacity(0.5),
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: canPerform ? Colors.white : Colors.white.withOpacity(0.5),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      customCostText ?? (energyCost < 0 ? '+${-energyCost}' : '-$energyCost'),
+                      style: TextStyle(
+                        color: canPerform 
+                            ? (energyCost < 0 ? const Color(0xFF32D74B) : Colors.white.withOpacity(0.7))
+                            : Colors.white.withOpacity(0.3),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                customCostText ?? (energyCost < 0 ? '+${-energyCost}' : '-$energyCost'),
-                style: TextStyle(
-                  color: canPerform 
-                      ? (energyCost < 0 ? const Color(0xFF32D74B) : Colors.white.withOpacity(0.7))
-                      : Colors.white.withOpacity(0.3),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -1088,29 +1457,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _showSongWritingDialog();
           }
           break;
-        case 'concert':
-          if (artistStats.energy >= 30) {
-            artistStats = artistStats.copyWith(
-              energy: artistStats.energy - 30,
-              concertsPerformed: artistStats.concertsPerformed + 1,
-              fame: artistStats.fame + 10,
-              money: artistStats.money + 50000,
-            );
-            _showMessage('🎤 Great concert! Fame +10, +\$50K');
-          }
-          break;
+        // Concert feature removed
         case 'record_album':
-          if (artistStats.energy >= 40 && artistStats.songsWritten >= 3) {
+          // Count recorded songs (not yet released)
+          final recordedSongs = artistStats.songs.where((s) => s.state == SongState.recorded).length;
+          
+          if (artistStats.energy >= 40 && recordedSongs >= 3) {
+            // Find the 3 recorded songs to use for the album
+            final songsToRelease = artistStats.songs.where((s) => s.state == SongState.recorded).take(3).toList();
+            
+            // Update those songs to released state
+            final updatedSongs = artistStats.songs.map((song) {
+              if (songsToRelease.contains(song)) {
+                return song.copyWith(
+                  state: SongState.released,
+                  releasedDate: currentGameDate,
+                );
+              }
+              return song;
+            }).toList();
+            
+            // Calculate album earnings based on fame and song quality
+            final avgQuality = songsToRelease.map((s) => s.finalQuality).reduce((a, b) => a + b) / songsToRelease.length;
+            final baseAlbumRevenue = 2000; // Base album advance
+            final qualityBonus = (avgQuality / 100) * 3000; // Up to $3K for quality
+            final fameBonus = artistStats.fame * 50; // $50 per fame point
+            final albumEarnings = (baseAlbumRevenue + qualityBonus + fameBonus).round();
+            final fameGain = 5 + (avgQuality ~/ 20); // 5-10 fame based on quality
+            
             artistStats = artistStats.copyWith(
               energy: artistStats.energy - 40,
               albumsSold: artistStats.albumsSold + 1,
-              songsWritten: artistStats.songsWritten - 3, // Use 3 songs for album
-              money: artistStats.money + 200000,
-              fame: artistStats.fame + 15,
+              money: artistStats.money + albumEarnings,
+              fame: artistStats.fame + fameGain,
+              songs: updatedSongs,
+              fanbase: artistStats.fanbase + (50 + (fameGain * 10)), // Album releases attract more fans
             );
-            _showMessage('💿 Album released! Fame +15, +\$200K');
-          } else if (artistStats.songsWritten < 3) {
-            _showMessage('❌ Need at least 3 songs to record an album');
+            _showMessage('💿 Album released! Fame +$fameGain, +\$${albumEarnings.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}\n3 songs now streaming!');
+            _addNotification(
+              'Album Released!',
+              'Your new album is out! Gained +$fameGain Fame and earned \$${albumEarnings.toStringAsFixed(0)}. Your songs are now earning passive income!',
+              icon: Icons.album_rounded,
+            );
+          } else if (recordedSongs < 3) {
+            _showMessage('❌ Need at least 3 RECORDED songs to release an album\nGo to the Studio to record your written songs!');
           }
           break;        case 'practice':
           if (artistStats.energy >= 15) {
@@ -1168,13 +1558,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
             _showMessage('📱 Posted on social media! Hype +2, Fame +3');
           }
-          break;
-        case 'rest':
-          int energyGain = (100 - artistStats.energy).clamp(0, 50);
-          artistStats = artistStats.copyWith(
-            energy: (artistStats.energy + energyGain).clamp(0, 100),
-          );
-          _showMessage('😴 You rested and gained $energyGain energy');
           break;
       }
     });  }
@@ -1819,9 +2202,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Map<String, int> skillGains = artistStats.calculateSkillGains(genre, effort, songQuality);
     int energyCost = _getEnergyCostForEffort(effort);
     
-    // Calculate rewards based on quality
-    int moneyGain = ((songQuality / 100) * 50000 * effort).round();
-    int fameGain = ((songQuality / 100) * 10 * effort).round();
+    // Calculate rewards based on quality (much more modest)
+    // Writing songs shouldn't make you rich - performing and releasing them should
+    int moneyGain = ((songQuality / 100) * 100 * effort).round(); // Max $300 for excellent song with max effort
+    int fameGain = ((songQuality / 100) * 2 * effort).round(); // Max 6 fame for excellent song
     int creativityGain = effort * 2;
     
     // Create the new song object
@@ -1909,11 +2293,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
               ),
             ),
-          );        } else if (index == 3) { // Tunify tab -> Tunify Platform
+          );        } else if (index == 3) { // Media tab -> All Media Platforms
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TunifyScreen(
+              builder: (context) => MediaHubScreen(
                 artistStats: artistStats,
                 onStatsUpdated: (updatedStats) {
                   setState(() {
@@ -1960,8 +2344,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icon(Icons.music_note),
           label: 'Music',
         ),        BottomNavigationBarItem(
-          icon: Icon(Icons.queue_music),
-          label: 'Tunify',
+          icon: Icon(Icons.camera_alt_rounded),
+          label: 'Media',
         ),        BottomNavigationBarItem(
           icon: Icon(Icons.public),
           label: 'World',
@@ -1971,7 +2355,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _getNavItemName(int index) {
-    const names = ['Home', 'Activity', 'Music', 'Tunify', 'World'];
+    const names = ['Home', 'Activity', 'Music', 'Media', 'World'];
     return names[index];
   }
 
@@ -2036,6 +2420,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initializeOnlineMode() async {
     if (_isInitializing) return; // Prevent multiple initialization attempts
     
+    // Check if mounted before setState
+    if (!mounted) return;
+    
     setState(() {
       _isInitializing = true;
     });
@@ -2046,6 +2433,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         print('Firebase is available, attempting real Firebase service...');
         _multiplayerService = FirebaseService();
         await _multiplayerService.signInAnonymously();
+        
+        // Check if still mounted after async operation
+        if (!mounted) return;
         
         if (_multiplayerService.isSignedIn) {
           setState(() {
@@ -2062,10 +2452,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('Firebase connection failed: $e');
     }
 
+    // Check if still mounted before fallback
+    if (!mounted) return;
+
     // Fallback to demo service
     print('Using demo service...');
     _multiplayerService = DemoFirebaseService();
     final success = await _multiplayerService.signInAnonymously();
+    
+    // Check if still mounted after async operation
+    if (!mounted) return;
     
     setState(() {
       _isOnlineMode = success;

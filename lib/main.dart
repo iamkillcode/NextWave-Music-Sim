@@ -25,8 +25,14 @@ Future<void> _initializeFirebase() async {
         throw Exception('Firebase initialization timeout - check internet connection or try another platform (Windows/Android)');
       },
     );
+    
+    // Set persistence to LOCAL for web to keep user signed in
+    // This ensures auth state persists across hot reloads and app restarts
+    await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    
     FirebaseStatus.setInitialized(true);
     print('✅ Firebase initialization successful');
+    print('✅ Auth persistence set to LOCAL');
   } catch (e) {
     FirebaseStatus.setInitialized(false, e.toString());
     print('❌ Firebase initialization failed: $e');
@@ -55,20 +61,42 @@ class MusicArtistApp extends StatelessWidget {
         ),
       ),
       home: _getInitialScreen(),
+      routes: {
+        '/auth': (context) => const AuthScreen(),
+        '/dashboard': (context) => const DashboardScreen(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }
 
   Widget _getInitialScreen() {
-    // Check if user is already authenticated
-    final currentUser = FirebaseAuth.instance.currentUser;
-    
-    if (currentUser != null) {
-      // User is signed in, go to dashboard
-      return const DashboardScreen();
-    } else {
-      // User is not signed in, show auth screen
-      return const AuthScreen();
-    }
+    // Use StreamBuilder to listen for auth state changes
+    // This ensures the UI updates when auth state changes (login/logout)
+    // and persists across hot reloads
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading screen while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF0D1117),
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF00D9FF),
+              ),
+            ),
+          );
+        }
+        
+        // Check if user is authenticated
+        if (snapshot.hasData && snapshot.data != null) {
+          // User is signed in, go to dashboard
+          return const DashboardScreen();
+        } else {
+          // User is not signed in, show auth screen
+          return const AuthScreen();
+        }
+      },
+    );
   }
 }

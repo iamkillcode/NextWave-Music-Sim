@@ -8,22 +8,22 @@ class GameTimeService {
   static const int hoursPerGameDay = 1;
   
   /// Initialize the global game time system in Firestore
-  /// This should only run once when the first player joins
   Future<void> initializeGameTime() async {
     try {
       final gameSettingsRef = _firestore.collection('gameSettings').doc('globalTime');
       final doc = await gameSettingsRef.get();
       
       if (!doc.exists) {
-        // First time initialization - set the anchor point
-        final realWorldStartDate = DateTime(2025, 10, 1, 0, 0); // Oct 1, 2025 00:00
-        final gameWorldStartDate = DateTime(2020, 1, 1); // Jan 1, 2020
+        // Use server timestamp for precision
+        final realWorldStartDate = DateTime(2025, 10, 1, 0, 0);
+        final gameWorldStartDate = DateTime(2020, 1, 1);
         
         await gameSettingsRef.set({
           'realWorldStartDate': Timestamp.fromDate(realWorldStartDate),
           'gameWorldStartDate': Timestamp.fromDate(gameWorldStartDate),
-          'hoursPerDay': hoursPerGameDay, // 1 real hour = 1 game day
+          'hoursPerDay': hoursPerGameDay,
           'description': '1 real world hour equals 1 in-game day',
+          'lastUpdated': FieldValue.serverTimestamp(), // Use server time
         });
         
         print('✅ Game time system initialized!');
@@ -36,7 +36,8 @@ class GameTimeService {
     }
   }
   
-  /// Get the current synchronized game date based on real-world time elapsed
+  /// Get the current synchronized game date based on FIREBASE SERVER TIME
+  /// Pure date-only system: 1 real hour = 1 game day
   Future<DateTime> getCurrentGameDate() async {
     try {
       final gameSettingsRef = _firestore.collection('gameSettings').doc('globalTime');
@@ -46,36 +47,37 @@ class GameTimeService {
         final data = doc.data()!;
         final realWorldStartDate = (data['realWorldStartDate'] as Timestamp).toDate();
         final gameWorldStartDate = (data['gameWorldStartDate'] as Timestamp).toDate();
-        final hoursPerDay = data['hoursPerDay'] as int;
+        // hoursPerDay is now implicit: always 1 real hour = 1 game day
         
-        // Calculate how much real time has passed
-        final now = DateTime.now();
-        final totalRealMinutes = now.difference(realWorldStartDate).inMinutes;
+        // CRITICAL: Use Firebase server time, not device time
+        // This ensures all users calculate from the exact same moment
+        final serverTimeRef = _firestore.collection('serverTime').doc('current');
+        await serverTimeRef.set({'timestamp': FieldValue.serverTimestamp()});
+        final serverTimeDoc = await serverTimeRef.get();
+        final serverTimestamp = serverTimeDoc.data()?['timestamp'] as Timestamp?;
         
-        // Convert to game time: 1 real hour = 1 game day
-        // So 1 real minute = 24 game minutes (60 min / 1 day = 1440 min)
-        final gameDays = totalRealMinutes ~/ 60; // Full days
-        final remainingMinutes = totalRealMinutes % 60; // Minutes within the hour
+        final now = serverTimestamp?.toDate() ?? DateTime.now();
         
-        // Convert remaining real minutes to game hours
-        // 60 real minutes = 24 game hours, so 1 real minute = 24/60 = 0.4 game hours
-        final gameHours = (remainingMinutes * 24 / 60).floor();
-        final gameMinutes = ((remainingMinutes * 24 % 60)).floor();
+        // Calculate real HOURS elapsed (not seconds) - simplified!
+        final realHoursElapsed = now.difference(realWorldStartDate).inHours;
         
-        // Calculate current game date with time
-        final currentGameDate = gameWorldStartDate.add(
-          Duration(days: gameDays, hours: gameHours, minutes: gameMinutes)
-        );
+        // Convert to game days: 1 real hour = 1 game day
+        final gameDaysElapsed = realHoursElapsed;
+        
+        // Calculate current game date (add days only, no time component)
+        final calculatedDate = gameWorldStartDate.add(Duration(days: gameDaysElapsed));
+        
+        // Return date at midnight (strip time component)
+        final currentGameDate = DateTime(calculatedDate.year, calculatedDate.month, calculatedDate.day);
         
         return currentGameDate;
       } else {
-        // Fallback if not initialized
-        print('⚠️ Game time not initialized, using fallback');
+        print('⚠️ Game time not initialized');
         return DateTime(2020, 1, 1);
       }
     } catch (e) {
       print('❌ Error getting game date: $e');
-      return DateTime(2020, 1, 1); // Fallback
+      return DateTime(2020, 1, 1);
     }
   }
   
@@ -84,9 +86,10 @@ class GameTimeService {
     return DateFormat('MMMM d, yyyy').format(gameDate);
   }
   
-  /// Format game time for display
+  /// Format game time for display (deprecated - date-only system)
   String formatGameTime(DateTime gameDate) {
-    return DateFormat('HH:mm').format(gameDate);
+    // Return empty string since we no longer track time
+    return '';
   }
   
   /// Calculate player age based on career start date and current game date
@@ -95,7 +98,7 @@ class GameTimeService {
     return startingAge + yearsElapsed;
   }
   
-  /// Get time until next game day (for scheduling features)
+  /// Get time until next game day
   Duration getTimeUntilNextGameDay() {
     final now = DateTime.now();
     final nextHour = DateTime(now.year, now.month, now.day, now.hour + 1);
@@ -106,13 +109,5 @@ class GameTimeService {
   bool hasDatePassed(DateTime scheduledGameDate, DateTime currentGameDate) {
     return currentGameDate.isAfter(scheduledGameDate) || 
            currentGameDate.isAtSameMomentAs(scheduledGameDate);
-  }
-  
-  /// Convert a real-world duration to game time duration
-  Duration convertRealToGameDuration(Duration realDuration) {
-    // 1 real hour = 1 game day = 24 game hours
-    final realHours = realDuration.inHours;
-    final gameDays = realHours; // Direct 1:1 conversion
-    return Duration(days: gameDays);
   }
 }

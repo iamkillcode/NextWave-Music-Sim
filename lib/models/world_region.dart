@@ -34,12 +34,13 @@ class WorldRegion {
   double get costOfLivingMultiplier {
     switch (id) {
       case 'usa': return 1.2;
-      case 'europe': return 1.1;
+      case 'canada': return 1.15;
       case 'uk': return 1.15;
-      case 'asia': return 0.8;
-      case 'africa': return 0.6;
-      case 'latin_america': return 0.7;
+      case 'europe': return 1.1;
       case 'oceania': return 1.05;
+      case 'asia': return 0.8;
+      case 'latin_america': return 0.7;
+      case 'africa': return 0.6;
       default: return 1.0;
     }
   }
@@ -149,6 +150,69 @@ class WorldRegion {
           'afrobeat': 0.55,
           'reggae': 0.5,
           'country': 0.25,
+        },
+      ),
+      WorldRegion(
+        id: 'latin_america',
+        name: 'Latin America',
+        flag: '🌎',
+        description: 'Vibrant Latin trap and reggaeton scene.',
+        popularGenres: ['Hip Hop', 'Trap', 'Reggae', 'R&B'],
+        marketSize: 0.9,
+        avgIncomeLevel: 0.65,
+        timezone: 'COT/BRT',
+        genrePopularity: {
+          'reggae': 0.95,
+          'hip hop': 0.9,
+          'trap': 0.85,
+          'r&b': 0.75,
+          'rap': 0.8,
+          'drill': 0.55,
+          'afrobeat': 0.65,
+          'jazz': 0.6,
+          'country': 0.4,
+        },
+      ),
+      WorldRegion(
+        id: 'oceania',
+        name: 'Oceania',
+        flag: '🇦🇺',
+        description: 'Australia and New Zealand\'s booming hip-hop scene.',
+        popularGenres: ['Hip Hop', 'R&B', 'Trap', 'Rock'],
+        marketSize: 0.5,
+        avgIncomeLevel: 1.1,
+        timezone: 'AEST',
+        genrePopularity: {
+          'hip hop': 0.9,
+          'r&b': 0.85,
+          'trap': 0.8,
+          'rap': 0.75,
+          'reggae': 0.7,
+          'drill': 0.65,
+          'afrobeat': 0.6,
+          'jazz': 0.65,
+          'country': 0.55,
+        },
+      ),
+      WorldRegion(
+        id: 'canada',
+        name: 'Canada',
+        flag: '🇨🇦',
+        description: 'Home of Drake and The Weeknd, modern hip-hop powerhouse.',
+        popularGenres: ['Hip Hop', 'R&B', 'Rap', 'Trap'],
+        marketSize: 0.6,
+        avgIncomeLevel: 1.15,
+        timezone: 'EST/PST',
+        genrePopularity: {
+          'hip hop': 0.95,
+          'r&b': 0.9,
+          'rap': 0.85,
+          'trap': 0.8,
+          'drill': 0.75,
+          'jazz': 0.7,
+          'reggae': 0.6,
+          'afrobeat': 0.65,
+          'country': 0.5,
         },
       ),
     ];

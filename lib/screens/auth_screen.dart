@@ -134,33 +134,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _handleGuestMode() async {
-    setState(() => _isLoading = true);
-
-    try {
-      // Sign in anonymously
-      final credential = await FirebaseAuth.instance.signInAnonymously();
-      
-      if (mounted && credential.user != null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => OnboardingScreen(user: credential.user!, isGuest: true),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -277,23 +250,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   ),
 
                   const SizedBox(height: 24),
-
-                  // Guest Mode Button
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _handleGuestMode,
-                    icon: const Icon(Icons.person_outline),
-                    label: const Text('Continue as Guest'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white70,
-                      side: const BorderSide(color: Colors.white30),
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
 
                   // Firebase Status
                   if (!FirebaseStatus.isInitialized)

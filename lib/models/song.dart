@@ -13,6 +13,8 @@ class Song {
   final Map<String, dynamic> metadata;
   final String? coverArtStyle; // e.g., 'minimalist', 'abstract', 'photo', 'illustration'
   final String? coverArtColor; // Primary color theme
+  final List<String> streamingPlatforms; // List of platform IDs like ['tunify', 'maple_music']
+  final String? coverArtUrl; // Uploaded cover art image URL
 
   const Song({
     required this.id,
@@ -29,6 +31,8 @@ class Song {
     this.metadata = const {},
     this.coverArtStyle,
     this.coverArtColor,
+    this.streamingPlatforms = const [],
+    this.coverArtUrl,
   });
 
   Song copyWith({
@@ -46,6 +50,8 @@ class Song {
     Map<String, dynamic>? metadata,
     String? coverArtStyle,
     String? coverArtColor,
+    List<String>? streamingPlatforms,
+    String? coverArtUrl,
   }) {
     return Song(
       id: id ?? this.id,
@@ -62,6 +68,8 @@ class Song {
       metadata: metadata ?? this.metadata,
       coverArtStyle: coverArtStyle ?? this.coverArtStyle,
       coverArtColor: coverArtColor ?? this.coverArtColor,
+      streamingPlatforms: streamingPlatforms ?? this.streamingPlatforms,
+      coverArtUrl: coverArtUrl ?? this.coverArtUrl,
     );
   }
 
