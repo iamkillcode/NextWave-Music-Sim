@@ -7,6 +7,8 @@ import '../models/song.dart';
 import '../services/firebase_service.dart';
 import '../services/demo_firebase_service.dart';
 import '../services/game_time_service.dart';
+import '../services/stream_growth_service.dart';
+import '../services/song_name_generator.dart';
 import 'leaderboard_screen.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
@@ -14,6 +16,7 @@ import 'media_hub_screen.dart';
 import 'studios_list_screen.dart';
 import '../utils/firebase_status.dart';
 import 'settings_screen.dart';
+import 'regional_charts_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -36,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isInitializing = false;
   bool _isDateSynced = false; // Track if we've synced the date at least once
   final GameTimeService _gameTimeService = GameTimeService();
+  final StreamGrowthService _streamGrowthService = StreamGrowthService();
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
 
   @override
@@ -53,7 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     artistStats = ArtistStats(
       name: "Loading...",
       fame: 0,
-      money: 500, // Starting money - just starting out with minimal budget!
+      money: 1000, // Starting money - just starting out!
       energy: 100,
       creativity: 0, // No hype yet - you're just starting!
       fanbase: 1,
@@ -174,6 +178,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final data = doc.data()!;
         print('✅ Profile loaded: ${data['displayName']}');
         
+        // Load songs from Firebase
+        List<Song> loadedSongs = [];
+        if (data['songs'] != null) {
+          try {
+            final songsList = data['songs'] as List<dynamic>;
+            loadedSongs = songsList
+                .map((songData) => Song.fromJson(Map<String, dynamic>.from(songData)))
+                .toList();
+            print('✅ Loaded ${loadedSongs.length} songs from Firebase');
+          } catch (e) {
+            print('⚠️ Error loading songs: $e');
+          }
+        }
+        
+        // Load regional fanbase with proper deserialization
+        Map<String, int> loadedRegionalFanbase = {};
+        if (data['regionalFanbase'] != null) {
+          try {
+            final regionalData = data['regionalFanbase'] as Map<dynamic, dynamic>;
+            loadedRegionalFanbase = regionalData.map(
+              (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+            );
+            print('✅ Loaded regional fanbase for ${loadedRegionalFanbase.length} regions');
+          } catch (e) {
+            print('⚠️ Error loading regional fanbase: $e');
+          }
+        }
+        
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? 'Unknown Artist',
@@ -182,6 +214,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             energy: 100, // Always start with full energy
             creativity: (data['inspirationLevel'] ?? 0).toInt(),
             fanbase: (data['level'] ?? 1).toInt(),
+            loyalFanbase: (data['loyalFanbase'] ?? 0).toInt(),
             albumsSold: (data['albumsReleased'] ?? 0).toInt(),
             songsWritten: (data['songsPublished'] ?? 0).toInt(),
             concertsPerformed: (data['concertsPerformed'] ?? 0).toInt(),
@@ -190,9 +223,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             lyricsSkill: (data['lyricsSkill'] ?? 10).toInt(),
             compositionSkill: (data['compositionSkill'] ?? 10).toInt(),
             inspirationLevel: (data['inspirationLevel'] ?? 0).toInt(),
+            songs: loadedSongs,
             currentRegion: data['homeRegion'] ?? 'usa',
             age: (data['age'] ?? 18).toInt(),
             careerStartDate: (data['careerStartDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            regionalFanbase: loadedRegionalFanbase,
           );
         });
       } else {
@@ -223,6 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'currentMoney': artistStats.money,
             'inspirationLevel': artistStats.inspirationLevel,
             'level': artistStats.fanbase,
+            'loyalFanbase': artistStats.loyalFanbase,
             'albumsReleased': artistStats.albumsSold,
             'songsPublished': artistStats.songsWritten,
             'concertsPerformed': artistStats.concertsPerformed,
@@ -232,6 +268,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'compositionSkill': artistStats.compositionSkill,
             'homeRegion': artistStats.currentRegion,
             'age': artistStats.age,
+            'regionalFanbase': artistStats.regionalFanbase,
+            'songs': artistStats.songs.map((song) => song.toJson()).toList(),
             if (artistStats.careerStartDate != null)
               'careerStartDate': Timestamp.fromDate(artistStats.careerStartDate!),
           })
@@ -271,6 +309,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final now = DateTime.now();
         final realSecondsSinceLastUpdate = now.difference(_lastSyncTime!).inSeconds;
         _calculatePassiveIncome(realSecondsSinceLastUpdate);
+        
+        // Apply stream growth to all released songs
+        _applyDailyStreamGrowth(newGameDate);
         
         // Update last sync time
         _lastSyncTime = now;
@@ -374,6 +415,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icons.music_note,
         );
       }
+    }
+  }
+
+  /// Apply daily stream growth to all released songs
+  void _applyDailyStreamGrowth(DateTime currentGameDate) {
+    final List<Song> updatedSongs = [];
+    int totalNewStreams = 0;
+    int totalNewIncome = 0;
+    
+    for (final song in artistStats.songs) {
+      if (song.state != SongState.released || song.releasedDate == null) {
+        updatedSongs.add(song);
+        continue;
+      }
+      
+      // Calculate stream growth for this song
+      final newStreams = _streamGrowthService.calculateDailyStreamGrowth(
+        song: song,
+        artistStats: artistStats,
+        currentGameDate: currentGameDate,
+      );
+      
+      // Distribute streams regionally
+      final regionalStreamDelta = _streamGrowthService.calculateRegionalStreamDistribution(
+        totalDailyStreams: newStreams,
+        currentRegion: artistStats.currentRegion,
+        regionalFanbase: artistStats.regionalFanbase,
+        genre: song.genre,
+      );
+      
+      // Update regional streams for the song
+      final updatedRegionalStreams = Map<String, int>.from(song.regionalStreams);
+      regionalStreamDelta.forEach((region, delta) {
+        updatedRegionalStreams[region] = (updatedRegionalStreams[region] ?? 0) + delta;
+      });
+      
+      // Update days on chart
+      final daysSinceRelease = currentGameDate.difference(song.releasedDate!).inDays + 1;
+      
+      // Check if this is a new peak
+      final newPeak = _streamGrowthService.updatePeakDailyStreams(
+        song.peakDailyStreams,
+        newStreams,
+      );
+      
+      // Calculate income from new streams (pay artists daily royalties)
+      int songIncome = 0;
+      for (final platform in song.streamingPlatforms) {
+        if (platform == 'tunify') {
+          // Tunify: 85% reach, $0.003 per stream royalty
+          songIncome += (newStreams * 0.85 * 0.003).round();
+        } else if (platform == 'maple_music') {
+          // Maple Music: 65% reach, $0.01 per stream royalty
+          songIncome += (newStreams * 0.65 * 0.01).round();
+        }
+      }
+      
+      // Update the song
+      final updatedSong = song.copyWith(
+        streams: song.streams + newStreams,
+        regionalStreams: updatedRegionalStreams,
+        daysOnChart: daysSinceRelease,
+        peakDailyStreams: newPeak,
+      );
+      
+      updatedSongs.add(updatedSong);
+      totalNewStreams += newStreams;
+      totalNewIncome += songIncome;
+      
+      print('📈 ${song.title}: +${_streamGrowthService.formatStreams(newStreams)} streams (Total: ${_streamGrowthService.formatStreams(updatedSong.streams)})');
+    }
+    
+    // Update artist stats with new songs and income
+    if (totalNewStreams > 0) {
+      setState(() {
+        artistStats = artistStats.copyWith(
+          songs: updatedSongs,
+          money: artistStats.money + totalNewIncome,
+        );
+      });
+      
+      print('💰 Total daily streaming income: \$$totalNewIncome from ${_streamGrowthService.formatStreams(totalNewStreams)} streams');
+      
+      // Show notification
+      _addNotification(
+        'Daily Streams',
+        'Your music earned ${_streamGrowthService.formatStreams(totalNewStreams)} streams and \$$totalNewIncome today!',
+        icon: Icons.trending_up,
+      );
     }
   }
 
@@ -600,77 +730,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withOpacity(0.2),
-                  border: Border.all(color: const Color(0xFF00D9FF), width: 1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  '1h = 1 day',
-                  style: TextStyle(
-                    color: Color(0xFF00D9FF),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
             ],
           ),
           // Money and Energy Display
-          Row(
-            children: [
-              // Money
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF32D74B).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF32D74B), width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.attach_money, color: Color(0xFF32D74B), size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatMoney(artistStats.money.toDouble()),
-                      style: const TextStyle(
-                        color: Color(0xFF32D74B),
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Money
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF32D74B).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF32D74B), width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.attach_money, color: Color(0xFF32D74B), size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatMoney(artistStats.money.toDouble()),
+                        style: const TextStyle(
+                          color: Color(0xFF32D74B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Energy
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B9D).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFF6B9D), width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bolt, color: Color(0xFFFF6B9D), size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${artistStats.energy}',
-                      style: const TextStyle(
-                        color: Color(0xFFFF6B9D),
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                const SizedBox(width: 8),
+                // Energy
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF6B9D).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFF6B9D), width: 1.5),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.bolt, color: Color(0xFFFF6B9D), size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${artistStats.energy}',
+                        style: const TextStyle(
+                          color: Color(0xFFFF6B9D),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-            ],
+              ],
+            ),
           ),
           // Notification and Settings Buttons
           Row(
@@ -1359,6 +1476,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   energyCost: 10,
                   onTap: () => _performAction('social_media'),
                 ),
+                _buildActionCard(
+                  'Charts',
+                  Icons.bar_chart_rounded,
+                  const Color(0xFF4CAF50),
+                  energyCost: -1,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RegionalChartsScreen(
+                          artistStats: artistStats,
+                        ),
+                      ),
+                    );
+                  },
+                  customCostText: 'View',
+                ),
               ],
             ),
           ),
@@ -1887,28 +2021,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _showMessage('🎵 Created "$songName" ($genre)!\n+${songType['creativity']} Hype, +${songType['fame']} Fame\n📈 +${skillGains['experience']} XP, Skills improved!');
   }
 
-  String _generateSongName(String genre) {
-    final songTitles = {
-      'R&B': ['Smooth Operator', 'Soul Connection', 'Midnight Vibes', 'Love Languages', 'Velvet Touch'],
-      'Hip Hop': ['Street Chronicles', 'Flow State', 'City Dreams', 'Hustle Hard', 'Crown Jewels'],
-      'Rap': ['Lyrical Genius', 'Bars & Beats', 'Mic Drop', 'Word Play', 'Real Talk'],
-      'Trap': ['Money Moves', 'Trap House', 'Bass Heavy', 'Street Life', 'Get Money'],
-      'Drill': ['No Cap', 'Block Hot', 'Drill Time', 'Street Code', 'Real One'],
-      'Afrobeat': ['Lagos Nights', 'African Queen', 'Rhythm Divine', 'Motherland', 'Tribal Beats'],
-      'Country': ['Small Town', 'Country Roads', 'Whiskey Nights', 'Southern Belle', 'Pickup Truck'],
-      'Jazz': ['Blue Notes', 'Smooth Jazz', 'Midnight Sax', 'Cool Breeze', 'Swing Time'],
-      'Reggae': ['One Love', 'Island Vibes', 'Rasta Mon', 'Good Times', 'Peaceful Mind'],
-    };
-    
-    final titles = songTitles[genre] ?? ['New Song'];
-    titles.shuffle();
-    return titles.first;
+  String _generateSongName(String genre, {int? quality}) {
+    // Use the new SongNameGenerator service
+    // Quality defaults to average skill level for quick songs
+    final songQuality = quality ?? artistStats.calculateSongQuality(genre, 2).round();
+    return SongNameGenerator.generateTitle(genre, quality: songQuality);
   }
 
   void _showCustomSongForm() {
     final TextEditingController songTitleController = TextEditingController();
     String selectedGenre = 'R&B';
     int selectedEffort = 2; // 1-4 scale
+    List<String> nameSuggestions = [];
+    
+    // Generate initial suggestions based on default genre
+    int estimatedQuality = artistStats.calculateSongQuality(selectedGenre, selectedEffort).round();
+    nameSuggestions = SongNameGenerator.getSuggestions(selectedGenre, count: 4, quality: estimatedQuality);
     
     showDialog(
       context: context,
@@ -1922,48 +2050,113 @@ class _DashboardScreenState extends State<DashboardScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                width: MediaQuery.of(context).size.width * 0.9,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    const Center(
-                      child: Text(
-                        '🎼 Create Your Song',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  width: MediaQuery.of(context).size.width * 0.9,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header
+                      const Center(
+                        child: Text(
+                          '🎼 Create Your Song',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                    // Song Title Input
-                    const Text(
-                      'Song Title:',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: songTitleController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Enter song title...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                        filled: true,
-                        fillColor: const Color(0xFF30363D),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      // Song Title Input with Generate Button
+                      Row(
+                        children: [
+                          const Text(
+                            'Song Title:',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            onPressed: () {
+                              dialogSetState(() {
+                                int quality = artistStats.calculateSongQuality(selectedGenre, selectedEffort).round();
+                                nameSuggestions = SongNameGenerator.getSuggestions(selectedGenre, count: 4, quality: quality);
+                              });
+                            },
+                            icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF00D9FF)),
+                            label: const Text(
+                              'New Ideas',
+                              style: TextStyle(color: Color(0xFF00D9FF), fontSize: 12),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: songTitleController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Enter song title or pick a suggestion...',
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                          filled: true,
+                          fillColor: const Color(0xFF30363D),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        maxLength: 50,
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Name Suggestions
+                      const Text(
+                        '💡 Suggestions:',
+                        style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: nameSuggestions.map((suggestion) {
+                          return GestureDetector(
+                            onTap: () {
+                              dialogSetState(() {
+                                songTitleController.text = suggestion;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF00D9FF).withOpacity(0.3),
+                                    const Color(0xFF9B59B6).withOpacity(0.3),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFF00D9FF).withOpacity(0.5),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                suggestion,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
 
                     // Genre Selection
                     const Text(
@@ -1997,6 +2190,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           onChanged: (value) {
                             dialogSetState(() {
                               selectedGenre = value!;
+                              // Regenerate suggestions when genre changes
+                              int quality = artistStats.calculateSongQuality(selectedGenre, selectedEffort).round();
+                              nameSuggestions = SongNameGenerator.getSuggestions(selectedGenre, count: 4, quality: quality);
                             });
                           },
                           isExpanded: true,
@@ -2021,6 +2217,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           onTap: canAfford ? () {
                             dialogSetState(() {
                               selectedEffort = effort;
+                              // Regenerate suggestions when effort changes
+                              int quality = artistStats.calculateSongQuality(selectedGenre, selectedEffort).round();
+                              nameSuggestions = SongNameGenerator.getSuggestions(selectedGenre, count: 4, quality: quality);
                             });
                           } : null,
                           child: Container(
@@ -2142,6 +2341,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
+            ),
             );
           },
         );

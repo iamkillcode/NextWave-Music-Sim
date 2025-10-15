@@ -104,9 +104,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'joinDate': Timestamp.now(),
         'lastActive': Timestamp.now(),
         'isOnline': true,
-        'currentMoney': 500, // Starting money - minimal budget to start career!
+        'currentMoney': 1000, // Starting money - just starting out!
         'currentFame': 0,
         'level': 1,
+        'loyalFanbase': 0,
         'totalStreams': 0,
         'songsPublished': 0,
         'albumsReleased': 0,
@@ -119,6 +120,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'age': _selectedAge,
         'careerStartDate': Timestamp.now(),
         'inspirationLevel': 0, // No hype yet - you're just starting!
+        'regionalFanbase': {}, // Empty regional fanbase initially
+        'songs': [], // Empty songs list initially
       };
 
       // Add timeout to prevent infinite loading

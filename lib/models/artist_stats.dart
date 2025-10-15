@@ -7,6 +7,8 @@ class ArtistStats {
   final int energy;
   final int creativity;
   final int fanbase;
+  final int loyalFanbase; // Dedicated fans who consistently stream your music
+  final Map<String, int> regionalFanbase; // Fans per region (e.g., {'usa': 500, 'europe': 200})
   final int albumsSold;
   final int songsWritten;
   final int concertsPerformed;
@@ -34,6 +36,8 @@ class ArtistStats {
     required this.energy,
     required this.creativity,
     required this.fanbase,
+    this.loyalFanbase = 0,
+    this.regionalFanbase = const {},
     required this.albumsSold,
     required this.songsWritten,
     required this.concertsPerformed,
@@ -53,6 +57,8 @@ class ArtistStats {
     int? energy,
     int? creativity,
     int? fanbase,
+    int? loyalFanbase,
+    Map<String, int>? regionalFanbase,
     int? albumsSold,
     int? songsWritten,
     int? concertsPerformed,
@@ -73,6 +79,8 @@ class ArtistStats {
       energy: energy ?? this.energy,
       creativity: creativity ?? this.creativity,
       fanbase: fanbase ?? this.fanbase,
+      loyalFanbase: loyalFanbase ?? this.loyalFanbase,
+      regionalFanbase: regionalFanbase ?? this.regionalFanbase,
       albumsSold: albumsSold ?? this.albumsSold,
       songsWritten: songsWritten ?? this.songsWritten,
       concertsPerformed: concertsPerformed ?? this.concertsPerformed,

@@ -15,6 +15,14 @@ class Song {
   final String? coverArtColor; // Primary color theme
   final List<String> streamingPlatforms; // List of platform IDs like ['tunify', 'maple_music']
   final String? coverArtUrl; // Uploaded cover art image URL
+  
+  // Stream growth tracking
+  final double viralityScore; // 0.0 to 1.0 - how viral/popular this specific song is
+  final int peakDailyStreams; // Track the song's peak performance
+  final int daysOnChart; // How many days since release
+  
+  // Regional tracking - streams per region
+  final Map<String, int> regionalStreams; // e.g., {'usa': 10000, 'europe': 5000}
 
   const Song({
     required this.id,
@@ -33,6 +41,10 @@ class Song {
     this.coverArtColor,
     this.streamingPlatforms = const [],
     this.coverArtUrl,
+    this.viralityScore = 0.5, // Default mid-range virality
+    this.peakDailyStreams = 0,
+    this.daysOnChart = 0,
+    this.regionalStreams = const {},
   });
 
   Song copyWith({
@@ -52,6 +64,10 @@ class Song {
     String? coverArtColor,
     List<String>? streamingPlatforms,
     String? coverArtUrl,
+    double? viralityScore,
+    int? peakDailyStreams,
+    int? daysOnChart,
+    Map<String, int>? regionalStreams,
   }) {
     return Song(
       id: id ?? this.id,
@@ -70,6 +86,69 @@ class Song {
       coverArtColor: coverArtColor ?? this.coverArtColor,
       streamingPlatforms: streamingPlatforms ?? this.streamingPlatforms,
       coverArtUrl: coverArtUrl ?? this.coverArtUrl,
+      viralityScore: viralityScore ?? this.viralityScore,
+      peakDailyStreams: peakDailyStreams ?? this.peakDailyStreams,
+      daysOnChart: daysOnChart ?? this.daysOnChart,
+      regionalStreams: regionalStreams ?? this.regionalStreams,
+    );
+  }
+
+  // Convert Song to JSON for Firebase storage
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'genre': genre,
+      'quality': quality,
+      'createdDate': createdDate.toIso8601String(),
+      'state': state.name,
+      'recordingQuality': recordingQuality,
+      'recordedDate': recordedDate?.toIso8601String(),
+      'releasedDate': releasedDate?.toIso8601String(),
+      'streams': streams,
+      'likes': likes,
+      'metadata': metadata,
+      'coverArtStyle': coverArtStyle,
+      'coverArtColor': coverArtColor,
+      'streamingPlatforms': streamingPlatforms,
+      'coverArtUrl': coverArtUrl,
+      'viralityScore': viralityScore,
+      'peakDailyStreams': peakDailyStreams,
+      'daysOnChart': daysOnChart,
+      'regionalStreams': regionalStreams,
+    };
+  }
+
+  // Create Song from JSON (Firebase load)
+  factory Song.fromJson(Map<String, dynamic> json) {
+    return Song(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      genre: json['genre'] as String,
+      quality: (json['quality'] as num).toInt(),
+      createdDate: DateTime.parse(json['createdDate'] as String),
+      state: SongState.values.firstWhere(
+        (e) => e.name == json['state'],
+        orElse: () => SongState.written,
+      ),
+      recordingQuality: json['recordingQuality'] as int?,
+      recordedDate: json['recordedDate'] != null 
+          ? DateTime.parse(json['recordedDate'] as String) 
+          : null,
+      releasedDate: json['releasedDate'] != null 
+          ? DateTime.parse(json['releasedDate'] as String) 
+          : null,
+      streams: (json['streams'] as num?)?.toInt() ?? 0,
+      likes: (json['likes'] as num?)?.toInt() ?? 0,
+      metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? {}),
+      coverArtStyle: json['coverArtStyle'] as String?,
+      coverArtColor: json['coverArtColor'] as String?,
+      streamingPlatforms: List<String>.from(json['streamingPlatforms'] as List? ?? []),
+      coverArtUrl: json['coverArtUrl'] as String?,
+      viralityScore: (json['viralityScore'] as num?)?.toDouble() ?? 0.5,
+      peakDailyStreams: (json['peakDailyStreams'] as num?)?.toInt() ?? 0,
+      daysOnChart: (json['daysOnChart'] as num?)?.toInt() ?? 0,
+      regionalStreams: Map<String, int>.from(json['regionalStreams'] as Map? ?? {}),
     );
   }
 

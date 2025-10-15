@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/streaming_platform.dart';
+import '../services/stream_growth_service.dart';
 
 class ReleaseSongScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -828,32 +829,75 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       final releaseDate = _releaseNow ? DateTime.now() : _scheduledDate;
       final estimatedStreams = widget.song.estimatedStreams;
       
-      // Calculate combined revenue from all selected platforms
-      double totalRevenue = 0;
-      for (final platformId in _selectedPlatforms) {
-        final platform = StreamingPlatform.getById(platformId);
-        totalRevenue += estimatedStreams * platform.royaltiesPerStream;
-      }
-      final estimatedRevenue = totalRevenue.round();
+      // Note: Revenue is now calculated daily based on actual streams
+      // Artists receive royalty payments each day, not on release
       
       final fameGain = (widget.song.finalQuality * 0.5).round();
       final fanbaseGain = (widget.song.finalQuality * 2).round();
 
-      // Update song state with cover art and platforms
+      // Calculate virality score for this song
+      final streamGrowthService = StreamGrowthService();
+      final viralityScore = streamGrowthService.calculateViralityScore(
+        songQuality: widget.song.finalQuality,
+        artistFame: widget.artistStats.fame,
+        artistFanbase: widget.artistStats.fanbase,
+      );
+      
+      // Calculate loyal fanbase growth from releasing quality music
+      final loyalFanbaseGrowth = streamGrowthService.calculateLoyalFanbaseGrowth(
+        currentLoyalFanbase: widget.artistStats.loyalFanbase,
+        songQuality: widget.song.finalQuality,
+        totalFanbase: widget.artistStats.fanbase + fanbaseGain,
+      );
+
+      // Calculate regional fanbase growth from releasing this song
+      final regionalFanbaseGrowth = streamGrowthService.calculateRegionalFanbaseGrowth(
+        currentRegion: widget.artistStats.currentRegion,
+        originRegion: widget.artistStats.currentRegion, // The region where the song is released becomes origin
+        songQuality: widget.song.finalQuality,
+        genre: widget.song.genre,
+        currentGlobalFanbase: widget.artistStats.fanbase,
+        currentRegionalFanbase: widget.artistStats.regionalFanbase,
+      );
+
+      // Update regional fanbase map
+      final updatedRegionalFanbase = Map<String, int>.from(widget.artistStats.regionalFanbase);
+      regionalFanbaseGrowth.forEach((region, growth) {
+        updatedRegionalFanbase[region] = (updatedRegionalFanbase[region] ?? 0) + growth;
+      });
+
+      // Initialize regional streams for the song (release day gets some initial streams)
+      final initialRegionalStreams = _releaseNow 
+          ? streamGrowthService.calculateRegionalStreamDistribution(
+              totalDailyStreams: (estimatedStreams * 0.1).round(),
+              currentRegion: widget.artistStats.currentRegion,
+              regionalFanbase: updatedRegionalFanbase,
+              genre: widget.song.genre,
+            )
+          : <String, int>{};
+
+      // Update song state with cover art, platforms, virality, and regional data
       final updatedSong = widget.song.copyWith(
         state: SongState.released,
         releasedDate: releaseDate,
         streams: _releaseNow ? (estimatedStreams * 0.1).round() : 0, // 10% initial streams if released now
+        regionalStreams: initialRegionalStreams,
         likes: _releaseNow ? (estimatedStreams * 0.05).round() : 0,
         coverArtUrl: _uploadedCoverArtUrl,
         streamingPlatforms: _selectedPlatforms.toList(),
+        viralityScore: viralityScore,
+        daysOnChart: 0,
+        peakDailyStreams: _releaseNow ? (estimatedStreams * 0.1).round() : 0,
       );
 
-      // Update artist stats
+      // Update artist stats with loyal fanbase growth and regional fanbase
+      // Note: Royalty payments are calculated daily, not on release
       final updatedStats = widget.artistStats.copyWith(
-        money: widget.artistStats.money + (_releaseNow ? (estimatedRevenue * 0.1).round() : 0),
+        money: widget.artistStats.money, // No immediate payment - royalties paid daily
         fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
         fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
+        loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth).clamp(0, double.infinity).toInt(),
+        regionalFanbase: updatedRegionalFanbase,
         songs: widget.artistStats.songs.map((s) => s.id == updatedSong.id ? updatedSong : s).toList(),
       );
 
