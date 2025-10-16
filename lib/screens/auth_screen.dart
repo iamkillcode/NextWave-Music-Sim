@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firebase_status.dart';
 import 'onboarding_screen.dart';
 import 'dashboard_screen_new.dart';
@@ -11,16 +12,19 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
+class _AuthScreenState extends State<AuthScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _signUpFormKey = GlobalKey<FormState>();
   final _loginFormKey = GlobalKey<FormState>();
-  
+
   // Controllers
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+  final _loginIdentifierController =
+      TextEditingController(); // For email OR artist name
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -37,6 +41,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _loginIdentifierController.dispose();
     super.dispose();
   }
 
@@ -47,10 +52,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
     try {
       // Create user with email and password
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
 
       if (mounted && credential.user != null) {
         // Navigate to onboarding
@@ -61,24 +67,49 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         );
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'An error occurred';
-      if (e.code == 'weak-password') {
-        message = 'The password is too weak.';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'An account already exists for this email.';
-      } else if (e.code == 'invalid-email') {
-        message = 'Invalid email address.';
+      String message;
+      switch (e.code) {
+        case 'weak-password':
+          message =
+              '❌ Password is too weak. Use at least 6 characters with a mix of letters and numbers.';
+          break;
+        case 'email-already-in-use':
+          message =
+              '❌ An account already exists with this email. Try logging in instead.';
+          break;
+        case 'invalid-email':
+          message =
+              '❌ Invalid email format. Please enter a valid email address.';
+          break;
+        case 'operation-not-allowed':
+          message =
+              '❌ Email/password accounts are not enabled. Contact support.';
+          break;
+        case 'network-request-failed':
+          message =
+              '❌ Network error. Check your internet connection and try again.';
+          break;
+        default:
+          message = '❌ Sign up failed: ${e.message ?? "Unknown error"}';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('❌ Unexpected error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -94,38 +125,116 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     setState(() => _isLoading = true);
 
     try {
+      final identifier = _loginIdentifierController.text.trim();
+      String emailToUse = identifier;
+
+      // Check if identifier is an email or artist name
+      if (!identifier.contains('@')) {
+        // It's an artist name - look up the email in Firestore
+        try {
+          final querySnapshot = await FirebaseFirestore.instance
+              .collection('players')
+              .where('artistName', isEqualTo: identifier)
+              .limit(1)
+              .get();
+
+          if (querySnapshot.docs.isEmpty) {
+            throw FirebaseAuthException(
+              code: 'user-not-found',
+              message: 'No artist found with name "$identifier"',
+            );
+          }
+
+          // Get the email associated with this artist name
+          final playerData = querySnapshot.docs.first.data();
+          emailToUse = playerData['email'] as String;
+
+          if (emailToUse.isEmpty) {
+            throw FirebaseAuthException(
+              code: 'invalid-credential',
+              message: 'Artist account has no email associated',
+            );
+          }
+        } on FirebaseException catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '❌ Could not find artist "$identifier": ${e.message}',
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+            setState(() => _isLoading = false);
+            return;
+          }
+        }
+      }
+
       // Sign in with email and password
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
+        email: emailToUse,
         password: _passwordController.text,
       );
 
       if (mounted) {
-        // Check if user has completed onboarding
-        // For now, navigate directly to dashboard
+        // Navigate to dashboard
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {
-      String message = 'An error occurred';
-      if (e.code == 'user-not-found') {
-        message = 'No user found with this email.';
-      } else if (e.code == 'wrong-password') {
-        message = 'Wrong password.';
-      } else if (e.code == 'invalid-email') {
-        message = 'Invalid email address.';
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message =
+              '❌ No account found. Please check your email/artist name or sign up.';
+          break;
+        case 'wrong-password':
+          message = '❌ Incorrect password. Try again or reset your password.';
+          break;
+        case 'invalid-email':
+          message =
+              '❌ Invalid email format. Please enter a valid email address.';
+          break;
+        case 'user-disabled':
+          message =
+              '❌ This account has been disabled. Contact support for help.';
+          break;
+        case 'too-many-requests':
+          message =
+              '❌ Too many failed attempts. Please wait a few minutes and try again.';
+          break;
+        case 'network-request-failed':
+          message =
+              '❌ Network error. Check your internet connection and try again.';
+          break;
+        case 'invalid-credential':
+          message =
+              '❌ Invalid email or password. Please check your credentials.';
+          break;
+        default:
+          message = '❌ Login failed: ${e.message ?? "Unknown error"}';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('❌ Unexpected error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -199,7 +308,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   // Auth Container
                   Container(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width > 600 ? 450 : double.infinity,
+                      maxWidth: MediaQuery.of(context).size.width > 600
+                          ? 450
+                          : double.infinity,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF21262D),
@@ -242,10 +353,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                           height: 400,
                           child: TabBarView(
                             controller: _tabController,
-                            children: [
-                              _buildSignUpForm(),
-                              _buildLoginForm(),
-                            ],
+                            children: [_buildSignUpForm(), _buildLoginForm()],
                           ),
                         ),
                       ],
@@ -261,16 +369,25 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       decoration: BoxDecoration(
                         color: Colors.orange.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                          Icon(
+                            Icons.warning_amber,
+                            color: Colors.orange,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           const Text(
                             'Running in Demo Mode',
-                            style: TextStyle(color: Colors.orange, fontSize: 12),
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -300,7 +417,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               decoration: InputDecoration(
                 labelText: 'Email',
                 labelStyle: const TextStyle(color: Colors.white60),
-                prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF00D9FF)),
+                prefixIcon: const Icon(
+                  Icons.email_outlined,
+                  color: Color(0xFF00D9FF),
+                ),
                 filled: true,
                 fillColor: const Color(0xFF0D1117),
                 border: OutlineInputBorder(
@@ -313,7 +433,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF00D9FF),
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
@@ -336,13 +459,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               decoration: InputDecoration(
                 labelText: 'Password',
                 labelStyle: const TextStyle(color: Colors.white60),
-                prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFF00D9FF)),
+                prefixIcon: const Icon(
+                  Icons.lock_outlined,
+                  color: Color(0xFF00D9FF),
+                ),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     color: Colors.white60,
                   ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 filled: true,
                 fillColor: const Color(0xFF0D1117),
@@ -356,7 +483,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF00D9FF),
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
@@ -379,13 +509,20 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               decoration: InputDecoration(
                 labelText: 'Confirm Password',
                 labelStyle: const TextStyle(color: Colors.white60),
-                prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFF00D9FF)),
+                prefixIcon: const Icon(
+                  Icons.lock_outlined,
+                  color: Color(0xFF00D9FF),
+                ),
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                    _obscureConfirmPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
                     color: Colors.white60,
                   ),
-                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  onPressed: () => setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                  ),
                 ),
                 filled: true,
                 fillColor: const Color(0xFF0D1117),
@@ -399,7 +536,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF00D9FF),
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
@@ -434,7 +574,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.black,
+                          ),
                         ),
                       )
                     : const Text(
@@ -461,15 +603,23 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Email Field
+            // Email or Artist Name Field
             TextFormField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
+              controller: _loginIdentifierController,
+              keyboardType: TextInputType.text,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: 'Email',
+                labelText: 'Email or Artist Name',
                 labelStyle: const TextStyle(color: Colors.white60),
-                prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF00D9FF)),
+                helperText: 'You can sign in with your email or artist name',
+                helperStyle: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 11,
+                ),
+                prefixIcon: const Icon(
+                  Icons.person_outline,
+                  color: Color(0xFF00D9FF),
+                ),
                 filled: true,
                 fillColor: const Color(0xFF0D1117),
                 border: OutlineInputBorder(
@@ -482,15 +632,15 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF00D9FF),
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter your email';
-                }
-                if (!value.contains('@')) {
-                  return 'Please enter a valid email';
+                  return 'Please enter your email or artist name';
                 }
                 return null;
               },
@@ -505,13 +655,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
               decoration: InputDecoration(
                 labelText: 'Password',
                 labelStyle: const TextStyle(color: Colors.white60),
-                prefixIcon: const Icon(Icons.lock_outlined, color: Color(0xFF00D9FF)),
+                prefixIcon: const Icon(
+                  Icons.lock_outlined,
+                  color: Color(0xFF00D9FF),
+                ),
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     color: Colors.white60,
                   ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 filled: true,
                 fillColor: const Color(0xFF0D1117),
@@ -525,7 +679,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF00D9FF),
+                    width: 2,
+                  ),
                 ),
               ),
               validator: (value) {
@@ -572,7 +729,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.black,
+                          ),
                         ),
                       )
                     : const Text(

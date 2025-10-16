@@ -1,5 +1,5 @@
 // Firebase Cloud Functions for NextWave Music Sim v2.0
-// Enhanced with weekly charts, leaderboards, achievements, and anti-cheat
+// Enhanced with weekly charts, leaderboards, achievements, anti-cheat, and NPC artists
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
@@ -1103,3 +1103,444 @@ exports.catchUpMissedDays = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
+
+// ============================================================================
+// 8. NPC ARTIST SYSTEM - Populate game world with AI artists
+// ============================================================================
+
+// Signature NPC Artists (10 featured characters with storylines)
+const SIGNATURE_NPCS = [
+  {
+    id: 'npc_jaylen_sky',
+    name: 'Jaylen Sky',
+    region: 'usa',
+    primaryGenre: 'hip_hop',
+    secondaryGenre: 'trap',
+    tier: 'rising', // rising, established, star
+    bio: 'Atlanta-born rapper who built his following through SoundCloud battles and freestyle videos. His hit single went viral—but now a ghostwriter claims ownership of the lyrics.',
+    traits: ['Bold', 'Clever', 'Street-savvy'],
+    avatar: '🎤',
+    baseStreams: 150000, // Per week
+    growthRate: 1.15, // 15% growth per week
+    releaseFrequency: 14, // Days between releases
+    socialActivity: 'high', // EchoX posting frequency
+  },
+  {
+    id: 'npc_luna_grey',
+    name: 'Luna Grey',
+    region: 'uk',
+    primaryGenre: 'pop',
+    secondaryGenre: 'r&b',
+    tier: 'established',
+    bio: 'London-based singer-songwriter blending old-school soul with modern pop energy. Recently signed with a major label, torn between radio hits and staying artistic.',
+    traits: ['Elegant', 'Authentic', 'Outspoken'],
+    avatar: '🎵',
+    baseStreams: 300000,
+    growthRate: 1.10,
+    releaseFrequency: 21,
+    socialActivity: 'medium',
+  },
+  {
+    id: 'npc_elodie_rain',
+    name: 'Élodie Rain',
+    region: 'europe',
+    primaryGenre: 'electronic',
+    secondaryGenre: 'indie',
+    tier: 'rising',
+    bio: 'Parisian electronic artist known for moody synth textures and poetic lyrics. Her latest album was inspired by an AI poet she secretly trained.',
+    traits: ['Mysterious', 'Introspective', 'Experimental'],
+    avatar: '🎹',
+    baseStreams: 120000,
+    growthRate: 1.12,
+    releaseFrequency: 28,
+    socialActivity: 'low',
+  },
+  {
+    id: 'npc_santiago_vega',
+    name: 'Santiago Vega',
+    region: 'latin_america',
+    primaryGenre: 'latin',
+    secondaryGenre: 'reggaeton',
+    tier: 'star',
+    bio: 'Brazilian-Puerto Rican performer known for his electrifying dance style. His fiery rivalry with another Latin artist keeps him constantly in the tabloids.',
+    traits: ['Flirty', 'Passionate', 'Competitive'],
+    avatar: '💃',
+    baseStreams: 500000,
+    growthRate: 1.08,
+    releaseFrequency: 14,
+    socialActivity: 'high',
+  },
+  {
+    id: 'npc_zyrah',
+    name: 'Zyrah',
+    region: 'africa',
+    primaryGenre: 'afrobeat',
+    secondaryGenre: 'r&b',
+    tier: 'rising',
+    bio: 'Lagos-based rising star who started from open mic nights before getting discovered online. Her debut album\'s massive success sparks rumors she\'s leaving her crew behind.',
+    traits: ['Confident', 'Playful', 'Unstoppable'],
+    avatar: '🌍',
+    baseStreams: 180000,
+    growthRate: 1.20, // Fastest growing
+    releaseFrequency: 21,
+    socialActivity: 'high',
+  },
+  {
+    id: 'npc_kazuya_rin',
+    name: 'Kazuya Rin',
+    region: 'asia',
+    primaryGenre: 'electronic',
+    secondaryGenre: 'synthwave',
+    tier: 'established',
+    bio: 'Tokyo producer famous for futuristic visuals and anime-inspired soundscapes. His fans adore him, but he\'s secretly burned out and questioning his artistry.',
+    traits: ['Calm', 'Visionary', 'Disciplined'],
+    avatar: '🎧',
+    baseStreams: 280000,
+    growthRate: 1.05,
+    releaseFrequency: 35,
+    socialActivity: 'low',
+  },
+  {
+    id: 'npc_nova_reign',
+    name: 'Nova Reign',
+    region: 'usa',
+    primaryGenre: 'indie',
+    secondaryGenre: 'r&b',
+    tier: 'established',
+    bio: 'Toronto-based artist blending melancholic pop with cinematic sound design. Her mysterious persona hides a secret identity as a ghost producer for big names.',
+    traits: ['Dreamy', 'Articulate', 'Enigmatic'],
+    avatar: '✨',
+    baseStreams: 250000,
+    growthRate: 1.07,
+    releaseFrequency: 28,
+    socialActivity: 'medium',
+  },
+  {
+    id: 'npc_jax_carter',
+    name: 'Jax Carter',
+    region: 'oceania',
+    primaryGenre: 'indie',
+    secondaryGenre: 'rock',
+    tier: 'rising',
+    bio: 'Sydney-born multi-instrumentalist known for surf-inspired indie anthems. His "breakthrough album" leaked early—and it might have actually helped his fame.',
+    traits: ['Chill', 'Loyal', 'Creative'],
+    avatar: '🏄',
+    baseStreams: 140000,
+    growthRate: 1.13,
+    releaseFrequency: 21,
+    socialActivity: 'medium',
+  },
+  {
+    id: 'npc_kofi_dray',
+    name: 'Kofi Dray',
+    region: 'africa',
+    primaryGenre: 'afrobeat',
+    secondaryGenre: 'highlife',
+    tier: 'established',
+    bio: 'Producer-turned-singer mixing old highlife grooves with modern amapiano elements. Leading a "Highlife Revival" movement—but global fame is testing his principles.',
+    traits: ['Grounded', 'Visionary', 'Patient'],
+    avatar: '🥁',
+    baseStreams: 220000,
+    growthRate: 1.11,
+    releaseFrequency: 28,
+    socialActivity: 'medium',
+  },
+  {
+    id: 'npc_hana_seo',
+    name: 'Hana Seo',
+    region: 'asia',
+    primaryGenre: 'kpop',
+    secondaryGenre: 'r&b',
+    tier: 'star',
+    bio: 'Seoul-based idol turned independent artist, breaking free from strict management. Fans are divided over her "rebellious" shift from idol pop to mature R&B.',
+    traits: ['Ambitious', 'Brave', 'Perfectionist'],
+    avatar: '👑',
+    baseStreams: 600000,
+    growthRate: 1.09,
+    releaseFrequency: 14,
+    socialActivity: 'high',
+  },
+];
+
+// Initialize NPC artists in database (ONE-TIME SETUP)
+exports.initializeNPCArtists = functions.https.onCall(async (data, context) => {
+  try {
+    console.log('🤖 Initializing NPC artists...');
+    
+    // Check if already initialized
+    const npcCheckDoc = await db.collection('npc_artists').doc('_initialized').get();
+    if (npcCheckDoc.exists && npcCheckDoc.data().initialized === true) {
+      return {
+        success: false,
+        message: 'NPC artists already initialized',
+        count: npcCheckDoc.data().count || 0,
+      };
+    }
+    
+    // Use only signature NPCs (no background filler)
+    const allNPCs = SIGNATURE_NPCS;
+    
+    console.log(`📊 Creating ${allNPCs.length} signature NPC artists...`);
+    
+    // Create all NPCs with initial songs
+    const batch = db.batch();
+    let batchCount = 0;
+    
+    for (const npc of allNPCs) {
+      const npcRef = db.collection('npc_artists').doc(npc.id);
+      
+      // Generate 3-10 initial songs for each NPC
+      const songCount = Math.floor(Math.random() * 8) + 3;
+      const songs = [];
+      
+      for (let i = 0; i < songCount; i++) {
+        const daysOld = Math.floor(Math.random() * 180); // Songs up to 6 months old
+        const releasedDate = new Date();
+        releasedDate.setDate(releasedDate.getDate() - daysOld);
+        
+        const songGenre = Math.random() > 0.7 ? npc.secondaryGenre : npc.primaryGenre;
+        
+        songs.push({
+          id: `${npc.id}_song_${i + 1}`,
+          title: generateNPCSongTitle(songGenre),
+          genre: songGenre,
+          quality: Math.floor(Math.random() * 30) + 60, // 60-90 quality
+          totalStreams: Math.floor(npc.baseStreams * (1 - daysOld / 365) * (Math.random() * 0.5 + 0.75)),
+          last7DaysStreams: Math.floor(npc.baseStreams / 7 * (Math.random() * 0.5 + 0.75)),
+          releasedDate: admin.firestore.Timestamp.fromDate(releasedDate),
+          daysOld,
+          platforms: ['tunify', 'maple_music'],
+        });
+      }
+      
+      batch.set(npcRef, {
+        ...npc,
+        songs,
+        totalCareerStreams: songs.reduce((sum, s) => sum + s.totalStreams, 0),
+        fanbase: Math.floor(npc.baseStreams / 10),
+        fame: Math.min(100, Math.floor(npc.baseStreams / 10000)),
+        lastReleaseDate: admin.firestore.Timestamp.fromDate(new Date()),
+        isNPC: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
+      batchCount++;
+      
+      if (batchCount >= 500) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+    
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+    
+    // Mark as initialized
+    await db.collection('npc_artists').doc('_initialized').set({
+      initialized: true,
+      count: allNPCs.length,
+      signatureNPCs: allNPCs.length,
+      initializedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    console.log(`✅ Successfully initialized ${allNPCs.length} signature NPC artists!`);
+    
+    return {
+      success: true,
+      message: `Created ${allNPCs.length} signature NPC artists`,
+      count: allNPCs.length,
+    };
+  } catch (error) {
+    console.error('❌ Error initializing NPCs:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// Simulate NPC activity (runs with hourly update)
+exports.simulateNPCActivity = functions.pubsub
+  .schedule('0 * * * *') // Every hour with daily update
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🤖 Simulating NPC artist activity...');
+    
+    try {
+      const npcsSnapshot = await db.collection('npc_artists')
+        .where('isNPC', '==', true)
+        .get();
+      
+      if (npcsSnapshot.empty) {
+        console.log('⚠️ No NPCs found. Run initializeNPCArtists first.');
+        return null;
+      }
+      
+      console.log(`🎵 Processing ${npcsSnapshot.size} NPC artists...`);
+      
+      const batch = db.batch();
+      let batchCount = 0;
+      let songsReleased = 0;
+      let echoxPosts = 0;
+      
+      for (const npcDoc of npcsSnapshot.docs) {
+        const npc = npcDoc.data();
+        const songs = npc.songs || [];
+        
+        // 1. Update stream counts for existing songs
+        const updatedSongs = songs.map(song => {
+          const ageDecay = Math.max(0.3, 1 - (song.daysOld / 365) * 0.7);
+          const randomVariance = Math.random() * 0.4 + 0.8; // 80-120%
+          const dailyStreams = Math.floor(npc.baseStreams / 7 * ageDecay * randomVariance * npc.growthRate);
+          
+          // Decay last 7 days (14.3% per day)
+          const decayedLast7Days = Math.round(song.last7DaysStreams * 0.857);
+          const newLast7Days = decayedLast7Days + dailyStreams;
+          
+          return {
+            ...song,
+            totalStreams: song.totalStreams + dailyStreams,
+            last7DaysStreams: newLast7Days,
+            daysOld: song.daysOld + 1,
+          };
+        });
+        
+        // 2. Occasionally release new songs (based on release frequency)
+        const daysSinceLastRelease = Math.floor(
+          (Date.now() - npc.lastReleaseDate.toDate().getTime()) / (1000 * 60 * 60 * 24)
+        );
+        
+        if (daysSinceLastRelease >= npc.releaseFrequency && Math.random() > 0.7) {
+          const newSong = {
+            id: `${npc.id}_song_${Date.now()}`,
+            title: generateNPCSongTitle(npc.primaryGenre),
+            genre: Math.random() > 0.7 ? npc.secondaryGenre : npc.primaryGenre,
+            quality: Math.floor(Math.random() * 25) + 65, // 65-90 quality
+            totalStreams: Math.floor(npc.baseStreams * 0.1 * (Math.random() * 0.5 + 0.75)),
+            last7DaysStreams: Math.floor(npc.baseStreams * 0.1 * (Math.random() * 0.5 + 0.75)),
+            releasedDate: admin.firestore.Timestamp.fromDate(new Date()),
+            daysOld: 0,
+            platforms: ['tunify', 'maple_music'],
+          };
+          
+          updatedSongs.push(newSong);
+          songsReleased++;
+          
+          // Update last release date
+          npc.lastReleaseDate = admin.firestore.Timestamp.fromDate(new Date());
+        }
+        
+        // 3. Post on EchoX occasionally
+        if (shouldNPCPostOnEchoX(npc.socialActivity)) {
+          await createNPCEchoXPost(npc);
+          echoxPosts++;
+        }
+        
+        // 4. Update NPC document
+        const totalCareerStreams = updatedSongs.reduce((sum, s) => sum + s.totalStreams, 0);
+        
+        batch.update(npcDoc.ref, {
+          songs: updatedSongs,
+          totalCareerStreams,
+          fanbase: Math.floor(totalCareerStreams / 100),
+          fame: Math.min(100, Math.floor(totalCareerStreams / 100000)),
+          lastReleaseDate: npc.lastReleaseDate,
+        });
+        
+        batchCount++;
+        
+        if (batchCount >= 500) {
+          await batch.commit();
+          batchCount = 0;
+        }
+      }
+      
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+      
+      console.log(`✅ NPC simulation complete: ${songsReleased} songs released, ${echoxPosts} EchoX posts`);
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error simulating NPCs:', error);
+      return null;
+    }
+  });
+
+// Helper: Generate NPC song titles
+function generateNPCSongTitle(genre) {
+  const titleTemplates = {
+    pop: ['Love', 'Heart', 'Dream', 'Night', 'Star', 'Summer', 'Shine', 'Forever'],
+    hip_hop: ['Streets', 'Real', 'Money', 'Block', 'Ride', 'Game', 'City', 'Hustle'],
+    'r&b': ['Soul', 'Feels', 'Vibe', 'Mood', 'Love', 'Nights', 'Baby', 'True'],
+    rock: ['Fire', 'Storm', 'Wild', 'Breaking', 'Free', 'Run', 'Rebel', 'Edge'],
+    electronic: ['Digital', 'Neon', 'Pulse', 'Wave', 'Synth', 'Electric', 'Future', 'Cyber'],
+    indie: ['Quiet', 'Faded', 'Strange', 'Lost', 'Found', 'Home', 'Away', 'Simple'],
+    afrobeat: ['Lagos', 'Vibe', 'Dance', 'Rhythm', 'Africa', 'Party', 'Move', 'Celebrate'],
+    latin: ['Fuego', 'Bailar', 'Amor', 'Noche', 'Fiesta', 'Corazon', 'Vida', 'Caliente'],
+    reggaeton: ['Perreo', 'Bellaca', 'Dembow', 'Party', 'Night', 'Dance', 'Vibes', 'Trap'],
+    trap: ['Drip', 'Flex', 'Bands', 'Ice', 'Wave', 'Fire', 'Stack', 'Sauce'],
+    kpop: ['Heart', 'Love', 'Dream', 'Star', 'Shine', 'Light', 'Forever', 'Beautiful'],
+    highlife: ['Highlife', 'Joy', 'Celebration', 'Dance', 'Life', 'Happy', 'Good', 'Time'],
+    synthwave: ['Retro', 'Neon', '80s', 'Drive', 'Night', 'City', 'Future', 'Past'],
+    reggae: ['Peace', 'Love', 'Irie', 'Roots', 'Island', 'Sun', 'Vibes', 'One'],
+  };
+  
+  const words = titleTemplates[genre] || titleTemplates.pop;
+  const word1 = words[Math.floor(Math.random() * words.length)];
+  const word2 = words[Math.floor(Math.random() * words.length)];
+  
+  const templates = [
+    word1,
+    `${word1} ${word2}`,
+    `The ${word1}`,
+    `${word1} Night`,
+    `${word1} Dreams`,
+    `No ${word1}`,
+  ];
+  
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+// Helper: Should NPC post on EchoX?
+function shouldNPCPostOnEchoX(socialActivity) {
+  const thresholds = {
+    high: 0.15, // 15% chance per hour
+    medium: 0.05, // 5% chance
+    low: 0.02, // 2% chance
+  };
+  
+  return Math.random() < (thresholds[socialActivity] || 0.05);
+}
+
+// Helper: Create NPC EchoX post
+async function createNPCEchoXPost(npc) {
+  try {
+    const postTemplates = [
+      `Just dropped a new track! 🔥`,
+      `In the studio working on something special...`,
+      `${npc.region.toUpperCase()} stand up! 🙌`,
+      `New music coming soon 👀`,
+      `Working late nights on this album 💯`,
+      `Thank you for the love and support ❤️`,
+      `${npc.primaryGenre} vibes all day 🎵`,
+      `Grateful for this journey 🙏`,
+    ];
+    
+    const content = postTemplates[Math.floor(Math.random() * postTemplates.length)];
+    
+    await db.collection('echox_posts').add({
+      authorId: npc.id,
+      authorName: npc.name,
+      content,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      likes: 0,
+      echos: 0,
+      likedBy: [],
+      isNPC: true, // Mark as NPC post
+    });
+    
+    console.log(`📱 ${npc.name} posted on EchoX`);
+  } catch (error) {
+    console.error(`❌ Error creating EchoX post for ${npc.name}:`, error);
+  }
+}

@@ -103,10 +103,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     try {
-      // Check if name already exists
+      // Check if name already exists (correct field name: artistName)
       final querySnapshot = await _firestore
           .collection('players')
-          .where('displayName', isEqualTo: name)
+          .where('artistName', isEqualTo: name)
           .limit(1)
           .get();
 
@@ -181,19 +181,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'artistName': newName,
         });
 
+        // Update the artist stats and notify parent
         final updatedStats = widget.artistStats.copyWith(name: newName);
-
         widget.onStatsUpdated(updatedStats);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Artist name changed to "$newName"!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Artist name changed to "$newName"!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
-      _showError('Failed to update artist name: $e');
+      if (mounted) {
+        _showError('Failed to update artist name: $e');
+      }
     }
   }
 
