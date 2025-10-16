@@ -114,7 +114,15 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFFC3C44),
+                  color: _currentStats.avatarUrl == null
+                      ? const Color(0xFFFC3C44)
+                      : Colors.transparent,
+                  image: _currentStats.avatarUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(_currentStats.avatarUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFFFC3C44).withOpacity(0.4),
@@ -123,9 +131,15 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
                     ),
                   ],
                 ),
-                child: const Center(
-                  child: Icon(Icons.person, size: 70, color: Colors.white),
-                ),
+                child: _currentStats.avatarUrl == null
+                    ? const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 70,
+                          color: Colors.white,
+                        ),
+                      )
+                    : null,
               ),
             ),
           ),

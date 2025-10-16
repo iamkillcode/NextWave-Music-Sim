@@ -2,11 +2,11 @@
 
 **Release Date:** October 16, 2025  
 **Version:** 1.3.0  
-**Type:** Major Update - Enhanced Charts + Server-Side Automation
+**Type:** Major Update - Enhanced Charts, Server-Side Automation, + UX/Auth Improvements
 
 ---
 
-## 🚀 Major Features
+## 🎉 What's New
 
 ### 1. Enhanced Charts System ✅
 
@@ -15,17 +15,10 @@
 - **Content Types:** Singles, Albums, Artists
 - **Scope:** Global + 7 Regional Charts
 
-**Examples:**
-- Daily Top Singles (Global)
-- Weekly Top Albums (Europe)
-- Daily Top Artists (USA)
-- Weekly Top Artists (Global)
-- And 14 more combinations!
-
 **UI Features:**
 - Modern segmented button filters
 - Region dropdown selector
-- Pull-to-refresh
+- Pull-to-refresh capability
 - Medal indicators (🥇🥈🥉)
 - User song highlighting
 - Real-time updates
@@ -41,14 +34,50 @@
 **Benefits:**
 - Fair multiplayer competition
 - Real-time charts 24/7
-- Offline progression
-- True server-authoritative gameplay
+- Offline progression system
 - 99% cost reduction
 
-**Implementation:**
-- Firebase Cloud Functions
-- Scheduled execution (daily midnight UTC)
-- Batch processing (500 players per batch)
+---
+
+### 3. Enhanced Authentication & UX ✅ NEW!
+
+**Flexible Login:**
+- Sign in with email OR artist name
+- Auto-detection of input type
+- Smart Firestore lookup
+
+**Better Error Messages:**
+- 18 specific error cases with actionable guidance
+- Signup: 6 detailed errors
+- Login: 8 detailed errors  
+- Account Deletion: 4 detailed errors
+
+**Profile Images on Streaming Platforms:**
+- Upload once in Settings
+- Displays on Tunify (Spotify-style)
+- Displays on Maple Music (Apple Music-style)
+- Graceful fallbacks
+
+---
+
+## 🐛 Critical Fixes
+
+### Artist Name Change Bug [FIXED] ✅ NEW!
+**Issue:** Players couldn't change artist names  
+**Cause:** Wrong Firestore field name  
+**Fix:** Changed `displayName` → `artistName` + mounted checks  
+**Impact:** Name changing works perfectly
+
+### Account Deletion Failure [FIXED] ✅ NEW!
+**Issue:** Deletion failed with "requires-recent-login"  
+**Cause:** Firebase security requirement  
+**Fix:** Added password re-authentication dialog  
+**Impact:** Secure, reliable deletion
+
+### Date Format Improved ✅ NEW!
+**Before:** "January 1, 2020" (verbose)  
+**After:** "Jan 1, 2020" (30% shorter)  
+**Impact:** Cleaner UI, more space
 - Identical algorithm to client
 - Manual trigger for testing
 
@@ -517,10 +546,14 @@ Dashboard → Charts → Unified Charts
 - ✅ 10x faster player experience
 - ✅ Cheat-proof architecture
 - ✅ Scales to millions of players
+- ✅ Enhanced authentication & UX (NEW!)
+- ✅ Profile images on streaming platforms (NEW!)
+- ✅ 7 critical UX bugs fixed (NEW!)
+- ✅ 18 specific error messages (NEW!)
 
-**This transforms NextWave from a mobile game into a true competitive multiplayer music business simulation.** 🎵🏆
+**This transforms NextWave from a mobile game into a true competitive multiplayer music business simulation with professional UX and security.** 🎵🏆
 
 ---
 
 *Released: October 16, 2025*  
-*"Fair competition, powered by the cloud."* ☁️✨
+*"Fair competition, powered by the cloud, with polished UX."* ☁️✨

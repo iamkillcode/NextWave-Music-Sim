@@ -285,32 +285,151 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirm == true) {
-      try {
-        final userId = _auth.currentUser?.uid;
+      // Get password for re-authentication
+      final password = await _showPasswordDialog();
+      if (password == null) return;
 
-        if (userId != null) {
+      try {
+        final user = _auth.currentUser;
+        final userId = user?.uid;
+
+        if (user != null && userId != null) {
+          // Re-authenticate user (required by Firebase before account deletion)
+          final credential = EmailAuthProvider.credential(
+            email: user.email!,
+            password: password,
+          );
+
+          await user.reauthenticateWithCredential(credential);
+
           // Delete user data from Firestore
           await _firestore.collection('players').doc(userId).delete();
 
           // Delete Firebase Auth account
-          await _auth.currentUser?.delete();
+          await user.delete();
 
           if (mounted) {
             Navigator.of(context).pushReplacementNamed('/auth');
           }
         }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        switch (e.code) {
+          case 'wrong-password':
+            message = '❌ Incorrect password. Account deletion cancelled.';
+            break;
+          case 'requires-recent-login':
+            message =
+                '❌ Session expired. Please log out and log back in, then try again.';
+            break;
+          case 'user-mismatch':
+            message = '❌ Credential mismatch. Please try again.';
+            break;
+          case 'invalid-credential':
+            message = '❌ Invalid password. Please try again.';
+            break;
+          default:
+            message = '❌ Failed to delete account: ${e.message}';
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       } catch (e) {
         print('Error deleting account: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Failed to delete account. Please try logging in again.',
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Failed to delete account: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
+          );
+        }
       }
     }
+  }
+
+  Future<String?> _showPasswordDialog() async {
+    final TextEditingController passwordController = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Confirm Password',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'For security, please enter your password to confirm account deletion:',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                labelStyle: const TextStyle(color: Colors.white60),
+                prefixIcon: const Icon(
+                  Icons.lock_outline,
+                  color: Color(0xFF00D9FF),
+                ),
+                filled: true,
+                fillColor: const Color(0xFF0D1117),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white30),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white30),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF00D9FF),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              passwordController.dispose();
+              Navigator.pop(context, null);
+            },
+            child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final password = passwordController.text;
+              passwordController.dispose();
+              Navigator.pop(context, password);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('CONFIRM'),
+          ),
+        ],
+      ),
+    );
+
+    return result;
   }
 
   Future<void> _logout() async {

@@ -237,6 +237,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (data['careerStartDate'] as Timestamp?)?.toDate() ??
                 DateTime.now(),
             regionalFanbase: loadedRegionalFanbase,
+            avatarUrl: data['avatarUrl'] as String?,
           );
         });
 

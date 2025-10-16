@@ -160,27 +160,40 @@ class _TunifyScreenState extends State<TunifyScreen>
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [headerColor.withOpacity(0.9), headerColor],
-                      ),
+                      gradient: _currentStats.avatarUrl == null
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                headerColor.withOpacity(0.9),
+                                headerColor,
+                              ],
+                            )
+                          : null,
+                      image: _currentStats.avatarUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(_currentStats.avatarUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                       border: Border.all(
                         color: Colors.white.withOpacity(0.1),
                         width: 3,
                       ),
                     ),
-                    child: Center(
-                      child: Text(
-                        _getArtistInitials(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 64,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ),
+                    child: _currentStats.avatarUrl == null
+                        ? Center(
+                            child: Text(
+                              _getArtistInitials(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 64,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                 ),
               ],
