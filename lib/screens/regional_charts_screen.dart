@@ -212,7 +212,9 @@ class _RegionalChartsScreenState extends State<RegionalChartsScreen> with Single
             // Chart list
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(
+                  MediaQuery.of(context).size.width > 600 ? 24 : 16,
+                ),
                 itemCount: chartData.length,
                 itemBuilder: (context, index) {
                   final songData = chartData[index];
@@ -245,11 +247,13 @@ class _RegionalChartsScreenState extends State<RegionalChartsScreen> with Single
     required bool isCurrentUser,
     required String regionId,
   }) {
-    final song = songData['song'] as Song;
-    final artistName = songData['artistName'] as String;
-    final streams = regionId == 'global' 
-        ? song.streams 
-        : (song.regionalStreams[regionId] ?? 0);
+    // Extract song data from the map
+    final songTitle = songData['title'] as String? ?? 'Untitled';
+    final artistName = songData['artist'] as String? ?? 'Unknown Artist';
+    final genre = songData['genre'] as String? ?? 'Unknown';
+    final streams = regionId == 'global'
+        ? (songData['totalStreams'] as int? ?? 0)
+        : (songData['regionalStreams'] as int? ?? 0);
 
     // Medal colors for top 3
     Color? medalColor;
@@ -292,7 +296,7 @@ class _RegionalChartsScreenState extends State<RegionalChartsScreen> with Single
             // Could show song details
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Your song "${song.title}" is #$position!'),
+                content: Text('Your song "$songTitle" is #$position!'),
                 backgroundColor: regionColor,
                 behavior: SnackBarBehavior.floating,
               ),
@@ -331,8 +335,8 @@ class _RegionalChartsScreenState extends State<RegionalChartsScreen> with Single
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        song.title,
-                        style: TextStyle(
+                        songTitle,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -366,13 +370,13 @@ class _RegionalChartsScreenState extends State<RegionalChartsScreen> with Single
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: _getGenreColor(song.genre).withOpacity(0.2),
+                              color: _getGenreColor(genre).withOpacity(0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              song.genre,
+                              genre,
                               style: TextStyle(
-                                color: _getGenreColor(song.genre),
+                                color: _getGenreColor(genre),
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),

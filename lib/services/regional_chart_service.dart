@@ -82,7 +82,12 @@ class RegionalChartService {
             
             // Check if song has streams in this region
             final regionalStreams = songMap['regionalStreams'] as Map<dynamic, dynamic>?;
-            if (regionalStreams != null && regionalStreams.containsKey(region)) {
+            final songState = songMap['state'] ?? 'unknown';
+            
+            // Only include released songs in charts
+            if (songState == 'released' && 
+                regionalStreams != null && 
+                regionalStreams.containsKey(region)) {
               final streams = (regionalStreams[region] as num?)?.toInt() ?? 0;
               
               if (streams > 0) {
@@ -96,7 +101,7 @@ class RegionalChartService {
                   'totalStreams': songMap['totalStreams'] ?? 0,
                   'likes': songMap['likes'] ?? 0,
                   'releaseDate': songMap['releaseDate'],
-                  'state': songMap['state'] ?? 'unknown',
+                  'state': songState,
                 });
               }
             }
@@ -287,8 +292,10 @@ class RegionalChartService {
           for (var songData in songs) {
             final songMap = Map<String, dynamic>.from(songData);
             final totalStreams = songMap['totalStreams'] ?? 0;
+            final songState = songMap['state'] ?? 'unknown';
 
-            if (totalStreams > 0) {
+            // Only include released songs in charts
+            if (songState == 'released' && totalStreams > 0) {
               allSongs.add({
                 'title': songMap['title'] ?? 'Untitled',
                 'artist': artistName,
@@ -298,7 +305,7 @@ class RegionalChartService {
                 'totalStreams': totalStreams,
                 'likes': songMap['likes'] ?? 0,
                 'releaseDate': songMap['releaseDate'],
-                'state': songMap['state'] ?? 'unknown',
+                'state': songState,
               });
             }
           }

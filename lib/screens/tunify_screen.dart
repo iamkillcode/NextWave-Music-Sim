@@ -16,7 +16,8 @@ class TunifyScreen extends StatefulWidget {
   State<TunifyScreen> createState() => _TunifyScreenState();
 }
 
-class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMixin {
+class _TunifyScreenState extends State<TunifyScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late ArtistStats _currentStats;
   String _selectedTab = 'Popular';
@@ -35,29 +36,28 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
     super.dispose();
   }
 
-  List<Song> get releasedSongs => _currentStats.songs.where((s) => s.state == SongState.released).toList();
-  
+  List<Song> get releasedSongs =>
+      _currentStats.songs.where((s) => s.state == SongState.released).toList();
+
   @override
   Widget build(BuildContext context) {
-    final totalStreams = releasedSongs.fold<int>(0, (sum, song) => sum + song.streams);
-    final monthlyListeners = (totalStreams * 0.3).round(); // Estimate monthly listeners
+    final totalStreams = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.streams,
+    );
+    final monthlyListeners = (totalStreams * 0.3)
+        .round(); // Estimate monthly listeners
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: CustomScrollView(
         slivers: [
           // Header Section with Artist Profile
-          SliverToBoxAdapter(
-            child: _buildArtistHeader(monthlyListeners),
-          ),
+          SliverToBoxAdapter(child: _buildArtistHeader(monthlyListeners)),
           // Action Buttons & Navigation
-          SliverToBoxAdapter(
-            child: _buildActionButtonsAndNav(),
-          ),
+          SliverToBoxAdapter(child: _buildActionButtonsAndNav()),
           // Content based on selected tab
-          SliverToBoxAdapter(
-            child: _buildSelectedTabContent(),
-          ),
+          SliverToBoxAdapter(child: _buildSelectedTabContent()),
         ],
       ),
     );
@@ -67,7 +67,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
   Widget _buildArtistHeader(int monthlyListeners) {
     // Dynamic color based on artist name
     final headerColor = _getArtistColor();
-    
+
     return Container(
       height: 420,
       decoration: BoxDecoration(
@@ -109,7 +109,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                  size: 24,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
@@ -124,7 +128,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.white, size: 24),
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: Colors.white,
+                  size: 24,
+                ),
                 onPressed: () {},
               ),
             ),
@@ -155,10 +163,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          headerColor.withOpacity(0.9),
-                          headerColor,
-                        ],
+                        colors: [headerColor.withOpacity(0.9), headerColor],
                       ),
                       border: Border.all(
                         color: Colors.white.withOpacity(0.1),
@@ -194,7 +199,10 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.4),
                         borderRadius: BorderRadius.circular(12),
@@ -202,7 +210,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.verified, color: Color(0xFF1DB954), size: 16),
+                          Icon(
+                            Icons.verified,
+                            color: Color(0xFF1DB954),
+                            size: 16,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             'Verified Artist',
@@ -234,7 +246,10 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                 const SizedBox(height: 12),
                 // Monthly Listeners with icon
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(16),
@@ -295,18 +310,18 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
 
   // Action Buttons and Navigation Bar (realistic Spotify layout)
   Widget _buildActionButtonsAndNav() {
-    final totalStreams = releasedSongs.fold<int>(0, (sum, song) => sum + song.streams);
+    final totalStreams = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.streams,
+    );
     final totalSongs = releasedSongs.length;
-    
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF121212),
-            Colors.black,
-          ],
+          colors: [const Color(0xFF121212), Colors.black],
         ),
       ),
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -318,9 +333,15 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
             children: [
               _buildStatBadge(Icons.music_note_rounded, '$totalSongs songs'),
               const SizedBox(width: 16),
-              _buildStatBadge(Icons.play_circle_outline, _formatNumber(totalStreams)),
+              _buildStatBadge(
+                Icons.play_circle_outline,
+                _formatNumber(totalStreams),
+              ),
               const SizedBox(width: 16),
-              _buildStatBadge(Icons.favorite_border, '${_formatNumber(_currentStats.fanbase)} fans'),
+              _buildStatBadge(
+                Icons.favorite_border,
+                '${_formatNumber(_currentStats.fanbase)} fans',
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -343,7 +364,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                   ],
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 32),
+                  icon: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 32,
+                  ),
                   onPressed: () {},
                 ),
               ),
@@ -361,7 +386,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                   ),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.shuffle_rounded, color: Colors.white, size: 24),
+                  icon: const Icon(
+                    Icons.shuffle_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   onPressed: () {},
                 ),
               ),
@@ -388,15 +417,22 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    backgroundColor: _isFollowing ? Colors.transparent : Colors.transparent,
+                    backgroundColor: _isFollowing
+                        ? Colors.transparent
+                        : Colors.transparent,
                     side: BorderSide(
-                      color: _isFollowing ? const Color(0xFF1DB954) : Colors.white.withOpacity(0.3),
+                      color: _isFollowing
+                          ? const Color(0xFF1DB954)
+                          : Colors.white.withOpacity(0.3),
                       width: 2,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
                   ),
                 ),
               ),
@@ -414,7 +450,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                   ),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.more_horiz_rounded, color: Colors.white, size: 24),
+                  icon: const Icon(
+                    Icons.more_horiz_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   onPressed: () {
                     _showArtistOptions();
                   },
@@ -445,10 +485,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -493,22 +530,34 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
               const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.share_rounded, color: Colors.white),
-                title: const Text('Share artist', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: const Text(
+                  'Share artist',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
                 leading: const Icon(Icons.link_rounded, color: Colors.white),
-                title: const Text('Copy link', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: const Text(
+                  'Copy link',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
                 leading: const Icon(Icons.radio_rounded, color: Colors.white),
-                title: const Text('Go to artist radio', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: const Text(
+                  'Go to artist radio',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
                 leading: const Icon(Icons.report_outlined, color: Colors.white),
-                title: const Text('Report', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: const Text(
+                  'Report',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
             ],
@@ -567,7 +616,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
         padding: const EdgeInsets.all(40),
         child: Column(
           children: [
-            Icon(Icons.music_note_rounded, color: Colors.white.withOpacity(0.3), size: 80),
+            Icon(
+              Icons.music_note_rounded,
+              color: Colors.white.withOpacity(0.3),
+              size: 80,
+            ),
             const SizedBox(height: 16),
             Text(
               'No songs yet',
@@ -600,10 +653,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Colors.black,
-            const Color(0xFF0A0A0A),
-          ],
+          colors: [Colors.black, const Color(0xFF0A0A0A)],
         ),
       ),
       child: Column(
@@ -639,7 +689,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
             final index = entry.key;
             final song = entry.value;
             return _buildPopularTrackItem(index + 1, song);
-          }).toList(),
+          }),
           const SizedBox(height: 40),
         ],
       ),
@@ -648,7 +698,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
 
   Widget _buildPopularTrackItem(int rank, Song song) {
     final isTopTrack = rank <= 3;
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       decoration: BoxDecoration(
@@ -671,9 +721,13 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                     '$rank',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isTopTrack ? const Color(0xFF1DB954) : Colors.white,
+                      color: isTopTrack
+                          ? const Color(0xFF1DB954)
+                          : Colors.white,
                       fontSize: isTopTrack ? 18 : 16,
-                      fontWeight: isTopTrack ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isTopTrack
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -727,18 +781,20 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                         children: [
                           if (song.streamingPlatforms.contains('tunify'))
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1DB954).withOpacity(0.15),
+                                color: const Color(
+                                  0xFF1DB954,
+                                ).withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    '🎵',
-                                    style: TextStyle(fontSize: 10),
-                                  ),
+                                  Text('🎵', style: TextStyle(fontSize: 10)),
                                   SizedBox(width: 2),
                                   Text(
                                     'Tunify',
@@ -835,7 +891,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
         padding: const EdgeInsets.all(40),
         child: Column(
           children: [
-            Icon(Icons.album_rounded, color: Colors.white.withOpacity(0.3), size: 80),
+            Icon(
+              Icons.album_rounded,
+              color: Colors.white.withOpacity(0.3),
+              size: 80,
+            ),
             const SizedBox(height: 16),
             Text(
               'No albums yet',
@@ -973,11 +1033,15 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
 
   // About Tab - Artist bio and stats
   Widget _buildAboutContent() {
-    final totalStreams = releasedSongs.fold<int>(0, (sum, song) => sum + song.streams);
+    final totalStreams = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.streams,
+    );
     final totalRevenue = totalStreams * 0.003;
     final avgQuality = releasedSongs.isEmpty
         ? 0
-        : releasedSongs.fold<int>(0, (sum, song) => sum + song.finalQuality) ~/ releasedSongs.length;
+        : releasedSongs.fold<int>(0, (sum, song) => sum + song.finalQuality) ~/
+              releasedSongs.length;
 
     return Container(
       color: Colors.black,
@@ -1003,15 +1067,35 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
             ),
             child: Column(
               children: [
-                _buildAboutStat('Total Streams', _formatNumber(totalStreams), Icons.play_circle_outline),
+                _buildAboutStat(
+                  'Total Streams',
+                  _formatNumber(totalStreams),
+                  Icons.play_circle_outline,
+                ),
                 const Divider(color: Color(0xFF282828), height: 32),
-                _buildAboutStat('Total Revenue', '\$${totalRevenue.toStringAsFixed(2)}', Icons.attach_money),
+                _buildAboutStat(
+                  'Total Revenue',
+                  '\$${totalRevenue.toStringAsFixed(2)}',
+                  Icons.attach_money,
+                ),
                 const Divider(color: Color(0xFF282828), height: 32),
-                _buildAboutStat('Fanbase', _formatNumber(_currentStats.fanbase), Icons.people_rounded),
+                _buildAboutStat(
+                  'Fanbase',
+                  _formatNumber(_currentStats.fanbase),
+                  Icons.people_rounded,
+                ),
                 const Divider(color: Color(0xFF282828), height: 32),
-                _buildAboutStat('Avg Quality', '$avgQuality%', Icons.star_rounded),
+                _buildAboutStat(
+                  'Avg Quality',
+                  '$avgQuality%',
+                  Icons.star_rounded,
+                ),
                 const Divider(color: Color(0xFF282828), height: 32),
-                _buildAboutStat('Total Songs', '${releasedSongs.length}', Icons.music_note_rounded),
+                _buildAboutStat(
+                  'Total Songs',
+                  '${releasedSongs.length}',
+                  Icons.music_note_rounded,
+                ),
               ],
             ),
           ),
@@ -1052,7 +1136,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                         color: const Color(0xFF1DB954),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.music_note, color: Colors.black, size: 24),
+                      child: const Icon(
+                        Icons.music_note,
+                        color: Colors.black,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -1130,10 +1218,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 14,
-          ),
+          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
         ),
         Text(
           value,
@@ -1226,35 +1311,68 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
               const SizedBox(height: 20),
               const Divider(color: Color(0xFF404040), height: 1),
               ListTile(
-                leading: const Icon(Icons.favorite_border_rounded, color: Colors.white),
-                title: const Text('Like', style: TextStyle(color: Colors.white, fontSize: 16)),
+                leading: const Icon(
+                  Icons.favorite_border_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Like',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
-                leading: const Icon(Icons.playlist_add_rounded, color: Colors.white),
-                title: const Text('Add to playlist', style: TextStyle(color: Colors.white, fontSize: 16)),
+                leading: const Icon(
+                  Icons.playlist_add_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Add to playlist',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
-                leading: const Icon(Icons.queue_music_rounded, color: Colors.white),
-                title: const Text('Add to queue', style: TextStyle(color: Colors.white, fontSize: 16)),
+                leading: const Icon(
+                  Icons.queue_music_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'Add to queue',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
                 leading: const Icon(Icons.radio_rounded, color: Colors.white),
-                title: const Text('Go to song radio', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: const Text(
+                  'Go to song radio',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
                 leading: const Icon(Icons.share_rounded, color: Colors.white),
-                title: const Text('Share', style: TextStyle(color: Colors.white, fontSize: 16)),
+                title: const Text(
+                  'Share',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 onTap: () => Navigator.pop(context),
               ),
               ListTile(
-                leading: const Icon(Icons.bar_chart_rounded, color: Colors.white),
-                title: const Text('View song stats', style: TextStyle(color: Colors.white, fontSize: 16)),
+                leading: const Icon(
+                  Icons.bar_chart_rounded,
+                  color: Colors.white,
+                ),
+                title: const Text(
+                  'View song stats',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1DB954).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -1333,10 +1451,18 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
       );
     }
 
-    final totalStreams = releasedSongs.fold<int>(0, (sum, song) => sum + song.streams);
-    final totalLikes = releasedSongs.fold<int>(0, (sum, song) => sum + song.likes);
+    final totalStreams = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.streams,
+    );
+    final totalLikes = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.likes,
+    );
     final totalEarnings = (totalStreams * 0.003).round();
-    final avgQuality = releasedSongs.fold<int>(0, (sum, song) => sum + song.finalQuality) ~/ releasedSongs.length;
+    final avgQuality =
+        releasedSongs.fold<int>(0, (sum, song) => sum + song.finalQuality) ~/
+        releasedSongs.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1354,17 +1480,41 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: _buildAnalyticsCard('Total Streams', _formatNumber(totalStreams), Icons.play_arrow)),
+              Expanded(
+                child: _buildAnalyticsCard(
+                  'Total Streams',
+                  _formatNumber(totalStreams),
+                  Icons.play_arrow,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildAnalyticsCard('Total Likes', _formatNumber(totalLikes), Icons.favorite)),
+              Expanded(
+                child: _buildAnalyticsCard(
+                  'Total Likes',
+                  _formatNumber(totalLikes),
+                  Icons.favorite,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildAnalyticsCard('Total Earnings', '\$${_formatNumber(totalEarnings)}', Icons.attach_money)),
+              Expanded(
+                child: _buildAnalyticsCard(
+                  'Total Earnings',
+                  '\$${_formatNumber(totalEarnings)}',
+                  Icons.attach_money,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _buildAnalyticsCard('Avg Quality', '$avgQuality%', Icons.star)),
+              Expanded(
+                child: _buildAnalyticsCard(
+                  'Avg Quality',
+                  '$avgQuality%',
+                  Icons.star,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 30),
@@ -1439,7 +1589,10 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                     ),
                     Text(
                       '${song.genre} • Released ${_formatTimeAgo(song.releasedDate!)}',
-                      style: const TextStyle(color: Colors.white60, fontSize: 14),
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
@@ -1465,7 +1618,11 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStreamingStatChip('Streams', song.streams, Icons.play_arrow),
+              _buildStreamingStatChip(
+                'Streams',
+                song.streams,
+                Icons.play_arrow,
+              ),
               _buildStreamingStatChip('Likes', song.likes, Icons.favorite),
               _buildStreamingStatChip('Quality', song.finalQuality, Icons.star),
             ],
@@ -1543,19 +1700,21 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
 
   List<Widget> _buildGenreAnalytics() {
     final genreStats = <String, Map<String, int>>{};
-    
+
     for (final song in releasedSongs) {
       genreStats[song.genre] ??= {'streams': 0, 'songs': 0, 'quality': 0};
-      genreStats[song.genre]!['streams'] = genreStats[song.genre]!['streams']! + song.streams;
+      genreStats[song.genre]!['streams'] =
+          genreStats[song.genre]!['streams']! + song.streams;
       genreStats[song.genre]!['songs'] = genreStats[song.genre]!['songs']! + 1;
-      genreStats[song.genre]!['quality'] = genreStats[song.genre]!['quality']! + song.finalQuality;
+      genreStats[song.genre]!['quality'] =
+          genreStats[song.genre]!['quality']! + song.finalQuality;
     }
 
     return genreStats.entries.map((entry) {
       final genre = entry.key;
       final stats = entry.value;
       final avgQuality = stats['quality']! ~/ stats['songs']!;
-      
+
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -1573,7 +1732,10 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
                 children: [
                   Text(
                     genre,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
                     '${stats['songs']} songs • ${_formatNumber(stats['streams']!)} streams',
@@ -1584,7 +1746,10 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
             ),
             Text(
               '$avgQuality%',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -1594,20 +1759,70 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
 
   Widget _buildTrendingSongCard(int rank) {
     final trendingSongs = [
-      {'title': 'Midnight Vibes', 'artist': 'SoulMaster', 'genre': 'R&B', 'streams': 15600000},
-      {'title': 'Street Legend', 'artist': 'RapKing', 'genre': 'Hip Hop', 'streams': 12300000},
-      {'title': 'Afro Magic', 'artist': 'RhythmQueen', 'genre': 'Afrobeat', 'streams': 8900000},
-      {'title': 'Country Road', 'artist': 'CowboyJoe', 'genre': 'Country', 'streams': 7200000},
-      {'title': 'Jazz Fusion', 'artist': 'SmoothSax', 'genre': 'Jazz', 'streams': 5800000},
-      {'title': 'Trap Nation', 'artist': 'BeatMaker', 'genre': 'Trap', 'streams': 4500000},
-      {'title': 'Drill Sergeant', 'artist': 'UrbanFlow', 'genre': 'Drill', 'streams': 3200000},
-      {'title': 'Island Time', 'artist': 'ReggaeMon', 'genre': 'Reggae', 'streams': 2100000},
-      {'title': 'Rap Battle', 'artist': 'LyricLord', 'genre': 'Rap', 'streams': 1800000},
-      {'title': 'R&B Smooth', 'artist': 'VelvetVoice', 'genre': 'R&B', 'streams': 1500000},
+      {
+        'title': 'Midnight Vibes',
+        'artist': 'SoulMaster',
+        'genre': 'R&B',
+        'streams': 15600000,
+      },
+      {
+        'title': 'Street Legend',
+        'artist': 'RapKing',
+        'genre': 'Hip Hop',
+        'streams': 12300000,
+      },
+      {
+        'title': 'Afro Magic',
+        'artist': 'RhythmQueen',
+        'genre': 'Afrobeat',
+        'streams': 8900000,
+      },
+      {
+        'title': 'Country Road',
+        'artist': 'CowboyJoe',
+        'genre': 'Country',
+        'streams': 7200000,
+      },
+      {
+        'title': 'Jazz Fusion',
+        'artist': 'SmoothSax',
+        'genre': 'Jazz',
+        'streams': 5800000,
+      },
+      {
+        'title': 'Trap Nation',
+        'artist': 'BeatMaker',
+        'genre': 'Trap',
+        'streams': 4500000,
+      },
+      {
+        'title': 'Drill Sergeant',
+        'artist': 'UrbanFlow',
+        'genre': 'Drill',
+        'streams': 3200000,
+      },
+      {
+        'title': 'Island Time',
+        'artist': 'ReggaeMon',
+        'genre': 'Reggae',
+        'streams': 2100000,
+      },
+      {
+        'title': 'Rap Battle',
+        'artist': 'LyricLord',
+        'genre': 'Rap',
+        'streams': 1800000,
+      },
+      {
+        'title': 'R&B Smooth',
+        'artist': 'VelvetVoice',
+        'genre': 'R&B',
+        'streams': 1500000,
+      },
     ];
 
     final song = trendingSongs[rank - 1];
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1622,7 +1837,9 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: rank <= 3 ? const Color(0xFFFFD700) : const Color(0xFF30363D),
+              color: rank <= 3
+                  ? const Color(0xFFFFD700)
+                  : const Color(0xFF30363D),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
@@ -1644,7 +1861,10 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
               children: [
                 Text(
                   song['title'] as String,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Text(
                   '${song['artist']} • ${song['genre']}',
@@ -1661,19 +1881,40 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
       ),
     );
   }
+
   Widget _getGenreEmoji(String genre) {
     String emoji;
     switch (genre.toLowerCase()) {
-      case 'r&b': emoji = '💕'; break;
-      case 'hip hop': emoji = '🎤'; break;
-      case 'rap': emoji = '🎯'; break;
-      case 'trap': emoji = '🔥'; break;
-      case 'drill': emoji = '💀'; break;
-      case 'afrobeat': emoji = '🌍'; break;
-      case 'country': emoji = '🤠'; break;
-      case 'jazz': emoji = '🎺'; break;
-      case 'reggae': emoji = '🌴'; break;
-      default: emoji = '🎵'; break;
+      case 'r&b':
+        emoji = '💕';
+        break;
+      case 'hip hop':
+        emoji = '🎤';
+        break;
+      case 'rap':
+        emoji = '🎯';
+        break;
+      case 'trap':
+        emoji = '🔥';
+        break;
+      case 'drill':
+        emoji = '💀';
+        break;
+      case 'afrobeat':
+        emoji = '🌍';
+        break;
+      case 'country':
+        emoji = '🤠';
+        break;
+      case 'jazz':
+        emoji = '🎺';
+        break;
+      case 'reggae':
+        emoji = '🌴';
+        break;
+      default:
+        emoji = '🎵';
+        break;
     }
     return Text(emoji, style: const TextStyle(fontSize: 24));
   }
@@ -1692,7 +1933,7 @@ class _TunifyScreenState extends State<TunifyScreen> with TickerProviderStateMix
   String _formatTimeAgo(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays > 0) return '${difference.inDays}d ago';
     if (difference.inHours > 0) return '${difference.inHours}h ago';
     return '${difference.inMinutes}m ago';

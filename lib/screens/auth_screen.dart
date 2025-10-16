@@ -13,7 +13,8 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final _formKey = GlobalKey<FormState>();
+  final _signUpFormKey = GlobalKey<FormState>();
+  final _loginFormKey = GlobalKey<FormState>();
   
   // Controllers
   final _emailController = TextEditingController();
@@ -40,7 +41,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _handleSignUp() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_signUpFormKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
@@ -88,7 +89,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_loginFormKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
@@ -197,7 +198,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
                   // Auth Container
                   Container(
-                    constraints: const BoxConstraints(maxWidth: 400),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width > 600 ? 450 : double.infinity,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF21262D),
                       borderRadius: BorderRadius.circular(16),
@@ -283,7 +286,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   Widget _buildSignUpForm() {
     return Form(
-      key: _formKey,
+      key: _signUpFormKey,
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -452,7 +455,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   Widget _buildLoginForm() {
     return Form(
-      key: _formKey,
+      key: _loginFormKey,
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(

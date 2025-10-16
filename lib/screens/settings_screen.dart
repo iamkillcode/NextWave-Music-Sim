@@ -11,10 +11,10 @@ class SettingsScreen extends StatefulWidget {
   final Function(ArtistStats) onStatsUpdated;
 
   const SettingsScreen({
-    Key? key,
+    super.key,
     required this.artistStats,
     required this.onStatsUpdated,
-  }) : super(key: key);
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -23,17 +23,17 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _showOnlineStatus = true;
-  
+
   final TextEditingController _artistNameController = TextEditingController();
   bool _isCheckingName = false;
   bool _isNameAvailable = true;
   String _nameCheckMessage = '';
-  
+
   String? _avatarUrl;
 
   @override
@@ -74,7 +74,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'vibrationEnabled': _vibrationEnabled,
           'showOnlineStatus': _showOnlineStatus,
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Settings saved!'),
@@ -127,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _updateArtistName() async {
     final newName = _artistNameController.text.trim();
-    
+
     if (newName.isEmpty) {
       _showError('Artist name cannot be empty');
       return;
@@ -148,7 +148,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Change Artist Name?', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Change Artist Name?',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           'Are you sure you want to change your artist name to "$newName"?',
           style: const TextStyle(color: Colors.white70),
@@ -160,7 +163,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00D9FF)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00D9FF),
+            ),
             child: const Text('CHANGE NAME'),
           ),
         ],
@@ -176,9 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'artistName': newName,
         });
 
-        final updatedStats = widget.artistStats.copyWith(
-          name: newName,
-        );
+        final updatedStats = widget.artistStats.copyWith(name: newName);
 
         widget.onStatsUpdated(updatedStats);
 
@@ -196,10 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -258,7 +258,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Delete Account?', style: TextStyle(color: Colors.red)),
+        title: const Text(
+          'Delete Account?',
+          style: TextStyle(color: Colors.red),
+        ),
         content: const Text(
           'This action is permanent and cannot be undone. All your data, including artist stats, songs, and progress will be permanently deleted.',
           style: TextStyle(color: Colors.white70),
@@ -280,14 +283,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirm == true) {
       try {
         final userId = _auth.currentUser?.uid;
-        
+
         if (userId != null) {
           // Delete user data from Firestore
           await _firestore.collection('players').doc(userId).delete();
-          
+
           // Delete Firebase Auth account
           await _auth.currentUser?.delete();
-          
+
           if (mounted) {
             Navigator.of(context).pushReplacementNamed('/auth');
           }
@@ -296,7 +299,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         print('Error deleting account: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to delete account. Please try logging in again.'),
+            content: Text(
+              'Failed to delete account. Please try logging in again.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -413,7 +418,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: const Color(0xFF00D9FF),
-                    backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                    backgroundImage: _avatarUrl != null
+                        ? NetworkImage(_avatarUrl!)
+                        : null,
                     child: _avatarUrl == null
                         ? Text(
                             widget.artistStats.name[0].toUpperCase(),
@@ -435,7 +442,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF00D9FF),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1A1A1A), width: 2),
+                          border: Border.all(
+                            color: const Color(0xFF1A1A1A),
+                            width: 2,
+                          ),
                         ),
                         child: const Icon(
                           Icons.camera_alt,
@@ -463,10 +473,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 4),
                     const Text(
                       'No email',
-                      style: TextStyle(
-                        color: Colors.white60,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.white60, fontSize: 14),
                     ),
                   ],
                 ),
@@ -545,7 +552,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _isNameAvailable && _artistNameController.text.trim() != widget.artistStats.name
+              onPressed:
+                  _isNameAvailable &&
+                      _artistNameController.text.trim() !=
+                          widget.artistStats.name
                   ? _updateArtistName
                   : null,
               style: ElevatedButton.styleFrom(
@@ -702,7 +712,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSwitchTile(String title, String subtitle, bool value, Function(bool) onChanged) {
+  Widget _buildSwitchTile(
+    String title,
+    String subtitle,
+    bool value,
+    Function(bool) onChanged,
+  ) {
     return Row(
       children: [
         Expanded(
@@ -720,10 +735,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white60, fontSize: 12),
               ),
             ],
           ),

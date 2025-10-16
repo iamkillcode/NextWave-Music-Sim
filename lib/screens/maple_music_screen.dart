@@ -16,7 +16,8 @@ class MapleMusicScreen extends StatefulWidget {
   State<MapleMusicScreen> createState() => _MapleMusicScreenState();
 }
 
-class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProviderStateMixin {
+class _MapleMusicScreenState extends State<MapleMusicScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late ArtistStats _currentStats;
   String _selectedTab = 'Songs';
@@ -36,29 +37,28 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
   }
 
   List<Song> get releasedSongs => _currentStats.songs
-      .where((s) => s.state == SongState.released && s.streamingPlatforms.contains('maple_music'))
+      .where(
+        (s) =>
+            s.state == SongState.released &&
+            s.streamingPlatforms.contains('maple_music'),
+      )
       .toList();
-  
+
   @override
   Widget build(BuildContext context) {
-    final followers = (_currentStats.fanbase * 0.4).round(); // 40% of fanbase on Maple Music
+    final followers = (_currentStats.fanbase * 0.4)
+        .round(); // 40% of fanbase on Maple Music
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       body: CustomScrollView(
         slivers: [
           // Apple Music-style Header
-          SliverToBoxAdapter(
-            child: _buildArtistHeader(followers),
-          ),
+          SliverToBoxAdapter(child: _buildArtistHeader(followers)),
           // Action Buttons & Navigation
-          SliverToBoxAdapter(
-            child: _buildActionButtonsAndNav(),
-          ),
+          SliverToBoxAdapter(child: _buildActionButtonsAndNav()),
           // Content based on selected tab
-          SliverToBoxAdapter(
-            child: _buildSelectedTabContent(),
-          ),
+          SliverToBoxAdapter(child: _buildSelectedTabContent()),
         ],
       ),
     );
@@ -86,10 +86,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withOpacity(0.1),
-                  Colors.transparent,
-                ],
+                colors: [Colors.white.withOpacity(0.1), Colors.transparent],
               ),
             ),
           ),
@@ -98,7 +95,11 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
             top: 40,
             left: 16,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 24),
+              icon: const Icon(
+                Icons.arrow_back_ios,
+                color: Colors.white,
+                size: 24,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -123,11 +124,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                   ],
                 ),
                 child: const Center(
-                  child: Icon(
-                    Icons.person,
-                    size: 70,
-                    color: Colors.white,
-                  ),
+                  child: Icon(Icons.person, size: 70, color: Colors.white),
                 ),
               ),
             ),
@@ -164,7 +161,10 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                 const SizedBox(height: 4),
                 // Platform badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFC3C44).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -206,10 +206,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                   icon: const Icon(Icons.play_arrow, size: 24),
                   label: const Text(
                     'Play',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFC3C44),
@@ -230,14 +227,14 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                   icon: const Icon(Icons.shuffle, size: 20),
                   label: const Text(
                     'Shuffle',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFFC3C44),
-                    side: const BorderSide(color: Color(0xFFFC3C44), width: 1.5),
+                    side: const BorderSide(
+                      color: Color(0xFFFC3C44),
+                      width: 1.5,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -272,12 +269,19 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  backgroundColor: _isFollowing ? const Color(0xFFFC3C44).withOpacity(0.2) : Colors.transparent,
+                  backgroundColor: _isFollowing
+                      ? const Color(0xFFFC3C44).withOpacity(0.2)
+                      : Colors.transparent,
                   side: BorderSide(
-                    color: _isFollowing ? const Color(0xFFFC3C44) : Colors.white.withOpacity(0.3),
+                    color: _isFollowing
+                        ? const Color(0xFFFC3C44)
+                        : Colors.white.withOpacity(0.3),
                     width: 1.5,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -306,7 +310,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
   // Apple Music-style Navigation Tabs
   Widget _buildNavigationTabs() {
     final tabs = ['Songs', 'Albums', 'About'];
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: tabs.map((tab) {
@@ -322,7 +326,9 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
               Text(
                 tab,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFFFC3C44) : Colors.white.withOpacity(0.5),
+                  color: isSelected
+                      ? const Color(0xFFFC3C44)
+                      : Colors.white.withOpacity(0.5),
                   fontSize: 16,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 ),
@@ -332,7 +338,9 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                 height: 2,
                 width: 50,
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFFC3C44) : Colors.transparent,
+                  color: isSelected
+                      ? const Color(0xFFFC3C44)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(1),
                 ),
               ),
@@ -425,7 +433,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
             final index = entry.key;
             final song = entry.value;
             return _buildSongTile(song, index + 1);
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -499,10 +507,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  '🍎',
-                  style: TextStyle(fontSize: 12),
-                ),
+                const Text('🍎', style: TextStyle(fontSize: 12)),
                 const SizedBox(width: 4),
                 Text(
                   '\$${(song.streams * 0.01).toStringAsFixed(2)}',
@@ -517,10 +522,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
           ],
         ),
         trailing: IconButton(
-          icon: Icon(
-            Icons.more_vert,
-            color: Colors.white.withOpacity(0.5),
-          ),
+          icon: Icon(Icons.more_vert, color: Colors.white.withOpacity(0.5)),
           onPressed: () {},
         ),
       ),
@@ -564,7 +566,10 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
 
   // About Tab - Artist Stats and Platform Info
   Widget _buildAboutTab() {
-    final totalStreams = releasedSongs.fold<int>(0, (sum, song) => sum + song.streams);
+    final totalStreams = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.streams,
+    );
     final totalRevenue = totalStreams * 0.01; // $0.01 per stream
 
     return Container(
@@ -583,13 +588,25 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
             ),
           ),
           const SizedBox(height: 16),
-          _buildStatCard('Total Streams', _formatNumber(totalStreams), Icons.play_circle_outline),
+          _buildStatCard(
+            'Total Streams',
+            _formatNumber(totalStreams),
+            Icons.play_circle_outline,
+          ),
           const SizedBox(height: 12),
-          _buildStatCard('Total Revenue', '\$$totalRevenue', Icons.attach_money),
+          _buildStatCard(
+            'Total Revenue',
+            '\$$totalRevenue',
+            Icons.attach_money,
+          ),
           const SizedBox(height: 12),
-          _buildStatCard('Songs Released', '${releasedSongs.length}', Icons.music_note),
+          _buildStatCard(
+            'Songs Released',
+            '${releasedSongs.length}',
+            Icons.music_note,
+          ),
           const SizedBox(height: 32),
-          
+
           // Platform Info
           const Text(
             'About Maple Music',
@@ -682,11 +699,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen> with TickerProvider
               color: const Color(0xFFFC3C44).withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFFFC3C44),
-              size: 24,
-            ),
+            child: Icon(icon, color: const Color(0xFFFC3C44), size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(

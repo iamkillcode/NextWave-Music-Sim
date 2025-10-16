@@ -25,7 +25,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
   bool _releaseNow = true;
   DateTime _scheduledDate = DateTime.now().add(const Duration(days: 7));
   bool _isProcessing = false;
-  Set<String> _selectedPlatforms = {'tunify'}; // Can select multiple platforms
+  final Set<String> _selectedPlatforms = {
+    'tunify',
+  }; // Can select multiple platforms
   String? _uploadedCoverArtUrl; // URL of uploaded cover art image
 
   @override
@@ -119,14 +121,14 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.5), width: 2),
+        border: Border.all(
+          color: const Color(0xFFFFD700).withOpacity(0.5),
+          width: 2,
+        ),
       ),
       child: Column(
         children: [
-          Text(
-            widget.song.genreEmoji,
-            style: const TextStyle(fontSize: 64),
-          ),
+          Text(widget.song.genreEmoji, style: const TextStyle(fontSize: 64)),
           const SizedBox(height: 16),
           Text(
             widget.song.title,
@@ -140,10 +142,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
           const SizedBox(height: 8),
           Text(
             widget.song.genre,
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 16,
-            ),
+            style: const TextStyle(color: Colors.white60, fontSize: 16),
           ),
           const SizedBox(height: 16),
           Container(
@@ -201,13 +200,12 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
           const SizedBox(height: 8),
           const Text(
             'Select one or both platforms to distribute your music',
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Colors.white60, fontSize: 13),
           ),
           const SizedBox(height: 20),
-          ...StreamingPlatform.all.map((platform) => _buildPlatformOption(platform)).toList(),
+          ...StreamingPlatform.all.map(
+            (platform) => _buildPlatformOption(platform),
+          ),
         ],
       ),
     );
@@ -215,7 +213,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
   Widget _buildPlatformOption(StreamingPlatform platform) {
     final isSelected = _selectedPlatforms.contains(platform.id);
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -238,7 +236,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               : const Color(0xFF30363D),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Color(platform.getColorValue()) : Colors.white30,
+            color: isSelected
+                ? Color(platform.getColorValue())
+                : Colors.white30,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -247,10 +247,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
           children: [
             Row(
               children: [
-                Text(
-                  platform.emoji,
-                  style: const TextStyle(fontSize: 32),
-                ),
+                Text(platform.emoji, style: const TextStyle(fontSize: 32)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -259,7 +256,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                       Text(
                         platform.name,
                         style: TextStyle(
-                          color: isSelected ? Color(platform.getColorValue()) : Colors.white,
+                          color: isSelected
+                              ? Color(platform.getColorValue())
+                              : Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -286,7 +285,11 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                _buildPlatformStat('💰', '\$${platform.royaltiesPerStream.toStringAsFixed(3)}/stream', platform),
+                _buildPlatformStat(
+                  '💰',
+                  '\$${platform.royaltiesPerStream.toStringAsFixed(3)}/stream',
+                  platform,
+                ),
               ],
             ),
           ],
@@ -295,7 +298,11 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     );
   }
 
-  Widget _buildPlatformStat(String emoji, String text, StreamingPlatform platform) {
+  Widget _buildPlatformStat(
+    String emoji,
+    String text,
+    StreamingPlatform platform,
+  ) {
     final isSelected = _selectedPlatforms.contains(platform.id);
     return Row(
       children: [
@@ -341,10 +348,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
           const SizedBox(height: 16),
           const Text(
             'Upload your cover art image',
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: Colors.white60, fontSize: 13),
           ),
           const SizedBox(height: 16),
           // Upload Button
@@ -353,7 +357,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             child: ElevatedButton.icon(
               onPressed: _uploadCoverArt,
               icon: const Icon(Icons.upload_file),
-              label: Text(_uploadedCoverArtUrl != null ? 'Change Image' : 'Upload Image'),
+              label: Text(
+                _uploadedCoverArtUrl != null ? 'Change Image' : 'Upload Image',
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00D9FF),
                 foregroundColor: Colors.black,
@@ -374,13 +380,15 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                 color: const Color(0xFF30363D),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white.withOpacity(0.2)),
-                boxShadow: _uploadedCoverArtUrl != null ? [
-                  BoxShadow(
-                    color: const Color(0xFF00D9FF).withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ] : [],
+                boxShadow: _uploadedCoverArtUrl != null
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF00D9FF).withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : [],
                 image: _uploadedCoverArtUrl != null
                     ? DecorationImage(
                         image: NetworkImage(_uploadedCoverArtUrl!),
@@ -453,7 +461,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _releaseNow 
+                color: _releaseNow
                     ? const Color(0xFF00D9FF).withOpacity(0.2)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
@@ -466,7 +474,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                 children: [
                   Icon(
                     Icons.flash_on,
-                    color: _releaseNow ? const Color(0xFF00D9FF) : Colors.white60,
+                    color: _releaseNow
+                        ? const Color(0xFF00D9FF)
+                        : Colors.white60,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -485,7 +495,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                         Text(
                           'Go live immediately',
                           style: TextStyle(
-                            color: _releaseNow ? Colors.white60 : Colors.white30,
+                            color: _releaseNow
+                                ? Colors.white60
+                                : Colors.white30,
                             fontSize: 12,
                           ),
                         ),
@@ -504,12 +516,14 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: !_releaseNow 
+                color: !_releaseNow
                     ? const Color(0xFF9B59B6).withOpacity(0.2)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: !_releaseNow ? const Color(0xFF9B59B6) : Colors.white30,
+                  color: !_releaseNow
+                      ? const Color(0xFF9B59B6)
+                      : Colors.white30,
                   width: 2,
                 ),
               ),
@@ -517,7 +531,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                 children: [
                   Icon(
                     Icons.schedule,
-                    color: !_releaseNow ? const Color(0xFF9B59B6) : Colors.white60,
+                    color: !_releaseNow
+                        ? const Color(0xFF9B59B6)
+                        : Colors.white60,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -536,7 +552,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                         Text(
                           'Set a future release date',
                           style: TextStyle(
-                            color: !_releaseNow ? Colors.white60 : Colors.white30,
+                            color: !_releaseNow
+                                ? Colors.white60
+                                : Colors.white30,
                             fontSize: 12,
                           ),
                         ),
@@ -562,24 +580,30 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                 children: [
                   const Text(
                     'Release Date',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: _selectDate,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF21262D),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF9B59B6).withOpacity(0.5)),
+                        border: Border.all(
+                          color: const Color(0xFF9B59B6).withOpacity(0.5),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today, color: Color(0xFF9B59B6), size: 20),
+                          const Icon(
+                            Icons.calendar_today,
+                            color: Color(0xFF9B59B6),
+                            size: 20,
+                          ),
                           const SizedBox(width: 12),
                           Text(
                             '${_scheduledDate.day}/${_scheduledDate.month}/${_scheduledDate.year}',
@@ -590,7 +614,11 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                             ),
                           ),
                           const Spacer(),
-                          const Icon(Icons.edit, color: Color(0xFF9B59B6), size: 18),
+                          const Icon(
+                            Icons.edit,
+                            color: Color(0xFF9B59B6),
+                            size: 18,
+                          ),
                         ],
                       ),
                     ),
@@ -604,7 +632,11 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, color: Color(0xFF9B59B6), size: 16),
+                        const Icon(
+                          Icons.info_outline,
+                          color: Color(0xFF9B59B6),
+                          size: 16,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -629,7 +661,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
   Widget _buildExpectedResults() {
     final estimatedStreams = widget.song.estimatedStreams;
-    
+
     // Calculate combined revenue from all selected platforms
     double totalRevenue = 0;
     for (final platformId in _selectedPlatforms) {
@@ -637,7 +669,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       totalRevenue += estimatedStreams * platform.royaltiesPerStream;
     }
     final estimatedRevenue = totalRevenue.round();
-    
+
     final fameGain = (widget.song.finalQuality * 0.5).round();
     final fanbaseGain = (widget.song.finalQuality * 2).round();
 
@@ -702,7 +734,11 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.lightbulb_outline, color: Color(0xFF00D9FF), size: 16),
+                const Icon(
+                  Icons.lightbulb_outline,
+                  color: Color(0xFF00D9FF),
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -721,7 +757,12 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     );
   }
 
-  Widget _buildExpectedStat(IconData icon, String label, String value, Color color) {
+  Widget _buildExpectedStat(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Row(
       children: [
         Container(
@@ -805,7 +846,10 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               onPrimary: Colors.white,
               surface: Color(0xFF21262D),
               onSurface: Colors.white,
-            ), dialogTheme: DialogThemeData(backgroundColor: const Color(0xFF21262D)),
+            ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: const Color(0xFF21262D),
+            ),
           ),
           child: child!,
         );
@@ -828,10 +872,10 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       final releaseDate = _releaseNow ? DateTime.now() : _scheduledDate;
       final estimatedStreams = widget.song.estimatedStreams;
-      
+
       // Note: Revenue is now calculated daily based on actual streams
       // Artists receive royalty payments each day, not on release
-      
+
       final fameGain = (widget.song.finalQuality * 0.5).round();
       final fanbaseGain = (widget.song.finalQuality * 2).round();
 
@@ -842,32 +886,39 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
         artistFame: widget.artistStats.fame,
         artistFanbase: widget.artistStats.fanbase,
       );
-      
+
       // Calculate loyal fanbase growth from releasing quality music
-      final loyalFanbaseGrowth = streamGrowthService.calculateLoyalFanbaseGrowth(
-        currentLoyalFanbase: widget.artistStats.loyalFanbase,
-        songQuality: widget.song.finalQuality,
-        totalFanbase: widget.artistStats.fanbase + fanbaseGain,
-      );
+      final loyalFanbaseGrowth = streamGrowthService
+          .calculateLoyalFanbaseGrowth(
+            currentLoyalFanbase: widget.artistStats.loyalFanbase,
+            songQuality: widget.song.finalQuality,
+            totalFanbase: widget.artistStats.fanbase + fanbaseGain,
+          );
 
       // Calculate regional fanbase growth from releasing this song
-      final regionalFanbaseGrowth = streamGrowthService.calculateRegionalFanbaseGrowth(
-        currentRegion: widget.artistStats.currentRegion,
-        originRegion: widget.artistStats.currentRegion, // The region where the song is released becomes origin
-        songQuality: widget.song.finalQuality,
-        genre: widget.song.genre,
-        currentGlobalFanbase: widget.artistStats.fanbase,
-        currentRegionalFanbase: widget.artistStats.regionalFanbase,
-      );
+      final regionalFanbaseGrowth = streamGrowthService
+          .calculateRegionalFanbaseGrowth(
+            currentRegion: widget.artistStats.currentRegion,
+            originRegion: widget
+                .artistStats
+                .currentRegion, // The region where the song is released becomes origin
+            songQuality: widget.song.finalQuality,
+            genre: widget.song.genre,
+            currentGlobalFanbase: widget.artistStats.fanbase,
+            currentRegionalFanbase: widget.artistStats.regionalFanbase,
+          );
 
       // Update regional fanbase map
-      final updatedRegionalFanbase = Map<String, int>.from(widget.artistStats.regionalFanbase);
+      final updatedRegionalFanbase = Map<String, int>.from(
+        widget.artistStats.regionalFanbase,
+      );
       regionalFanbaseGrowth.forEach((region, growth) {
-        updatedRegionalFanbase[region] = (updatedRegionalFanbase[region] ?? 0) + growth;
+        updatedRegionalFanbase[region] =
+            (updatedRegionalFanbase[region] ?? 0) + growth;
       });
 
       // Initialize regional streams for the song (release day gets some initial streams)
-      final initialRegionalStreams = _releaseNow 
+      final initialRegionalStreams = _releaseNow
           ? streamGrowthService.calculateRegionalStreamDistribution(
               totalDailyStreams: (estimatedStreams * 0.1).round(),
               currentRegion: widget.artistStats.currentRegion,
@@ -880,7 +931,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       final updatedSong = widget.song.copyWith(
         state: SongState.released,
         releasedDate: releaseDate,
-        streams: _releaseNow ? (estimatedStreams * 0.1).round() : 0, // 10% initial streams if released now
+        streams: _releaseNow
+            ? (estimatedStreams * 0.1).round()
+            : 0, // 10% initial streams if released now
         regionalStreams: initialRegionalStreams,
         likes: _releaseNow ? (estimatedStreams * 0.05).round() : 0,
         coverArtUrl: _uploadedCoverArtUrl,
@@ -893,17 +946,25 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       // Update artist stats with loyal fanbase growth and regional fanbase
       // Note: Royalty payments are calculated daily, not on release
       final updatedStats = widget.artistStats.copyWith(
-        money: widget.artistStats.money, // No immediate payment - royalties paid daily
+        money: widget
+            .artistStats
+            .money, // No immediate payment - royalties paid daily
         fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
         fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
-        loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth).clamp(0, double.infinity).toInt(),
+        loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
+            .clamp(0, double.infinity)
+            .toInt(),
         regionalFanbase: updatedRegionalFanbase,
-        songs: widget.artistStats.songs.map((s) => s.id == updatedSong.id ? updatedSong : s).toList(),
+        songs: widget.artistStats.songs
+            .map((s) => s.id == updatedSong.id ? updatedSong : s)
+            .toList(),
       );
 
       // Show success message
       if (mounted) {
-        final platformNames = _selectedPlatforms.map((id) => StreamingPlatform.getById(id).name).join(' & ');
+        final platformNames = _selectedPlatforms
+            .map((id) => StreamingPlatform.getById(id).name)
+            .join(' & ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
