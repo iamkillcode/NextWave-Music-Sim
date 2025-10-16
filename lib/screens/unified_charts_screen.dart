@@ -14,7 +14,7 @@ import '../services/unified_chart_service.dart';
 /// - Daily/Weekly Albums (Global/Regional)
 /// - Daily/Weekly Artists (Global/Regional)
 class UnifiedChartsScreen extends StatefulWidget {
-  const UnifiedChartsScreen({Key? key}) : super(key: key);
+  const UnifiedChartsScreen({super.key});
 
   @override
   State<UnifiedChartsScreen> createState() => _UnifiedChartsScreenState();
@@ -295,7 +295,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'No ${_selectedType} charting yet',
+              'No $_selectedType charting yet',
               style: const TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 8),
@@ -437,7 +437,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams (${_selectedPeriod})',
+              '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams ($_selectedPeriod)',
               style: TextStyle(
                 color: _getThemeColor(),
                 fontWeight: FontWeight.bold,

@@ -1,0 +1,33 @@
+name: iOS Build (Flutter)
+
+on:
+  push:
+    branches:
+      - main  # or your branch name
+  workflow_dispatch:  # lets you manually trigger builds
+
+jobs:
+  build_ios:
+    name: Build iOS App
+    runs-on: macos-latest  # free macOS build server
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build iOS release
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos/

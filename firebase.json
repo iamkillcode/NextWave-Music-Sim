@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"nextwave-music-sim","appId":"1:554743988495:android:7791fa662d945a94d0be7a","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"nextwave-music-sim","configurations":{"android":"1:554743988495:android:7791fa662d945a94d0be7a","ios":"1:554743988495:ios:9c71e37708fcd20ed0be7a","web":"1:554743988495:web:ad5721181a1c5b11d0be7a"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "nextwave-music-sim",
+          "appId": "1:554743988495:android:7791fa662d945a94d0be7a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "nextwave-music-sim",
+          "configurations": {
+            "android": "1:554743988495:android:7791fa662d945a94d0be7a",
+            "ios": "1:554743988495:ios:9c71e37708fcd20ed0be7a",
+            "web": "1:554743988495:web:ad5721181a1c5b11d0be7a"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
+}
