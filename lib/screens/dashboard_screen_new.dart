@@ -239,6 +239,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             regionalFanbase: loadedRegionalFanbase,
           );
         });
+
+        // Check if player missed days while offline
+        await _checkForMissedDays(data);
       } else {
         print('⚠️ Profile not found in Firestore, using demo stats');
       }
@@ -246,6 +249,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('❌ Error loading profile: $e');
       print('💡 Using demo stats instead');
       // Keep the default stats if loading fails
+    }
+  }
+
+  /// Check if player was offline and show welcome back message
+  /// Note: Server handles all daily updates automatically at midnight UTC
+  /// This just shows the player what they earned while away
+  Future<void> _checkForMissedDays(Map<String, dynamic> data) async {
+    try {
+      // Get last active time
+      final lastActiveTimestamp = data['lastActive'] as Timestamp?;
+      if (lastActiveTimestamp == null) {
+        print('⚠️ No lastActive timestamp');
+        return;
+      }
+
+      final lastActive = lastActiveTimestamp.toDate();
+      final currentGameDate = await _gameTimeService.getCurrentGameDate();
+
+      // Calculate how many in-game days passed since last login
+      final daysMissed = currentGameDate
+          .difference(
+            DateTime(lastActive.year, lastActive.month, lastActive.day),
+          )
+          .inDays;
+
+      if (daysMissed <= 0) {
+        print('✅ Player is up to date');
+        return;
+      }
+
+      print('🌅 Player was offline for $daysMissed day(s)');
+
+      // Server already updated everything!
+      // Just calculate what they earned to show them
+      int totalStreams = 0;
+      int previousMoney = data['previousMoney'] ?? artistStats.money;
+      int incomeEarned = artistStats.money - previousMoney;
+
+      // Calculate total streams earned (approximate)
+      for (final song in artistStats.songs) {
+        if (song.state == SongState.released) {
+          totalStreams += song.lastDayStreams * daysMissed;
+        }
+      }
+
+      // Show welcome back message
+      if (daysMissed > 0) {
+        _addNotification(
+          'Welcome Back!',
+          'While you were away for $daysMissed day(s), your music earned ${_streamGrowthService.formatStreams(totalStreams)} streams and \$$incomeEarned! 🎉',
+          icon: Icons.celebration,
+        );
+
+        _showMessage(
+          '💰 Offline earnings: \$$incomeEarned from $daysMissed day(s)!',
+        );
+      }
+    } catch (e) {
+      print('❌ Error checking missed days: $e');
+      // Don't fail the login if this check fails
     }
   }
 
@@ -265,6 +328,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .update({
             'currentFame': artistStats.fame,
             'currentMoney': artistStats.money,
+            'previousMoney': artistStats
+                .money, // Store current money as previous for next session
             'inspirationLevel': artistStats.inspirationLevel,
             'level': artistStats.fanbase,
             'loyalFanbase': artistStats.loyalFanbase,
@@ -278,6 +343,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'homeRegion': artistStats.currentRegion,
             'age': artistStats.age,
             'regionalFanbase': artistStats.regionalFanbase,
+            'lastActive': Timestamp.fromDate(
+              DateTime.now(),
+            ), // Track last activity
             'songs': artistStats.songs.map((song) => song.toJson()).toList(),
             if (artistStats.careerStartDate != null)
               'careerStartDate': Timestamp.fromDate(
