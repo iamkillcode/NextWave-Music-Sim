@@ -8,12 +8,11 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // ============================================================================
-// 1. DAILY UPDATE - Main game progression (EVERY HOUR)
-// In-game: 1 day = 1 real-world hour
+// 1. DAILY UPDATE - Main game progression (Midnight UTC)
 // ============================================================================
 
 exports.dailyGameUpdate = functions.pubsub
-  .schedule('0 * * * *') // Every hour (1 in-game day)
+  .schedule('0 0 * * *') // Every day at midnight UTC
   .timeZone('UTC')
   .onRun(async (context) => {
     console.log('🌅 Starting daily game update for all players...');
@@ -99,12 +98,11 @@ exports.dailyGameUpdate = functions.pubsub
   });
 
 // ============================================================================
-// 2. WEEKLY LEADERBOARD UPDATE - Snapshots & historical tracking (EVERY 7 HOURS)
-// In-game: 1 week = 7 real-world hours
+// 2. WEEKLY LEADERBOARD UPDATE - Snapshots & historical tracking (Sunday 1 AM UTC)
 // ============================================================================
 
 exports.weeklyLeaderboardUpdate = functions.pubsub
-  .schedule('0 */7 * * *') // Every 7 hours (1 in-game week)
+  .schedule('0 1 * * 0') // Every Sunday at 1 AM UTC
   .timeZone('UTC')
   .onRun(async (context) => {
     console.log('📊 Starting weekly leaderboard snapshot...');
@@ -216,12 +214,11 @@ exports.validateSongRelease = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================================================
-// 5. SPECIAL EVENTS SYSTEM - Dynamic game events (EVERY 7 HOURS)
-// In-game: 1 week = 7 real-world hours
+// 5. SPECIAL EVENTS SYSTEM - Dynamic game events (Monday noon UTC)
 // ============================================================================
 
 exports.triggerSpecialEvent = functions.pubsub
-  .schedule('0 */7 * * *') // Every 7 hours (1 in-game week)
+  .schedule('0 12 * * 1') // Every Monday at noon UTC
   .timeZone('UTC')
   .onRun(async (context) => {
     console.log('🎪 Triggering weekly special event...');
@@ -233,14 +230,14 @@ exports.triggerSpecialEvent = functions.pubsub
           name: '🔥 Viral Week',
           description: 'All songs get 2x viral chance!',
           effect: { viralityMultiplier: 2.0 },
-          duration: 7, // hours (1 in-game week)
+          duration: 7, // days
         },
         {
           id: 'album_week',
           name: '💿 Album Week',
           description: 'Albums earn 50% more streams!',
           effect: { albumBonus: 1.5 },
-          duration: 7, // hours (1 in-game week)
+          duration: 7,
         },
         {
           id: 'regional_focus',
@@ -250,21 +247,21 @@ exports.triggerSpecialEvent = functions.pubsub
             regionalBonus: 2.0,
             targetRegion: selectRandomRegion(),
           },
-          duration: 7, // hours (1 in-game week)
+          duration: 7,
         },
         {
           id: 'new_artist_boost',
           name: '⭐ Rising Stars Week',
           description: 'Artists under 10K fans get 3x discovery!',
           effect: { newArtistBonus: 3.0 },
-          duration: 7, // hours (1 in-game week)
+          duration: 7,
         },
         {
           id: 'chart_fever',
           name: '📊 Chart Fever',
           description: 'Top 10 songs get extra rewards!',
           effect: { chartBonusMultiplier: 1.5 },
-          duration: 7, // hours (1 in-game week)
+          duration: 7,
         },
       ];
       
@@ -276,7 +273,7 @@ exports.triggerSpecialEvent = functions.pubsub
         ...event,
         startDate: admin.firestore.FieldValue.serverTimestamp(),
         endDate: admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() + event.duration * 60 * 60 * 1000) // 7 hours (1 in-game week)
+          new Date(Date.now() + event.duration * 24 * 60 * 60 * 1000)
         ),
         active: true,
       });
