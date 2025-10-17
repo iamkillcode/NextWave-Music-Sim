@@ -19,6 +19,8 @@ class PracticeScreen extends StatefulWidget {
 class _PracticeScreenState extends State<PracticeScreen> {
   String? _selectedPractice;
   final int _energyCost = 15;
+  final int _moneyCost = 50; // Cost for practice materials/studio time
+  final int _timeHours = 3; // Practice takes 3 hours
 
   final List<Map<String, dynamic>> _practiceOptions = [
     {
@@ -27,7 +29,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
       'emoji': '🎼',
       'description': 'Improve your songwriting skills',
       'color': const Color(0xFF00D9FF),
-      'xp': 15,
+      'xp': 8, // Reduced XP for gradual gains
+      'skillGain': 2, // Small skill gain per session
     },
     {
       'id': 'lyrics',
@@ -35,7 +38,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
       'emoji': '📝',
       'description': 'Work on your lyrical abilities',
       'color': const Color(0xFFFF6B9D),
-      'xp': 12,
+      'xp': 6,
+      'skillGain': 2,
     },
     {
       'id': 'composition',
@@ -43,7 +47,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
       'emoji': '🎹',
       'description': 'Practice music composition',
       'color': const Color(0xFF9B59B6),
-      'xp': 18,
+      'xp': 10,
+      'skillGain': 3,
     },
     {
       'id': 'inspiration',
@@ -51,13 +56,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
       'emoji': '💡',
       'description': 'Gain creative inspiration',
       'color': const Color(0xFFFFD60A),
-      'xp': 10,
+      'xp': 5,
+      'skillGain': 4, // Higher inspiration gain
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    final canPractice = widget.artistStats.energy >= _energyCost;
+    final canPractice =
+        widget.artistStats.energy >= _energyCost &&
+        widget.artistStats.money >= _moneyCost;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
@@ -153,47 +161,127 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Energy indicator
+                    // Costs indicators
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.bolt,
-                              color: Color(0xFFFF6B9D),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Energy: ${widget.artistStats.energy}/100',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                        // Energy cost
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.bolt,
+                                color: Color(0xFFFF6B9D),
+                                size: 18,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                '${widget.artistStats.energy}/100',
+                                style: TextStyle(
+                                  color:
+                                      widget.artistStats.energy >= _energyCost
+                                      ? Colors.white
+                                      : const Color(0xFFFF453A),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
+                        // Money cost
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.attach_money,
+                                color: Color(0xFF32D74B),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '\$${widget.artistStats.money}',
+                                style: TextStyle(
+                                  color: widget.artistStats.money >= _moneyCost
+                                      ? Colors.white
+                                      : const Color(0xFFFF453A),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF39C12).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Cost info
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF39C12).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFF39C12).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Practice Cost:',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           ),
-                          child: Text(
-                            'Costs $_energyCost ⚡',
+                          const SizedBox(width: 8),
+                          Text(
+                            '$_energyCost ⚡',
                             style: const TextStyle(
-                              color: Color(0xFFF39C12),
+                              color: Color(0xFFFF6B9D),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          const Text(
+                            '•',
+                            style: TextStyle(
+                              color: Colors.white30,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '\$$_moneyCost 💵',
+                            style: const TextStyle(
+                              color: Color(0xFF32D74B),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            '•',
+                            style: TextStyle(
+                              color: Colors.white30,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_timeHours hrs ⏰',
+                            style: const TextStyle(
+                              color: Color(0xFF0A84FF),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -212,7 +300,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Select a skill to improve. Better results with higher energy.',
+                'Practice consistently for gradual improvement. Small gains lead to mastery!',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6),
                   fontSize: 14,
@@ -254,8 +342,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                     _selectedPractice == null
                         ? 'Select a Practice Option'
                         : canPractice
-                        ? 'Start Practicing'
-                        : 'Not Enough Energy',
+                        ? 'Start Practicing ($_timeHours hours)'
+                        : widget.artistStats.energy < _energyCost
+                        ? 'Not Enough Energy'
+                        : 'Not Enough Money',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -283,7 +373,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'You need at least $_energyCost energy to practice',
+                          widget.artistStats.energy < _energyCost
+                              ? 'You need at least $_energyCost energy to practice'
+                              : 'You need at least \$$_moneyCost to practice',
                           style: const TextStyle(
                             color: Color(0xFFFF453A),
                             fontSize: 13,
@@ -412,10 +504,25 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       Icon(Icons.trending_up, color: option['color'], size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        '+${option['xp']} XP',
+                        '+${option['skillGain']}-${option['skillGain'] + 2} skill',
                         style: TextStyle(
                           color: option['color'],
-                          fontSize: 12,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.stars,
+                        color: Color(0xFFFFD60A),
+                        size: 12,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '+${option['xp']} XP',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD60A),
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -438,7 +545,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   void _practiceSkill() {
-    if (_selectedPractice == null || widget.artistStats.energy < _energyCost) {
+    if (_selectedPractice == null ||
+        widget.artistStats.energy < _energyCost ||
+        widget.artistStats.money < _moneyCost) {
       return;
     }
 
@@ -447,11 +556,17 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
 
     final random = Random();
-    int skillGain = 2 + (widget.artistStats.energy > 50 ? 1 : 0);
 
-    // Add slight randomness (±1)
-    skillGain += random.nextInt(3) - 1;
-    skillGain = skillGain.clamp(1, 5);
+    // Small, gradual skill gains (base from option, ±1 random)
+    int baseSkillGain = option['skillGain'] as int;
+    int skillGain = baseSkillGain + random.nextInt(3) - 1;
+    skillGain = skillGain.clamp(1, baseSkillGain + 2);
+
+    // Very small experience gains
+    int xpGain = option['xp'] as int;
+
+    // Tiny fame increase (1 in 3 chance to get +1 fame)
+    int fameGain = random.nextInt(3) == 0 ? 1 : 0;
 
     Map<String, int> improvements = {};
     String practiceMessage = '';
@@ -459,31 +574,37 @@ class _PracticeScreenState extends State<PracticeScreen> {
     switch (_selectedPractice) {
       case 'songwriting':
         improvements['songwritingSkill'] = skillGain;
-        improvements['experience'] = option['xp'];
-        practiceMessage = '🎼 Practiced songwriting techniques!';
+        improvements['experience'] = xpGain;
+        practiceMessage =
+            'You refined your songwriting techniques through focused practice.';
         break;
       case 'lyrics':
         improvements['lyricsSkill'] = skillGain;
-        improvements['experience'] = option['xp'];
-        practiceMessage = '📝 Worked on lyrical skills!';
+        improvements['experience'] = xpGain;
+        practiceMessage =
+            'You developed your lyrical abilities with dedicated effort.';
         break;
       case 'composition':
         improvements['compositionSkill'] = skillGain;
-        improvements['experience'] = option['xp'];
-        practiceMessage = '🎹 Practiced music composition!';
+        improvements['experience'] = xpGain;
+        practiceMessage = 'You enhanced your musical composition skills.';
         break;
       case 'inspiration':
-        improvements['inspirationLevel'] = skillGain * 2;
-        improvements['experience'] = option['xp'];
-        practiceMessage = '💡 Gained creative inspiration!';
+        improvements['inspirationLevel'] = skillGain;
+        improvements['experience'] = xpGain;
+        practiceMessage = 'You found creative inspiration through exploration.';
         break;
     }
 
-    // Update stats
+    // Update stats with gradual gains and resource consumption
     final updatedStats = widget.artistStats.copyWith(
       energy: widget.artistStats.energy - _energyCost,
-      creativity: widget.artistStats.creativity + 3,
-      fanbase: widget.artistStats.fanbase + 1,
+      money: widget.artistStats.money - _moneyCost,
+      creativity: (widget.artistStats.creativity + 1).clamp(
+        0,
+        100,
+      ), // Tiny creativity boost
+      fanbase: widget.artistStats.fanbase + fameGain, // Sometimes gain a fan
       songwritingSkill:
           (widget.artistStats.songwritingSkill +
                   (improvements['songwritingSkill'] ?? 0))
@@ -518,7 +639,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
             const Expanded(
               child: Text(
                 'Practice Complete!',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.white, fontSize: 18),
               ),
             ),
           ],
@@ -529,17 +650,65 @@ class _PracticeScreenState extends State<PracticeScreen> {
           children: [
             Text(
               practiceMessage,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$_timeHours hours of practice completed',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
-            _buildResultRow('Skill Gained', '+$skillGain', option['color']),
+            const Text(
+              'Gains:',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildResultRow('Skill', '+$skillGain', option['color']),
             _buildResultRow(
               'Experience',
               '+${improvements['experience']} XP',
-              const Color(0xFF0A84FF),
+              const Color(0xFFFFD60A),
             ),
-            _buildResultRow('Creativity', '+3', const Color(0xFFFFD60A)),
-            _buildResultRow('Fans', '+1', const Color(0xFF32D74B)),
+            _buildResultRow('Creativity', '+1', const Color(0xFF9B59B6)),
+            if (fameGain > 0)
+              _buildResultRow('Fame', '+$fameGain', const Color(0xFF32D74B)),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white24),
+            const SizedBox(height: 8),
+            const Text(
+              'Resources Used:',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildResultRow(
+              'Energy',
+              '-$_energyCost ⚡',
+              const Color(0xFFFF6B9D),
+            ),
+            _buildResultRow(
+              'Money',
+              '-\$$_moneyCost 💵',
+              const Color(0xFFFF9500),
+            ),
           ],
         ),
         actions: [

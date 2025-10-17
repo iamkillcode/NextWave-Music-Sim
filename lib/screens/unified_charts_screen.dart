@@ -136,9 +136,39 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: SegmentedButton<String>(
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.resolveWith<Color>((
+                      Set<MaterialState> states,
+                    ) {
+                      if (states.contains(MaterialState.selected)) {
+                        return _getThemeColor().withOpacity(0.3);
+                      }
+                      return Colors.grey[800]!;
+                    }),
+                    foregroundColor: MaterialStateProperty.resolveWith<Color>((
+                      Set<MaterialState> states,
+                    ) {
+                      if (states.contains(MaterialState.selected)) {
+                        return _getThemeColor();
+                      }
+                      return Colors.white;
+                    }),
+                  ),
                   segments: const [
-                    ButtonSegment(value: 'daily', label: Text('Daily')),
-                    ButtonSegment(value: 'weekly', label: Text('Weekly')),
+                    ButtonSegment(
+                      value: 'daily',
+                      label: Text(
+                        'Daily',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    ButtonSegment(
+                      value: 'weekly',
+                      label: Text(
+                        'Weekly',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   ],
                   selected: {_selectedPeriod},
                   onSelectionChanged: (Set<String> newSelection) {
@@ -167,10 +197,55 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: SegmentedButton<String>(
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.resolveWith<Color>((
+                      Set<MaterialState> states,
+                    ) {
+                      if (states.contains(MaterialState.selected)) {
+                        return _getThemeColor().withOpacity(0.3);
+                      }
+                      return Colors.grey[800]!;
+                    }),
+                    foregroundColor: MaterialStateProperty.resolveWith<Color>((
+                      Set<MaterialState> states,
+                    ) {
+                      if (states.contains(MaterialState.selected)) {
+                        return _getThemeColor();
+                      }
+                      return Colors.white;
+                    }),
+                  ),
                   segments: const [
-                    ButtonSegment(value: 'singles', label: Text('Singles')),
-                    ButtonSegment(value: 'albums', label: Text('Albums')),
-                    ButtonSegment(value: 'artists', label: Text('Artists')),
+                    ButtonSegment(
+                      value: 'singles',
+                      label: Text(
+                        'Singles',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    ButtonSegment(
+                      value: 'albums',
+                      label: Text(
+                        'Albums',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    ButtonSegment(
+                      value: 'artists',
+                      label: Text(
+                        'Artists',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
                   ],
                   selected: {_selectedType},
                   onSelectionChanged: (Set<String> newSelection) {
