@@ -28,3 +28,42 @@ void main() {
     expect(find.text('1'), findsOneWidget);
   });
 }
+
+// Minimal MyApp implementation for the widget test to use.
+// This provides a counter starting at 0 and a FloatingActionButton
+// with Icons.add that increments the counter to 1 when tapped.
+class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  int _counter = 0;
+
+  void _increment() {
+    setState(() {
+      _counter++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Text(
+            '$_counter',
+            key: const ValueKey('counterText'),
+            style: const TextStyle(fontSize: 24),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _increment,
+          child: const Icon(Icons.add),
+        ),
+      ),
+    );
+  }
+}

@@ -4,22 +4,25 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import '../models/side_hustle.dart';
 import '../services/firebase_service.dart';
 import '../services/demo_firebase_service.dart';
 import '../services/game_time_service.dart';
 import '../services/stream_growth_service.dart';
+import '../services/side_hustle_service.dart';
 import '../services/song_name_generator.dart';
-import 'leaderboard_screen.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
 import 'media_hub_screen.dart';
 import 'studios_list_screen.dart';
+import 'activity_hub_screen.dart';
 import '../utils/firebase_status.dart';
 import 'settings_screen.dart';
-import 'unified_charts_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final dynamic initialStats;
+
+  const DashboardScreen({super.key, this.initialStats});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -41,6 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isInitializing = false;
   final GameTimeService _gameTimeService = GameTimeService();
   final StreamGrowthService _streamGrowthService = StreamGrowthService();
+  final SideHustleService _sideHustleService = SideHustleService();
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
 
   @override
@@ -54,23 +58,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Initialize passive income tracking
     _lastPassiveIncomeTime = DateTime.now();
 
-    // Initialize with default stats (will be replaced by user profile)
-    artistStats = ArtistStats(
-      name: "Loading...",
-      fame: 0,
-      money: 1000, // Starting money - just starting out!
-      energy: 100,
-      creativity: 0, // No hype yet - you're just starting!
-      fanbase: 1,
-      albumsSold: 0,
-      songsWritten: 0,
-      concertsPerformed: 0,
-      songwritingSkill: 10,
-      experience: 0,
-      lyricsSkill: 10,
-      compositionSkill: 10,
-      inspirationLevel: 0, // No hype yet - you're just starting!
-    );
+    // Initialize with provided initialStats (from onboarding) or defaults
+    if (widget.initialStats != null && widget.initialStats is ArtistStats) {
+      artistStats = widget.initialStats as ArtistStats;
+    } else {
+      artistStats = ArtistStats(
+        name: "Loading...",
+        fame: 0,
+        money:
+            5000, // Starting money - enough to get started with side hustles!
+        energy: 100,
+        creativity: 0, // No hype yet - you're just starting!
+        fanbase: 1,
+        albumsSold: 0,
+        songsWritten: 0,
+        concertsPerformed: 0,
+        songwritingSkill: 10,
+        experience: 0,
+        lyricsSkill: 10,
+        compositionSkill: 10,
+        inspirationLevel: 0, // No hype yet - you're just starting!
+      );
+    }
 
     // Load user profile from Firestore
     _loadUserProfile();
@@ -213,11 +222,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         }
 
+        // Load active side hustle
+        SideHustle? loadedSideHustle;
+        if (data['activeSideHustle'] != null) {
+          try {
+            loadedSideHustle = SideHustle.fromJson(
+              Map<String, dynamic>.from(data['activeSideHustle']),
+            );
+            print(
+              '✅ Loaded active side hustle: ${loadedSideHustle.type.displayName}',
+            );
+          } catch (e) {
+            print('⚠️ Error loading side hustle: $e');
+          }
+        }
+
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? 'Unknown Artist',
             fame: (data['currentFame'] ?? 0).toInt(),
-            money: (data['currentMoney'] ?? 1000).toInt(),
+            money: (data['currentMoney'] ?? 5000).toInt(),
             energy: 100, // Always start with full energy
             creativity: (data['inspirationLevel'] ?? 0).toInt(),
             fanbase: (data['level'] ?? 1).toInt(),
@@ -238,6 +262,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 DateTime.now(),
             regionalFanbase: loadedRegionalFanbase,
             avatarUrl: data['avatarUrl'] as String?,
+            activeSideHustle: loadedSideHustle,
           );
         });
 
@@ -348,6 +373,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               DateTime.now(),
             ), // Track last activity
             'songs': artistStats.songs.map((song) => song.toJson()).toList(),
+            'activeSideHustle': artistStats.activeSideHustle?.toJson(),
             if (artistStats.careerStartDate != null)
               'careerStartDate': Timestamp.fromDate(
                 artistStats.careerStartDate!,
@@ -667,18 +693,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
+    // 💼 SIDE HUSTLE SYSTEM: Apply daily side hustle effects (energy cost + pay)
+    int sideHustlePay = 0;
+    int sideHustleEnergyCost = 0;
+    bool sideHustleExpired = false;
+
+    if (artistStats.activeSideHustle != null) {
+      final result = _sideHustleService.applyDailySideHustle(
+        sideHustle: artistStats.activeSideHustle!,
+        currentMoney: artistStats.money + totalNewIncome,
+        currentEnergy: artistStats.energy,
+        currentGameDate: currentGameDate,
+      );
+
+      sideHustlePay = result['money']! - (artistStats.money + totalNewIncome);
+      sideHustleEnergyCost = (artistStats.energy - result['energy']!).round();
+      sideHustleExpired = result['expired'] == 1;
+
+      totalNewIncome += sideHustlePay;
+
+      print(
+        '💼 Side hustle (${artistStats.activeSideHustle!.type.displayName}): -$sideHustleEnergyCost energy, +\$$sideHustlePay pay',
+      );
+    }
+
     // Update artist stats with new songs, income, and growth from streaming success
     if (totalNewStreams > 0 ||
         fanbaseGrowth > 0 ||
         fameGrowth > 0 ||
-        loyalFanGrowth > 0) {
+        loyalFanGrowth > 0 ||
+        sideHustlePay > 0 ||
+        sideHustleEnergyCost > 0) {
       setState(() {
         artistStats = artistStats.copyWith(
           songs: updatedSongs,
           money: artistStats.money + totalNewIncome,
+          energy: sideHustleEnergyCost > 0
+              ? (artistStats.energy - sideHustleEnergyCost).clamp(0, 100)
+              : artistStats.energy,
           fanbase: artistStats.fanbase + fanbaseGrowth,
           fame: artistStats.fame + fameGrowth,
           loyalFanbase: artistStats.loyalFanbase + loyalFanGrowth,
+          clearSideHustle: sideHustleExpired, // Clear if contract expired
         );
       });
 
@@ -689,6 +745,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (fanbaseGrowth > 0 || fameGrowth > 0 || loyalFanGrowth > 0) {
         print(
           '📈 Artist growth: +$fanbaseGrowth fans (+$loyalFanGrowth loyal), +$fameGrowth fame (from streaming success)',
+        );
+      }
+
+      if (sideHustleExpired) {
+        print(
+          '⏰ Side hustle contract expired: ${artistStats.activeSideHustle!.type.displayName}',
+        );
+        _addNotification(
+          'Contract Ended',
+          'Your ${artistStats.activeSideHustle!.type.displayName} contract has ended!',
+          icon: Icons.work_off,
         );
       }
 
@@ -1497,7 +1564,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 // Responsive grid columns based on width
-                int crossAxisCount = 3;
+                int crossAxisCount = 2;
                 double childAspectRatio = 2.0;
 
                 if (constraints.maxWidth < 400) {
@@ -1507,11 +1574,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 } else if (constraints.maxWidth >= 600 &&
                     constraints.maxWidth < 1024) {
                   // Tablet
-                  crossAxisCount = 4;
+                  crossAxisCount = 3;
                   childAspectRatio = 2.2;
                 } else if (constraints.maxWidth >= 1024) {
                   // Desktop
-                  crossAxisCount = 5;
+                  crossAxisCount = 4;
                   childAspectRatio = 2.5;
                 }
 
@@ -1552,35 +1619,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                       },
                       customCostText: 'Record',
-                    ),
-                    _buildActionCard(
-                      'Practice',
-                      Icons.music_note_rounded,
-                      const Color(0xFFF39C12),
-                      energyCost: 15,
-                      onTap: () => _performAction('practice'),
-                    ),
-                    _buildActionCard(
-                      'Promote',
-                      Icons.campaign_rounded,
-                      const Color(0xFFFF6B9D),
-                      energyCost: 10,
-                      onTap: () => _performAction('social_media'),
-                    ),
-                    _buildActionCard(
-                      'Charts',
-                      Icons.bar_chart_rounded,
-                      const Color(0xFF4CAF50),
-                      energyCost: -1,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const UnifiedChartsScreen(),
-                          ),
-                        );
-                      },
-                      customCostText: 'View',
                     ),
                   ],
                 );
@@ -2807,18 +2845,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           _selectedIndex = index;
         }); // Handle navigation
-        if (index == 1 && _isOnlineMode) {
-          // Activity tab -> Leaderboards
+        if (index == 1) {
+          // Activity tab -> Activity Hub
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  LeaderboardScreen(multiplayerService: _multiplayerService),
+              builder: (context) => ActivityHubScreen(
+                artistStats: artistStats,
+                onStatsUpdated: (updatedStats) {
+                  setState(() {
+                    artistStats = updatedStats;
+                  });
+                  _saveUserProfile(); // Save stats to Firestore
+                },
+                currentGameDate: currentGameDate ?? DateTime.now(),
+              ),
             ),
           );
-        } else if (index == 1 && !_isOnlineMode) {
-          _showMessage('🌐 Connecting to online mode...');
-          _initializeOnlineMode();
         } else if (index == 2) {
           // Music tab -> Music Hub
           Navigator.push(

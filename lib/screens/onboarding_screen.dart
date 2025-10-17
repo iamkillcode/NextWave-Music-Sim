@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_screen_new.dart';
+import '../models/artist_stats.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final User user;
 
-  const OnboardingScreen({
-    super.key,
-    required this.user,
-  });
+  const OnboardingScreen({super.key, required this.user});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -75,6 +73,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
     }
   }
+
   Future<void> _completeOnboarding() async {
     if (_artistName.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +83,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
       );
       return;
-    }    setState(() => _isLoading = true);
+    }
+    setState(() => _isLoading = true);
 
     print('🚀 Starting onboarding completion...');
     print('   Artist Name: $_artistName');
@@ -104,7 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'joinDate': Timestamp.now(),
         'lastActive': Timestamp.now(),
         'isOnline': true,
-        'currentMoney': 1000, // Starting money - just starting out!
+        'currentMoney': 5000, // Starting money - enough to get started!
         'currentFame': 0,
         'level': 1,
         'loyalFanbase': 0,
@@ -132,7 +132,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           .timeout(
             const Duration(seconds: 10),
             onTimeout: () {
-              throw Exception('Connection timeout. Please check your internet connection and Firebase setup.');
+              throw Exception(
+                'Connection timeout. Please check your internet connection and Firebase setup.',
+              );
             },
           );
 
@@ -146,19 +148,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         );
 
-        // Navigate to dashboard
+        // Build initial ArtistStats to pass to Dashboard so onboarding selections show immediately
+        final initialStats = ArtistStats(
+          name: _artistName.trim(),
+          fame: 0,
+          money: 5000,
+          energy: 100,
+          creativity: 0,
+          fanbase: 1,
+          loyalFanbase: 0,
+          regionalFanbase: {},
+          albumsSold: 0,
+          songsWritten: 0,
+          concertsPerformed: 0,
+          songwritingSkill: 10,
+          experience: 0,
+          lyricsSkill: 10,
+          compositionSkill: 10,
+          inspirationLevel: 0,
+          songs: [],
+          currentRegion: _selectedRegion,
+          age: _selectedAge,
+          careerStartDate: DateTime.now(),
+        );
+
+        // Navigate to dashboard and pass initial stats
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const DashboardScreen(),
+            builder: (context) => DashboardScreen(initialStats: initialStats),
           ),
         );
       }
     } catch (e) {
       print('❌ Onboarding error: $e');
-      
+
       if (mounted) {
         setState(() => _isLoading = false);
-        
+
         // Show detailed error with options
         showDialog(
           context: context,
@@ -180,10 +206,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Error: ${e.toString()}',
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -219,9 +242,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Navigator.of(context).pop();
                   // Continue anyway to dashboard (demo mode)
                   Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => const DashboardScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => DashboardScreen()),
                   );
                 },
                 child: const Text(
@@ -244,11 +265,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0D1117),
-              Color(0xFF1A1F2E),
-              Color(0xFF0D1117),
-            ],
+            colors: [Color(0xFF0D1117), Color(0xFF1A1F2E), Color(0xFF0D1117)],
           ),
         ),
         child: SafeArea(
@@ -270,7 +287,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         child: LinearProgressIndicator(
                           value: (_currentPage + 1) / 5,
                           backgroundColor: Colors.white24,
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00D9FF)),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF00D9FF),
+                          ),
                           minHeight: 8,
                         ),
                       ),
@@ -326,11 +345,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             width: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.black,
+                              ),
                             ),
                           )
                         : Text(
-                            _currentPage == 3 ? 'START YOUR JOURNEY' : 'CONTINUE',
+                            _currentPage == 3
+                                ? 'START YOUR JOURNEY'
+                                : 'CONTINUE',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -365,11 +388,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.star,
-              size: 80,
-              color: Color(0xFF00D9FF),
-            ),
+            child: const Icon(Icons.star, size: 80, color: Color(0xFF00D9FF)),
           ),
           const SizedBox(height: 32),
           const Text(
@@ -396,7 +415,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildFeatureItem(
             icon: Icons.music_note,
             title: 'Create Music',
-            description: 'Write songs, record albums, and build your discography',
+            description:
+                'Write songs, record albums, and build your discography',
           ),
           const SizedBox(height: 24),
           _buildFeatureItem(
@@ -425,9 +445,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF21262D),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF00D9FF).withOpacity(0.2),
-        ),
+        border: Border.all(color: const Color(0xFF00D9FF).withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -455,10 +473,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: const TextStyle(
-                    color: Colors.white60,
-                    fontSize: 14,
-                  ),
+                  style: const TextStyle(color: Colors.white60, fontSize: 14),
                 ),
               ],
             ),
@@ -475,11 +490,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 40),
-          const Icon(
-            Icons.person,
-            size: 80,
-            color: Color(0xFF00D9FF),
-          ),
+          const Icon(Icons.person, size: 80, color: Color(0xFF00D9FF)),
           const SizedBox(height: 32),
           const Text(
             'What\'s Your Artist Name?',
@@ -493,10 +504,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 16),
           const Text(
             'Choose a name that will be remembered',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white60,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.white60),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
@@ -535,7 +543,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF00D9FF),
+                        width: 2,
+                      ),
                     ),
                   ),
                   maxLength: 30,
@@ -563,7 +574,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF00D9FF), width: 2),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF00D9FF),
+                        width: 2,
+                      ),
                     ),
                   ),
                   maxLength: 200,
@@ -582,11 +596,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          const Icon(
-            Icons.cake,
-            size: 80,
-            color: Color(0xFF00D9FF),
-          ),
+          const Icon(Icons.cake, size: 80, color: Color(0xFF00D9FF)),
           const SizedBox(height: 32),
           const Text(
             'How Old Are You?',
@@ -600,10 +610,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 16),
           const Text(
             'Your age will progress as you play',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white60,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.white60),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
@@ -612,7 +619,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF21262D),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF00D9FF).withOpacity(0.3)),
+              border: Border.all(
+                color: const Color(0xFF00D9FF).withOpacity(0.3),
+              ),
             ),
             child: Column(
               children: [
@@ -627,10 +636,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   'Years Old',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white60,
-                  ),
+                  style: TextStyle(fontSize: 18, color: Colors.white60),
                 ),
                 const SizedBox(height: 32),
                 Slider(
@@ -678,7 +684,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: Color(0xFF00D9FF), size: 20),
+                const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFF00D9FF),
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -703,11 +713,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          const Icon(
-            Icons.music_note,
-            size: 80,
-            color: Color(0xFF00D9FF),
-          ),
+          const Icon(Icons.music_note, size: 80, color: Color(0xFF00D9FF)),
           const SizedBox(height: 32),
           const Text(
             'Pick Your Primary Genre',
@@ -721,10 +727,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 16),
           const Text(
             'You can experiment with other genres later',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white60,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.white60),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
@@ -741,15 +744,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             itemBuilder: (context, index) {
               final genre = _genres[index];
               final isSelected = _selectedGenre == genre;
-              
+
               return InkWell(
                 onTap: () => setState(() => _selectedGenre = genre),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF00D9FF).withOpacity(0.2) : const Color(0xFF21262D),
+                    color: isSelected
+                        ? const Color(0xFF00D9FF).withOpacity(0.2)
+                        : const Color(0xFF21262D),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF00D9FF) : Colors.white30,
+                      color: isSelected
+                          ? const Color(0xFF00D9FF)
+                          : Colors.white30,
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -757,9 +764,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Text(
                       genre,
                       style: TextStyle(
-                        color: isSelected ? const Color(0xFF00D9FF) : Colors.white,
+                        color: isSelected
+                            ? const Color(0xFF00D9FF)
+                            : Colors.white,
                         fontSize: 18,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.w600,
                       ),
                     ),
                   ),
@@ -778,11 +789,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         children: [
           const SizedBox(height: 40),
-          const Icon(
-            Icons.public,
-            size: 80,
-            color: Color(0xFF00D9FF),
-          ),
+          const Icon(Icons.public, size: 80, color: Color(0xFF00D9FF)),
           const SizedBox(height: 32),
           const Text(
             'Choose Your Starting Region',
@@ -796,10 +803,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 16),
           const Text(
             'You can travel to other regions later',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white60,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.white60),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
@@ -815,10 +819,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF00D9FF).withOpacity(0.2) : const Color(0xFF21262D),
+                    color: isSelected
+                        ? const Color(0xFF00D9FF).withOpacity(0.2)
+                        : const Color(0xFF21262D),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF00D9FF) : Colors.white30,
+                      color: isSelected
+                          ? const Color(0xFF00D9FF)
+                          : Colors.white30,
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -833,9 +841,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         child: Text(
                           regionData['name']!,
                           style: TextStyle(
-                            color: isSelected ? const Color(0xFF00D9FF) : Colors.white,
+                            color: isSelected
+                                ? const Color(0xFF00D9FF)
+                                : Colors.white,
                             fontSize: 20,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w600,
                           ),
                         ),
                       ),

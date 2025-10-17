@@ -127,7 +127,11 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             children: [
               const Text(
                 '⏱️ Period: ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -154,7 +158,11 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             children: [
               const Text(
                 '🎵 Type: ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -182,12 +190,18 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             children: [
               const Text(
                 '🌍 Region: ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
                   value: _selectedRegion,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  dropdownColor: Colors.grey[850],
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.grey[850],
@@ -198,7 +212,10 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   items: [
                     const DropdownMenuItem(
                       value: 'global',
-                      child: Text('🌍 Global'),
+                      child: Text(
+                        '🌍 Global',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                     ...UnifiedChartService.regions.map((region) {
                       final flag =
@@ -207,7 +224,10 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                           UnifiedChartService.regionNames[region] ?? region;
                       return DropdownMenuItem(
                         value: region,
-                        child: Text('$flag $name'),
+                        child: Text(
+                          '$flag $name',
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       );
                     }),
                   ],
@@ -277,7 +297,10 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           children: [
             const Icon(Icons.error_outline, size: 64, color: Colors.red),
             const SizedBox(height: 16),
-            Text('Error loading chart', style: const TextStyle(fontSize: 18)),
+            Text(
+              'Error loading chart',
+              style: const TextStyle(fontSize: 18, color: Colors.white),
+            ),
             const SizedBox(height: 8),
             Text(_error!, style: TextStyle(color: Colors.grey[400])),
             const SizedBox(height: 16),
@@ -305,7 +328,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             const SizedBox(height: 16),
             Text(
               'No $_selectedType charting yet',
-              style: const TextStyle(fontSize: 18),
+              style: const TextStyle(fontSize: 18, color: Colors.white),
             ),
             const SizedBox(height: 8),
             Text(

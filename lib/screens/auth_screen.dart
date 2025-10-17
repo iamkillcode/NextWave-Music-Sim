@@ -134,7 +134,7 @@ class _AuthScreenState extends State<AuthScreen>
         try {
           final querySnapshot = await FirebaseFirestore.instance
               .collection('players')
-              .where('artistName', isEqualTo: identifier)
+              .where('displayName', isEqualTo: identifier)
               .limit(1)
               .get();
 
@@ -181,7 +181,7 @@ class _AuthScreenState extends State<AuthScreen>
       if (mounted) {
         // Navigate to dashboard
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          MaterialPageRoute(builder: (context) => DashboardScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {

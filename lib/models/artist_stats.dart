@@ -1,4 +1,5 @@
 import 'song.dart';
+import 'side_hustle.dart';
 
 class ArtistStats {
   final String name;
@@ -13,6 +14,9 @@ class ArtistStats {
   final int albumsSold;
   final int songsWritten;
   final int concertsPerformed;
+
+  // Side hustle system
+  final SideHustle? activeSideHustle; // Current active side hustle contract
 
   // Player Skills
   final int songwritingSkill;
@@ -55,6 +59,7 @@ class ArtistStats {
     this.age = 18,
     this.careerStartDate,
     this.avatarUrl,
+    this.activeSideHustle,
   });
   ArtistStats copyWith({
     String? name,
@@ -78,6 +83,8 @@ class ArtistStats {
     int? age,
     DateTime? careerStartDate,
     String? avatarUrl,
+    SideHustle? activeSideHustle,
+    bool clearSideHustle = false, // Flag to explicitly clear side hustle
   }) {
     return ArtistStats(
       name: name ?? this.name,
@@ -101,6 +108,9 @@ class ArtistStats {
       age: age ?? this.age,
       careerStartDate: careerStartDate ?? this.careerStartDate,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      activeSideHustle: clearSideHustle
+          ? null
+          : (activeSideHustle ?? this.activeSideHustle),
     );
   }
 

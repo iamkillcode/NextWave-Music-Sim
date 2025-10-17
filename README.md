@@ -25,7 +25,26 @@ A mobile music artist life simulation game built with Flutter and Firebase. Rise
 - **Studio Bonuses**: Premium studios and producers boost recording quality
 - **Streaming Economics**: Earn money from streams ($0.003 per stream)
 
-## 🚀 Getting Started
+## � Documentation
+
+All project documentation has been organized into the `/docs` directory:
+
+- **[Documentation Index](docs/README.md)** - Complete documentation navigation
+- **[Quick Start Guide](docs/guides/QUICK_START.md)** - Get started quickly
+- **[Game Overview](docs/guides/GAME_OVERVIEW.md)** - Comprehensive game mechanics
+- **[All Features](docs/ALL_FEATURES_SUMMARY.md)** - Complete feature list
+- **[Latest Release Notes](docs/releases/)** - Version history
+
+### Key Documentation
+
+- 📖 **Systems**: Core game mechanics and technical systems
+- 🎨 **Features**: Specific game features and implementations
+- 📝 **Guides**: User guides and quick references
+- 🔧 **Fixes**: Bug fixes and patches
+- 🚀 **Releases**: Version history and changelogs
+- ⚙️ **Setup**: Installation and configuration
+
+## �🚀 Getting Started
 
 ### Prerequisites
 - Flutter SDK (3.8.1 or higher)
@@ -54,7 +73,7 @@ A mobile music artist life simulation game built with Flutter and Firebase. Rise
    ```
    
    Option B: Manual setup:
-   - See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed instructions
+   - See [docs/setup/FIREBASE_SETUP.md](docs/setup/) for detailed instructions
    - Or run: `flutterfire configure`
 
 4. **Run the app**
