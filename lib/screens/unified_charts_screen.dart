@@ -248,9 +248,18 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
       color: _getThemeColor().withOpacity(0.2),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 18),
+          const Icon(Icons.info_outline, size: 18, color: Colors.white),
           const SizedBox(width: 8),
-          Expanded(child: Text(info, style: const TextStyle(fontSize: 13))),
+          Expanded(
+            child: Text(
+              info,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -353,6 +362,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -369,7 +379,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           children: [
             Text(
               entry['artist'] ?? 'Unknown Artist',
-              style: TextStyle(color: Colors.grey[400]),
+              style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 4),
             Row(
@@ -377,14 +387,14 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 Text(
                   '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams',
                   style: TextStyle(
-                    color: _getThemeColor(),
+                    color: _getStreamColor(),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12),
                 ),
               ],
             ),
@@ -420,6 +430,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -433,13 +444,13 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           children: [
             Text(
               '${entry['releasedSongs'] ?? 0} songs • ${_chartService.formatStreams(entry['fanbase'] ?? 0)} fans',
-              style: TextStyle(color: Colors.grey[400]),
+              style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 4),
             Text(
               '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams ($_selectedPeriod)',
               style: TextStyle(
-                color: _getThemeColor(),
+                color: _getStreamColor(),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -460,13 +471,13 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
       badgeColor = Colors.amber;
       emoji = '🥇';
     } else if (position == 2) {
-      badgeColor = Colors.grey[400]!;
+      badgeColor = Colors.grey[300]!;
       emoji = '🥈';
     } else if (position == 3) {
       badgeColor = Colors.brown;
       emoji = '🥉';
     } else {
-      badgeColor = Colors.grey[700]!;
+      badgeColor = Colors.grey[600]!;
       emoji = '';
     }
 
@@ -474,7 +485,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
       width: 50,
       height: 50,
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.2),
+        color: badgeColor.withOpacity(0.25),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: badgeColor, width: 2),
       ),
@@ -489,7 +500,8 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 '#$position',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: badgeColor,
+                  color: Colors.white,
+                  fontSize: 14,
                 ),
               ),
           ],
@@ -519,6 +531,21 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
         return Colors.purple;
       } else {
         return Colors.green;
+      }
+    }
+  }
+
+  /// Get high-contrast color for stream counts
+  Color _getStreamColor() {
+    if (_selectedPeriod == 'daily') {
+      return const Color(0xFFFFAA00); // Bright orange
+    } else {
+      if (_selectedType == 'singles') {
+        return const Color(0xFF00D9FF); // Bright cyan
+      } else if (_selectedType == 'albums') {
+        return const Color(0xFFAA66FF); // Bright purple
+      } else {
+        return const Color(0xFF00FF88); // Bright green
       }
     }
   }

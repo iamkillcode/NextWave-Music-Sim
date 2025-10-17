@@ -540,6 +540,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         continue;
       }
 
+      // ⏰ REALISTIC STREAM DELAYS: Check if enough time has passed since last update
+      // Songs on streaming platforms update every 12 hours (half in-game day)
+      final lastUpdate = song.lastStreamUpdateDate ?? song.releasedDate!;
+      final hoursSinceLastUpdate = currentGameDate
+          .difference(lastUpdate)
+          .inHours;
+
+      // Skip if less than 12 hours have passed (need half-day delay)
+      if (hoursSinceLastUpdate < 12) {
+        updatedSongs.add(song.copyWith(last7DaysStreams: decayedLast7Days));
+        print(
+          '⏸️ ${song.title}: Waiting for stream update (${hoursSinceLastUpdate}h/12h)',
+        );
+        continue;
+      }
+
       // Calculate stream growth for this song
       final newStreams = _streamGrowthService.calculateDailyStreamGrowth(
         song: song,
@@ -596,6 +612,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         regionalStreams: updatedRegionalStreams,
         daysOnChart: daysSinceRelease,
         peakDailyStreams: newPeak,
+        lastStreamUpdateDate:
+            currentGameDate, // Track when streams were last updated
       );
 
       updatedSongs.add(updatedSong);
@@ -607,12 +625,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    // Update artist stats with new songs and income
+    // 🎯 BALANCE ARTIST STATS: Calculate fanbase and fame growth from streams
+    // More streams = more fans discovering your music + growing reputation
+    int fanbaseGrowth = 0;
+    int fameGrowth = 0;
+    int loyalFanGrowth = 0;
+
     if (totalNewStreams > 0) {
+      // Every 1,000 streams converts 1 casual listener to a fan
+      // Apply diminishing returns for established artists (prevents exploits)
+      final baseFanGrowth = (totalNewStreams / 1000).floor();
+      final diminishingFactor = 1.0 / (1.0 + artistStats.fanbase / 10000);
+      fanbaseGrowth = (baseFanGrowth * diminishingFactor).round().clamp(
+        0,
+        50,
+      ); // Max 50 fans per day
+
+      // Every 10,000 streams increases fame by 1 point
+      // Also has diminishing returns for mega-celebrities
+      final baseFameGrowth = (totalNewStreams / 10000).floor();
+      final fameDiminishing = 1.0 / (1.0 + artistStats.fame / 500);
+      fameGrowth = (baseFameGrowth * fameDiminishing).round().clamp(
+        0,
+        10,
+      ); // Max 10 fame per day
+
+      // Convert casual fans to loyal fans based on consistent streaming
+      // Every 5,000 streams converts 1 casual fan to loyal (they love your music!)
+      final casualFans = (artistStats.fanbase - artistStats.loyalFanbase)
+          .clamp(0, double.infinity)
+          .toInt();
+      if (casualFans > 0) {
+        final baseLoyalGrowth = (totalNewStreams / 5000).floor();
+        final loyalDiminishing = 1.0 / (1.0 + artistStats.loyalFanbase / 5000);
+        final maxConvertible = (casualFans * 0.05)
+            .round(); // Max 5% of casual fans per day
+        loyalFanGrowth = (baseLoyalGrowth * loyalDiminishing).round().clamp(
+          0,
+          maxConvertible,
+        );
+      }
+    }
+
+    // Update artist stats with new songs, income, and growth from streaming success
+    if (totalNewStreams > 0 ||
+        fanbaseGrowth > 0 ||
+        fameGrowth > 0 ||
+        loyalFanGrowth > 0) {
       setState(() {
         artistStats = artistStats.copyWith(
           songs: updatedSongs,
           money: artistStats.money + totalNewIncome,
+          fanbase: artistStats.fanbase + fanbaseGrowth,
+          fame: artistStats.fame + fameGrowth,
+          loyalFanbase: artistStats.loyalFanbase + loyalFanGrowth,
         );
       });
 
@@ -620,7 +686,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         '💰 Total daily streaming income: \$$totalNewIncome from ${_streamGrowthService.formatStreams(totalNewStreams)} streams',
       );
 
-      // Save to Firebase to persist the income
+      if (fanbaseGrowth > 0 || fameGrowth > 0 || loyalFanGrowth > 0) {
+        print(
+          '📈 Artist growth: +$fanbaseGrowth fans (+$loyalFanGrowth loyal), +$fameGrowth fame (from streaming success)',
+        );
+      }
+
+      // Save to Firebase to persist the income and growth
       _saveUserProfile();
 
       // Show notification

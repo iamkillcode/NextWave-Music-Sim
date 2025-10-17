@@ -35,6 +35,10 @@ class Song {
   // Track whether this is an album or single (for Spotlight charts)
   final bool isAlbum; // true = album (Spotlight 200), false = single (Hot 100)
 
+  // Track last stream update time for realistic delays
+  final DateTime?
+  lastStreamUpdateDate; // When streams were last updated (for half-day delay)
+
   const Song({
     required this.id,
     required this.title,
@@ -59,6 +63,7 @@ class Song {
     this.last7DaysStreams = 0,
     this.regionalStreams = const {},
     this.isAlbum = false, // Default to single
+    this.lastStreamUpdateDate,
   });
 
   Song copyWith({
@@ -85,6 +90,7 @@ class Song {
     int? last7DaysStreams,
     Map<String, int>? regionalStreams,
     bool? isAlbum,
+    DateTime? lastStreamUpdateDate,
   }) {
     return Song(
       id: id ?? this.id,
@@ -110,6 +116,7 @@ class Song {
       last7DaysStreams: last7DaysStreams ?? this.last7DaysStreams,
       regionalStreams: regionalStreams ?? this.regionalStreams,
       isAlbum: isAlbum ?? this.isAlbum,
+      lastStreamUpdateDate: lastStreamUpdateDate ?? this.lastStreamUpdateDate,
     );
   }
 
@@ -139,6 +146,7 @@ class Song {
       'last7DaysStreams': last7DaysStreams,
       'regionalStreams': regionalStreams,
       'isAlbum': isAlbum,
+      'lastStreamUpdateDate': lastStreamUpdateDate?.toIso8601String(),
     };
   }
 
@@ -179,6 +187,9 @@ class Song {
         json['regionalStreams'] as Map? ?? {},
       ),
       isAlbum: json['isAlbum'] as bool? ?? false,
+      lastStreamUpdateDate: json['lastStreamUpdateDate'] != null
+          ? DateTime.parse(json['lastStreamUpdateDate'] as String)
+          : null,
     );
   }
 
