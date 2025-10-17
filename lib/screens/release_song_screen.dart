@@ -236,9 +236,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               : const Color(0xFF30363D),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected
-                ? Color(platform.getColorValue())
-                : Colors.white30,
+            color:
+                isSelected ? Color(platform.getColorValue()) : Colors.white30,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -474,9 +473,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                 children: [
                   Icon(
                     Icons.flash_on,
-                    color: _releaseNow
-                        ? const Color(0xFF00D9FF)
-                        : Colors.white60,
+                    color:
+                        _releaseNow ? const Color(0xFF00D9FF) : Colors.white60,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -495,9 +493,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                         Text(
                           'Go live immediately',
                           style: TextStyle(
-                            color: _releaseNow
-                                ? Colors.white60
-                                : Colors.white30,
+                            color:
+                                _releaseNow ? Colors.white60 : Colors.white30,
                             fontSize: 12,
                           ),
                         ),
@@ -521,9 +518,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: !_releaseNow
-                      ? const Color(0xFF9B59B6)
-                      : Colors.white30,
+                  color:
+                      !_releaseNow ? const Color(0xFF9B59B6) : Colors.white30,
                   width: 2,
                 ),
               ),
@@ -531,9 +527,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                 children: [
                   Icon(
                     Icons.schedule,
-                    color: !_releaseNow
-                        ? const Color(0xFF9B59B6)
-                        : Colors.white60,
+                    color:
+                        !_releaseNow ? const Color(0xFF9B59B6) : Colors.white60,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -552,9 +547,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
                         Text(
                           'Set a future release date',
                           style: TextStyle(
-                            color: !_releaseNow
-                                ? Colors.white60
-                                : Colors.white30,
+                            color:
+                                !_releaseNow ? Colors.white60 : Colors.white30,
                             fontSize: 12,
                           ),
                         ),
@@ -847,8 +841,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               surface: Color(0xFF21262D),
               onSurface: Colors.white,
             ),
-            dialogTheme: DialogThemeData(
-              backgroundColor: const Color(0xFF21262D),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Color(0xFF21262D),
             ),
           ),
           child: child!,
@@ -888,25 +882,24 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       );
 
       // Calculate loyal fanbase growth from releasing quality music
-      final loyalFanbaseGrowth = streamGrowthService
-          .calculateLoyalFanbaseGrowth(
-            currentLoyalFanbase: widget.artistStats.loyalFanbase,
-            songQuality: widget.song.finalQuality,
-            totalFanbase: widget.artistStats.fanbase + fanbaseGain,
-          );
+      final loyalFanbaseGrowth =
+          streamGrowthService.calculateLoyalFanbaseGrowth(
+        currentLoyalFanbase: widget.artistStats.loyalFanbase,
+        songQuality: widget.song.finalQuality,
+        totalFanbase: widget.artistStats.fanbase + fanbaseGain,
+      );
 
       // Calculate regional fanbase growth from releasing this song
-      final regionalFanbaseGrowth = streamGrowthService
-          .calculateRegionalFanbaseGrowth(
-            currentRegion: widget.artistStats.currentRegion,
-            originRegion: widget
-                .artistStats
-                .currentRegion, // The region where the song is released becomes origin
-            songQuality: widget.song.finalQuality,
-            genre: widget.song.genre,
-            currentGlobalFanbase: widget.artistStats.fanbase,
-            currentRegionalFanbase: widget.artistStats.regionalFanbase,
-          );
+      final regionalFanbaseGrowth =
+          streamGrowthService.calculateRegionalFanbaseGrowth(
+        currentRegion: widget.artistStats.currentRegion,
+        originRegion: widget.artistStats
+            .currentRegion, // The region where the song is released becomes origin
+        songQuality: widget.song.finalQuality,
+        genre: widget.song.genre,
+        currentGlobalFanbase: widget.artistStats.fanbase,
+        currentRegionalFanbase: widget.artistStats.regionalFanbase,
+      );
 
       // Update regional fanbase map
       final updatedRegionalFanbase = Map<String, int>.from(
@@ -947,8 +940,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       // Note: Royalty payments are calculated daily, not on release
       final updatedStats = widget.artistStats.copyWith(
         money: widget
-            .artistStats
-            .money, // No immediate payment - royalties paid daily
+            .artistStats.money, // No immediate payment - royalties paid daily
         fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
         fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
         loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)

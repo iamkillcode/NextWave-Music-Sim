@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.nextwave.musicgame"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35  // Updated from flutter.compileSdkVersion to support flutter_plugin_android_lifecycle
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -25,7 +25,7 @@ android {
     defaultConfig {
         applicationId = "com.nextwave.musicgame"
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 35  // Updated to match compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
