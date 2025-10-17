@@ -1,15 +1,19 @@
-# GitHub Actions - APK Build Setup
+# GitHub Actions - Android APK Build Setup
 
-This repository includes a GitHub Actions workflow that automatically builds Android APK files on every push to the main branch.
+This repository includes a GitHub Actions workflow that automatically builds **Android APK files only** on every push to the main branch.
+
+> **Note**: iOS builds are not included. This workflow is optimized for Android development only.
 
 ## 🚀 Features
 
+- **Android Only**: Builds Android APKs (no iOS builds)
 - **Automatic Builds**: Builds APKs on every push to `main` branch
 - **Manual Triggers**: Can be manually triggered via GitHub Actions UI
 - **Multiple ABIs**: Creates split APKs for different architectures (arm64-v8a, armeabi-v7a, x86_64)
 - **Debug & Release**: Builds both debug and release APKs
 - **Artifact Storage**: Stores APKs for download (14 days for debug, 30 days for release)
 - **Build Summary**: Provides detailed build information in GitHub UI
+- **Fast Builds**: Ubuntu runners with Gradle caching (~5 minutes per build)
 
 ## 📋 Setup Instructions
 

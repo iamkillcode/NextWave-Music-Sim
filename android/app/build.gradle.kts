@@ -11,14 +11,14 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        // 🧠 Match your JDK 21 environment
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        // Match GitHub Actions Java 17 environment
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = "17"
         freeCompilerArgs += listOf("-Xjvm-default=all")
     }
 
