@@ -19,6 +19,11 @@ Welcome to the NextWave Music Sim documentation! All project documentation has b
 
 ## 🚀 Quick Start
 
+### 👑 Admin/Developer Setup
+1. **[Admin Quick Setup](./setup/ADMIN_QUICK_SETUP.md)** - Get admin access in 5 minutes
+2. **[Admin System Documentation](./systems/ADMIN_SYSTEM.md)** - Full admin features guide
+3. [Initialize NPCs & Game Setup](./fixes/NPC_INITIALIZATION_FIX.md)
+
 ### New Developer?
 1. [ORGANIZATION.md](./ORGANIZATION.md) - Project structure
 2. [Multiplayer Sync Strategy](./features/MULTIPLAYER_SYNC_STRATEGY.md) - How sync works
@@ -35,7 +40,9 @@ Welcome to the NextWave Music Sim documentation! All project documentation has b
 
 ### `/systems` - Core Game Systems
 Technical documentation for major game systems:
+- **[Admin System](./systems/ADMIN_SYSTEM.md)** ← **NEW! Admin control panel**
 - [Royalty Payment System](./systems/ROYALTY_PAYMENT_SYSTEM.md)
+- [NPC Artist System](./systems/NPC_ARTIST_SYSTEM.md)
 - Dynamic Stream Growth System
 - Global Time System (see archive)
 - EchoX Social Media Platform
@@ -90,6 +97,7 @@ Version history and release documentation:
 
 ### `/setup` - Setup & Configuration
 Installation and configuration documentation:
+- **[Admin Quick Setup](./setup/ADMIN_QUICK_SETUP.md)** ← **NEW! Get admin access**
 - Firebase Setup
 - Cloud Functions Deployment
 - Icon & Splash Setup

@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../models/artist_stats.dart';
+import '../services/admin_service.dart';
+import 'admin_dashboard_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -23,11 +25,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final AdminService _adminService = AdminService();
 
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
   bool _vibrationEnabled = true;
   bool _showOnlineStatus = true;
+  bool _isAdmin = false;
 
   final TextEditingController _artistNameController = TextEditingController();
   bool _isCheckingName = false;
@@ -41,6 +45,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _artistNameController.text = widget.artistStats.name;
     _loadSettings();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    final isAdmin = await _adminService.isAdmin();
+    setState(() {
+      _isAdmin = isAdmin;
+    });
   }
 
   Future<void> _loadSettings() async {
@@ -502,7 +514,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Danger Zone
           _buildSectionHeader('Account Actions'),
           _buildDangerZoneCard(),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
+
+          // Admin Section (only show if user is admin)
+          if (_isAdmin) ...[
+            _buildSectionHeader('Admin Dashboard'),
+            _buildAdminAccessCard(),
+            const SizedBox(height: 24),
+          ],
+
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -541,9 +562,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: const Color(0xFF00D9FF),
-                    backgroundImage: _avatarUrl != null
-                        ? NetworkImage(_avatarUrl!)
-                        : null,
+                    backgroundImage:
+                        _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
                     child: _avatarUrl == null
                         ? Text(
                             widget.artistStats.name[0].toUpperCase(),
@@ -675,8 +695,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed:
-                  _isNameAvailable &&
+              onPressed: _isNameAvailable &&
                       _artistNameController.text.trim() !=
                           widget.artistStats.name
                   ? _updateArtistName
@@ -869,6 +888,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
           activeColor: const Color(0xFF00D9FF),
         ),
       ],
+    );
+  }
+
+  Widget _buildAdminAccessCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF00D9FF), Color(0xFF0A84FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00D9FF).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.admin_panel_settings,
+            color: Colors.black,
+            size: 48,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Admin Access',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'You have administrative privileges.\nAccess powerful game management tools.',
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminDashboardScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.dashboard, color: Color(0xFF00D9FF), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'OPEN ADMIN DASHBOARD',
+                    style: TextStyle(
+                      color: Color(0xFF00D9FF),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
