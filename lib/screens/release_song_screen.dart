@@ -863,13 +863,36 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     // Simulate processing
     Future.delayed(const Duration(seconds: 2), () {
       final releaseDate = _releaseNow ? DateTime.now() : _scheduledDate;
-      final estimatedStreams = widget.song.estimatedStreams;
 
-      // Note: Revenue is now calculated daily based on actual streams
-      // Artists receive royalty payments each day, not on release
+      // Calculate realistic initial streams based on artist's ACTUAL fanbase
+      // Not based on unrealistic global population estimates
+      final baseInitialStreams = widget.artistStats.fanbase > 0
+          ? widget.artistStats.fanbase // Fanbase is the starting point
+          : 10; // Absolute minimum for brand new artists with no fans
 
-      final fameGain = (widget.song.finalQuality * 0.5).round();
-      final fanbaseGain = (widget.song.finalQuality * 2).round();
+      // Quality multiplier (0.4 to 1.0) - even great songs start small for new artists
+      final qualityMultiplier = (widget.song.finalQuality / 100.0) * 0.6 + 0.4;
+
+      // Platform multiplier - more platforms = more reach (1.0 to 1.5)
+      final platformMultiplier = 1.0 + (_selectedPlatforms.length - 1) * 0.25;
+
+      // Calculate realistic initial streams (first day release)
+      final realisticInitialStreams =
+          (baseInitialStreams * qualityMultiplier * platformMultiplier).round();
+
+      // Fame gain should be gradual - based on quality, not instant massive jump
+      final fameGain = _releaseNow
+          ? (widget.song.finalQuality * 0.1)
+              .round()
+              .clamp(1, 5) // Max 5 fame on release
+          : 0;
+
+      // Fanbase gain should also be gradual and realistic
+      final fanbaseGain = _releaseNow
+          ? (widget.song.finalQuality * 0.5)
+              .round()
+              .clamp(5, 50) // 5-50 new fans max on release
+          : 0;
 
       // Calculate virality score for this song
       final streamGrowthService = StreamGrowthService();
@@ -911,7 +934,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
       // Initialize regional streams for the song (release day gets some initial streams)
       final initialRegionalStreams = _releaseNow
           ? streamGrowthService.calculateRegionalStreamDistribution(
-              totalDailyStreams: (estimatedStreams * 0.1).round(),
+              totalDailyStreams: realisticInitialStreams,
               currentRegion: widget.artistStats.currentRegion,
               regionalFanbase: updatedRegionalFanbase,
               genre: widget.song.genre,
@@ -923,15 +946,17 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
         state: SongState.released,
         releasedDate: releaseDate,
         streams: _releaseNow
-            ? (estimatedStreams * 0.1).round()
-            : 0, // 10% initial streams if released now
+            ? realisticInitialStreams
+            : 0, // Initial streams based on artist's actual fanbase
         regionalStreams: initialRegionalStreams,
-        likes: _releaseNow ? (estimatedStreams * 0.05).round() : 0,
+        likes: _releaseNow
+            ? (realisticInitialStreams * 0.3).round()
+            : 0, // 30% of streams become likes
         coverArtUrl: _uploadedCoverArtUrl,
         streamingPlatforms: _selectedPlatforms.toList(),
         viralityScore: viralityScore,
         daysOnChart: 0,
-        peakDailyStreams: _releaseNow ? (estimatedStreams * 0.1).round() : 0,
+        peakDailyStreams: _releaseNow ? realisticInitialStreams : 0,
       );
 
       // Update artist stats with loyal fanbase growth and regional fanbase

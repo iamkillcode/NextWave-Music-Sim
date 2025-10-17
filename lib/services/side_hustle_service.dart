@@ -34,8 +34,7 @@ class SideHustleService {
             .clamp(5, 40); // Min 5, max 40 energy per day
 
     return SideHustle(
-      id:
-          DateTime.now().millisecondsSinceEpoch.toString() +
+      id: DateTime.now().millisecondsSinceEpoch.toString() +
           _random.nextInt(1000).toString(),
       type: type,
       dailyPay: dailyPay,
@@ -100,6 +99,7 @@ class SideHustleService {
   /// Generate new contracts for the shared pool
   /// Should be called periodically (e.g., every game day)
   Future<void> generateNewContracts(int count) async {
+    print('🎯 Attempting to generate $count new contracts...');
     try {
       final batch = _firestore.batch();
 
@@ -107,30 +107,48 @@ class SideHustleService {
         final contract = _generateRandomContract();
         final docRef = _contractsRef.doc(contract.id);
         batch.set(docRef, contract.toJson());
+        print(
+          '  📝 Contract $i: ${contract.type.displayName} - \$${contract.dailyPay}/day for ${contract.contractLengthDays} days',
+        );
       }
 
       await batch.commit();
-      print('✅ Generated $count new side hustle contracts');
-    } catch (e) {
+      print('✅ Successfully generated $count new side hustle contracts');
+    } catch (e, stackTrace) {
       print('❌ Error generating contracts: $e');
+      print('Stack trace: $stackTrace');
+      rethrow; // Re-throw to see error in UI
     }
   }
 
   /// Get all available contracts from the shared pool
   Stream<List<SideHustle>> getAvailableContracts() {
+    print('📡 Setting up stream for available contracts...');
     return _contractsRef
         .where('isAvailable', isEqualTo: true)
         .orderBy('createdAt', descending: true)
         .limit(20) // Show max 20 contracts
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map(
-                (doc) =>
-                    SideHustle.fromJson(doc.data() as Map<String, dynamic>),
-              )
-              .toList();
-        });
+        .handleError((error) {
+      print('❌ Error in contracts stream: $error');
+    }).map((snapshot) {
+      print('📊 Received ${snapshot.docs.length} available contracts');
+      return snapshot.docs
+          .map(
+            (doc) {
+              try {
+                return SideHustle.fromJson(
+                  doc.data() as Map<String, dynamic>,
+                );
+              } catch (e) {
+                print('❌ Error parsing contract ${doc.id}: $e');
+                return null;
+              }
+            },
+          )
+          .whereType<SideHustle>() // Filter out nulls
+          .toList();
+    });
   }
 
   /// Claim a contract (first-come, first-served)
@@ -218,21 +236,27 @@ class SideHustleService {
     }
   }
 
-  /// Initialize the contract pool with initial contracts
+  /// Initialize contract pool on first launch
   Future<void> initializeContractPool() async {
     try {
+      print('🔍 Checking if contract pool needs initialization...');
       // Check if pool already has contracts
       final snapshot = await _contractsRef.limit(1).get();
 
       if (snapshot.docs.isEmpty) {
+        print('📋 Contract pool is empty, initializing with 15 contracts...');
         // Generate initial batch of contracts
         await generateNewContracts(15);
         print('✅ Initialized contract pool with 15 contracts');
       } else {
-        print('✅ Contract pool already initialized');
+        print(
+          '✅ Contract pool already initialized (${snapshot.docs.length} contracts found)',
+        );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error initializing contract pool: $e');
+      print('Stack trace: $stackTrace');
+      // Don't rethrow - this is called in initState, let app continue
     }
   }
 

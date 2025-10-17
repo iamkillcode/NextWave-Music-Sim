@@ -76,7 +76,7 @@ syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
 });
 ```
 
-**After**:
+**After (Initial Implementation)**:
 ```dart
 // Updates every 5 minutes (12x less frequent!)
 gameTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
@@ -88,6 +88,24 @@ syncTimer = Timer.periodic(const Duration(hours: 1), (timer) async {
   await _syncWithFirebase();
 });
 ```
+
+**📝 Update (October 2025) - Multiplayer Optimization:**
+```dart
+// Game date check: Still every 5 minutes
+gameTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+  _updateGameDate();
+});
+
+// Auto-save: Changed to 30 seconds for multiplayer sync
+// This is a FEATURE, not a regression - enables real-time multiplayer
+syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+  if (_hasPendingSave && mounted) {
+    _saveUserProfile(); // Only saves if changes pending
+  }
+});
+```
+
+See: `docs/features/MULTIPLAYER_SYNC_STRATEGY.md` for full details on the 30-second sync decision.
 
 #### Change 2: Update Logic
 **Before** (`_updateGameTime()`):

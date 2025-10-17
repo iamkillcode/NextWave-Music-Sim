@@ -33,12 +33,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   Timer? gameTimer; // Made nullable to prevent dispose errors
   Timer? syncTimer; // Made nullable to prevent dispose errors
+  Timer? _countdownTimer; // Timer for next day countdown
+  Timer? _saveDebounceTimer; // Timer for debouncing saves
+  Timer? _multiplayerStatsTimer; // Timer for multiplayer stats updates
   DateTime?
-  currentGameDate; // Will be set from Firebase, starts as null to show loading
+      currentGameDate; // Will be set from Firebase, starts as null to show loading
   DateTime? _lastSyncTime; // Track when we last synced with Firebase
   int _lastEnergyReplenishDay = 0; // Track the last day we replenished energy
   DateTime?
-  _lastPassiveIncomeTime; // Track when we last calculated passive income
+      _lastPassiveIncomeTime; // Track when we last calculated passive income
   late dynamic _multiplayerService;
   bool _isOnlineMode = false;
   bool _isInitializing = false;
@@ -46,6 +49,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final StreamGrowthService _streamGrowthService = StreamGrowthService();
   final SideHustleService _sideHustleService = SideHustleService();
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
+  String _timeUntilNextDay = ''; // Formatted time until next day
+  bool _hasPendingSave = false; // Track if we have pending changes to save
 
   @override
   void initState() {
@@ -92,9 +97,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _updateGameDate();
     });
 
-    // Sync with Firebase every hour to stay synchronized
-    syncTimer = Timer.periodic(const Duration(hours: 1), (timer) async {
-      await _syncWithFirebase();
+    // Auto-save every 30 seconds for multiplayer sync
+    // This ensures other players see your progress in near real-time
+    // while still being cost-effective (only ~120 writes per hour vs constant updates)
+    syncTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      if (_hasPendingSave && mounted) {
+        print('🔄 Auto-save: Syncing with Firebase for multiplayer...');
+        _saveUserProfile();
+      }
+    });
+
+    // Update countdown every second
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _updateCountdown();
     });
   }
 
@@ -157,6 +172,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Cancel timers if they exist
     gameTimer?.cancel();
     syncTimer?.cancel();
+    _countdownTimer?.cancel();
+    _saveDebounceTimer?.cancel();
+    _multiplayerStatsTimer?.cancel();
+
+    // Save any pending changes before disposing
+    if (_hasPendingSave) {
+      _saveUserProfile();
+    }
+
     super.dispose();
   }
 
@@ -175,11 +199,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .doc(user.uid)
           .get()
           .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              throw Exception('Profile load timeout');
-            },
-          );
+        const Duration(seconds: 5),
+        onTimeout: () {
+          throw Exception('Profile load timeout');
+        },
+      );
 
       // Check if widget is still mounted after async operation
       if (!mounted) return;
@@ -244,7 +268,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             money: (data['currentMoney'] ?? 5000).toInt(),
             energy: 100, // Always start with full energy
             creativity: (data['inspirationLevel'] ?? 0).toInt(),
-            fanbase: (data['level'] ?? 1).toInt(),
+            fanbase: (data['fanbase'] ?? data['level'] ?? 1)
+                .toInt(), // Try fanbase first, fallback to level for old saves
             loyalFanbase: (data['loyalFanbase'] ?? 0).toInt(),
             albumsSold: (data['albumsReleased'] ?? 0).toInt(),
             songsWritten: (data['songsPublished'] ?? 0).toInt(),
@@ -259,7 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             age: (data['age'] ?? 18).toInt(),
             careerStartDate:
                 (data['careerStartDate'] as Timestamp?)?.toDate() ??
-                DateTime.now(),
+                    DateTime.now(),
             regionalFanbase: loadedRegionalFanbase,
             avatarUrl: data['avatarUrl'] as String?,
             activeSideHustle: loadedSideHustle,
@@ -352,44 +377,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .collection('players')
           .doc(user.uid)
           .update({
-            'currentFame': artistStats.fame,
-            'currentMoney': artistStats.money,
-            'previousMoney': artistStats
-                .money, // Store current money as previous for next session
-            'inspirationLevel': artistStats.inspirationLevel,
-            'level': artistStats.fanbase,
-            'loyalFanbase': artistStats.loyalFanbase,
-            'albumsReleased': artistStats.albumsSold,
-            'songsPublished': artistStats.songsWritten,
-            'concertsPerformed': artistStats.concertsPerformed,
-            'songwritingSkill': artistStats.songwritingSkill,
-            'experience': artistStats.experience,
-            'lyricsSkill': artistStats.lyricsSkill,
-            'compositionSkill': artistStats.compositionSkill,
-            'homeRegion': artistStats.currentRegion,
-            'age': artistStats.age,
-            'regionalFanbase': artistStats.regionalFanbase,
-            'lastActive': Timestamp.fromDate(
-              DateTime.now(),
-            ), // Track last activity
-            'songs': artistStats.songs.map((song) => song.toJson()).toList(),
-            'activeSideHustle': artistStats.activeSideHustle?.toJson(),
-            if (artistStats.careerStartDate != null)
-              'careerStartDate': Timestamp.fromDate(
-                artistStats.careerStartDate!,
-              ),
-          })
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              throw Exception('Profile save timeout');
-            },
-          );
+        'currentFame': artistStats.fame,
+        'currentMoney': artistStats.money,
+        'previousMoney': artistStats
+            .money, // Store current money as previous for next session
+        'inspirationLevel': artistStats.inspirationLevel,
+        'level': artistStats.fanbase, // Level tied to fanbase for compatibility
+        'fanbase': artistStats.fanbase, // Store fanbase explicitly
+        'loyalFanbase': artistStats.loyalFanbase,
+        'albumsReleased': artistStats.albumsSold,
+        'songsPublished': artistStats.songsWritten,
+        'concertsPerformed': artistStats.concertsPerformed,
+        'songwritingSkill': artistStats.songwritingSkill,
+        'experience': artistStats.experience,
+        'lyricsSkill': artistStats.lyricsSkill,
+        'compositionSkill': artistStats.compositionSkill,
+        'homeRegion': artistStats.currentRegion,
+        'age': artistStats.age,
+        'regionalFanbase': artistStats.regionalFanbase,
+        'lastActive': Timestamp.fromDate(
+          DateTime.now(),
+        ), // Track last activity
+        'songs': artistStats.songs.map((song) => song.toJson()).toList(),
+        'activeSideHustle': artistStats.activeSideHustle?.toJson(),
+        if (artistStats.careerStartDate != null)
+          'careerStartDate': Timestamp.fromDate(
+            artistStats.careerStartDate!,
+          ),
+      }).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          throw Exception('Profile save timeout');
+        },
+      );
 
+      _hasPendingSave = false;
       print('✅ Profile saved successfully');
     } catch (e) {
       print('❌ Error saving profile: $e');
     }
+  }
+
+  /// Debounced save - batches rapid requests into a single Firebase write
+  /// Short 500ms delay for multiplayer sync - balances responsiveness with cost
+  /// For critical multiplayer updates, call _saveUserProfile() directly instead
+  void _debouncedSave() {
+    _hasPendingSave = true;
+
+    // Cancel any existing timer
+    _saveDebounceTimer?.cancel();
+
+    // Short debounce for multiplayer - only prevents rapid-fire spam
+    // 500ms is fast enough for good sync, but prevents excessive writes during UI interactions
+    _saveDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (_hasPendingSave && mounted) {
+        _saveUserProfile();
+      }
+    });
+  }
+
+  /// Immediate save for critical multiplayer events
+  /// Use this for: publishing songs, completing contracts, major achievements, region changes
+  void _immediateSave() {
+    _saveDebounceTimer?.cancel();
+    _hasPendingSave = false;
+    _saveUserProfile();
   }
 
   void _updateGameDate() async {
@@ -414,9 +466,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Calculate passive income for the time that has passed
         final now = DateTime.now();
-        final realSecondsSinceLastUpdate = now
-            .difference(_lastSyncTime!)
-            .inSeconds;
+        final realSecondsSinceLastUpdate =
+            now.difference(_lastSyncTime!).inSeconds;
         _calculatePassiveIncome(realSecondsSinceLastUpdate);
 
         // Apply stream growth to all released songs
@@ -446,9 +497,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } else {
         // Same day, just update passive income
         final now = DateTime.now();
-        final realSecondsSinceLastUpdate = now
-            .difference(_lastSyncTime!)
-            .inSeconds;
+        final realSecondsSinceLastUpdate =
+            now.difference(_lastSyncTime!).inSeconds;
 
         // Only calculate if significant time has passed (at least 1 minute)
         if (realSecondsSinceLastUpdate >= 60) {
@@ -461,11 +511,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Update the countdown timer showing time until next game day
+  void _updateCountdown() {
+    if (!mounted) return;
+
+    final duration = _gameTimeService.getTimeUntilNextGameDay();
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+
+    setState(() {
+      _timeUntilNextDay =
+          '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    });
+  }
+
   void _calculatePassiveIncome(int realSecondsPassed) {
     // Get all released songs
-    final releasedSongs = artistStats.songs
-        .where((s) => s.state == SongState.released)
-        .toList();
+    final releasedSongs =
+        artistStats.songs.where((s) => s.state == SongState.released).toList();
 
     if (releasedSongs.isEmpty) return;
 
@@ -569,9 +633,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // ⏰ REALISTIC STREAM DELAYS: Check if enough time has passed since last update
       // Songs on streaming platforms update every 12 hours (half in-game day)
       final lastUpdate = song.lastStreamUpdateDate ?? song.releasedDate!;
-      final hoursSinceLastUpdate = currentGameDate
-          .difference(lastUpdate)
-          .inHours;
+      final hoursSinceLastUpdate =
+          currentGameDate.difference(lastUpdate).inHours;
 
       // Skip if less than 12 hours have passed (need half-day delay)
       if (hoursSinceLastUpdate < 12) {
@@ -590,13 +653,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
 
       // Distribute streams regionally
-      final regionalStreamDelta = _streamGrowthService
-          .calculateRegionalStreamDistribution(
-            totalDailyStreams: newStreams,
-            currentRegion: artistStats.currentRegion,
-            regionalFanbase: artistStats.regionalFanbase,
-            genre: song.genre,
-          );
+      final regionalStreamDelta =
+          _streamGrowthService.calculateRegionalStreamDistribution(
+        totalDailyStreams: newStreams,
+        currentRegion: artistStats.currentRegion,
+        regionalFanbase: artistStats.regionalFanbase,
+        genre: song.genre,
+      );
 
       // Update regional streams for the song
       final updatedRegionalStreams = Map<String, int>.from(
@@ -663,18 +726,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final baseFanGrowth = (totalNewStreams / 1000).floor();
       final diminishingFactor = 1.0 / (1.0 + artistStats.fanbase / 10000);
       fanbaseGrowth = (baseFanGrowth * diminishingFactor).round().clamp(
-        0,
-        50,
-      ); // Max 50 fans per day
+            0,
+            50,
+          ); // Max 50 fans per day
 
       // Every 10,000 streams increases fame by 1 point
       // Also has diminishing returns for mega-celebrities
       final baseFameGrowth = (totalNewStreams / 10000).floor();
       final fameDiminishing = 1.0 / (1.0 + artistStats.fame / 500);
       fameGrowth = (baseFameGrowth * fameDiminishing).round().clamp(
-        0,
-        10,
-      ); // Max 10 fame per day
+            0,
+            10,
+          ); // Max 10 fame per day
 
       // Convert casual fans to loyal fans based on consistent streaming
       // Every 5,000 streams converts 1 casual fan to loyal (they love your music!)
@@ -684,12 +747,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (casualFans > 0) {
         final baseLoyalGrowth = (totalNewStreams / 5000).floor();
         final loyalDiminishing = 1.0 / (1.0 + artistStats.loyalFanbase / 5000);
-        final maxConvertible = (casualFans * 0.05)
-            .round(); // Max 5% of casual fans per day
+        final maxConvertible =
+            (casualFans * 0.05).round(); // Max 5% of casual fans per day
         loyalFanGrowth = (baseLoyalGrowth * loyalDiminishing).round().clamp(
-          0,
-          maxConvertible,
-        );
+              0,
+              maxConvertible,
+            );
       }
     }
 
@@ -759,8 +822,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
 
-      // Save to Firebase to persist the income and growth
-      _saveUserProfile();
+      // Save to Firebase to persist the income and growth (debounced to reduce writes)
+      _debouncedSave();
 
       // Show notification
       _addNotification(
@@ -994,24 +1057,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Date-only display (simplified!)
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.calendar_today,
-                color: Color(0xFF00D9FF),
-                size: 18,
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today,
+                    color: Color(0xFF00D9FF),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    currentGameDate != null
+                        ? _gameTimeService.formatGameDate(currentGameDate!)
+                        : 'Syncing...',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                currentGameDate != null
-                    ? _gameTimeService.formatGameDate(currentGameDate!)
-                    : 'Syncing...',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              if (_timeUntilNextDay.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        color: Color(0xFFFFD60A),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Next day in: $_timeUntilNextDay',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           // Money and Energy Display
@@ -1146,7 +1236,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           setState(() {
                             artistStats = updatedStats;
                           });
-                          _saveUserProfile();
+                          _debouncedSave();
                         },
                       ),
                     ),
@@ -1682,9 +1772,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 child: Icon(
                   icon,
-                  color: canPerform
-                      ? Colors.white
-                      : Colors.white.withOpacity(0.5),
+                  color:
+                      canPerform ? Colors.white : Colors.white.withOpacity(0.5),
                   size: 18,
                 ),
               ),
@@ -1714,8 +1803,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         color: canPerform
                             ? (energyCost < 0
-                                  ? const Color(0xFF32D74B)
-                                  : Colors.white.withOpacity(0.7))
+                                ? const Color(0xFF32D74B)
+                                : Colors.white.withOpacity(0.7))
                             : Colors.white.withOpacity(0.3),
                         fontSize: 8,
                         fontWeight: FontWeight.w600,
@@ -1765,8 +1854,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }).toList();
 
             // Calculate album earnings based on fame and song quality
-            final avgQuality =
-                songsToRelease
+            final avgQuality = songsToRelease
                     .map((s) => s.finalQuality)
                     .reduce((a, b) => a + b) /
                 songsToRelease.length;
@@ -1774,8 +1862,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final qualityBonus =
                 (avgQuality / 100) * 3000; // Up to $3K for quality
             final fameBonus = artistStats.fame * 50; // $50 per fame point
-            final albumEarnings = (baseAlbumRevenue + qualityBonus + fameBonus)
-                .round();
+            final albumEarnings =
+                (baseAlbumRevenue + qualityBonus + fameBonus).round();
             final fameGain =
                 5 + (avgQuality ~/ 20); // 5-10 fame based on quality
 
@@ -1785,8 +1873,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               money: artistStats.money + albumEarnings,
               fame: artistStats.fame + fameGain,
               songs: updatedSongs,
-              fanbase:
-                  artistStats.fanbase +
+              fanbase: artistStats.fanbase +
                   (50 + (fameGain * 10)), // Album releases attract more fans
             );
             _showMessage(
@@ -1814,8 +1901,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ];
             final selectedPractice = (practiceTypes..shuffle()).first;
 
-            int skillGain =
-                2 +
+            int skillGain = 2 +
                 (artistStats.energy > 50
                     ? 1
                     : 0); // Better results with more energy
@@ -1850,21 +1936,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               energy: artistStats.energy - 15,
               creativity: artistStats.creativity + 3,
               fanbase: artistStats.fanbase + 1,
-              songwritingSkill:
-                  (artistStats.songwritingSkill +
-                          (improvements['songwritingSkill'] ?? 0))
-                      .clamp(0, 100),
+              songwritingSkill: (artistStats.songwritingSkill +
+                      (improvements['songwritingSkill'] ?? 0))
+                  .clamp(0, 100),
               lyricsSkill:
                   (artistStats.lyricsSkill + (improvements['lyricsSkill'] ?? 0))
                       .clamp(0, 100),
-              compositionSkill:
-                  (artistStats.compositionSkill +
-                          (improvements['compositionSkill'] ?? 0))
-                      .clamp(0, 100),
-              inspirationLevel:
-                  (artistStats.inspirationLevel +
-                          (improvements['inspirationLevel'] ?? 0))
-                      .clamp(0, 100),
+              compositionSkill: (artistStats.compositionSkill +
+                      (improvements['compositionSkill'] ?? 0))
+                  .clamp(0, 100),
+              inspirationLevel: (artistStats.inspirationLevel +
+                      (improvements['inspirationLevel'] ?? 0))
+                  .clamp(0, 100),
               experience:
                   artistStats.experience + (improvements['experience'] ?? 0),
             );
@@ -2191,8 +2274,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.of(context).pop(); // Close dialog
 
     // Calculate skill gains based on effort level (quick songs give moderate skill gain)
-    int effort =
-        (songType['energy'] as int) ~/
+    int effort = (songType['energy'] as int) ~/
         10; // Convert energy cost to effort level
     String genre = songType['genre'] as String;
     double songQuality = artistStats.calculateSongQuality(genre, effort);
@@ -2260,9 +2342,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<String> nameSuggestions = [];
 
     // Generate initial suggestions based on default genre
-    int estimatedQuality = artistStats
-        .calculateSongQuality(selectedGenre, selectedEffort)
-        .round();
+    int estimatedQuality =
+        artistStats.calculateSongQuality(selectedGenre, selectedEffort).round();
     nameSuggestions = SongNameGenerator.getSuggestions(
       selectedGenre,
       count: 4,
@@ -2326,10 +2407,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     .round();
                                 nameSuggestions =
                                     SongNameGenerator.getSuggestions(
-                                      selectedGenre,
-                                      count: 4,
-                                      quality: quality,
-                                    );
+                                  selectedGenre,
+                                  count: 4,
+                                  quality: quality,
+                                );
                               });
                             },
                             icon: const Icon(
@@ -2449,29 +2530,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             value: selectedGenre,
                             dropdownColor: const Color(0xFF30363D),
                             style: const TextStyle(color: Colors.white),
-                            items:
-                                [
-                                  'R&B',
-                                  'Hip Hop',
-                                  'Rap',
-                                  'Trap',
-                                  'Drill',
-                                  'Afrobeat',
-                                  'Country',
-                                  'Jazz',
-                                  'Reggae',
-                                ].map((genre) {
-                                  return DropdownMenuItem(
-                                    value: genre,
-                                    child: Row(
-                                      children: [
-                                        _getGenreIcon(genre),
-                                        const SizedBox(width: 8),
-                                        Text(genre),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                            items: [
+                              'R&B',
+                              'Hip Hop',
+                              'Rap',
+                              'Trap',
+                              'Drill',
+                              'Afrobeat',
+                              'Country',
+                              'Jazz',
+                              'Reggae',
+                            ].map((genre) {
+                              return DropdownMenuItem(
+                                value: genre,
+                                child: Row(
+                                  children: [
+                                    _getGenreIcon(genre),
+                                    const SizedBox(width: 8),
+                                    Text(genre),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
                             onChanged: (value) {
                               dialogSetState(() {
                                 selectedGenre = value!;
@@ -2484,10 +2564,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     .round();
                                 nameSuggestions =
                                     SongNameGenerator.getSuggestions(
-                                      selectedGenre,
-                                      count: 4,
-                                      quality: quality,
-                                    );
+                                  selectedGenre,
+                                  count: 4,
+                                  quality: quality,
+                                );
                               });
                             },
                             isExpanded: true,
@@ -2510,8 +2590,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [1, 2, 3, 4].map((effort) {
                           bool isSelected = selectedEffort == effort;
-                          bool canAfford =
-                              artistStats.energy >=
+                          bool canAfford = artistStats.energy >=
                               _getEnergyCostForEffort(effort);
 
                           return GestureDetector(
@@ -2528,10 +2607,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           .round();
                                       nameSuggestions =
                                           SongNameGenerator.getSuggestions(
-                                            selectedGenre,
-                                            count: 4,
-                                            quality: quality,
-                                          );
+                                        selectedGenre,
+                                        count: 4,
+                                        quality: quality,
+                                      );
                                     });
                                   }
                                 : null,
@@ -2544,8 +2623,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 color: isSelected
                                     ? const Color(0xFF00D9FF)
                                     : canAfford
-                                    ? const Color(0xFF30363D)
-                                    : const Color(0xFF30363D).withOpacity(0.3),
+                                        ? const Color(0xFF30363D)
+                                        : const Color(0xFF30363D)
+                                            .withOpacity(0.3),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: isSelected
@@ -2644,13 +2724,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: ElevatedButton(
                               onPressed:
                                   (songTitleController.text.trim().isNotEmpty &&
-                                      artistStats.energy >= energyCost)
-                                  ? () => _createCustomSong(
-                                      songTitleController.text.trim(),
-                                      selectedGenre,
-                                      selectedEffort,
-                                    )
-                                  : null,
+                                          artistStats.energy >= energyCost)
+                                      ? () => _createCustomSong(
+                                            songTitleController.text.trim(),
+                                            selectedGenre,
+                                            selectedEffort,
+                                          )
+                                      : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00D9FF),
                                 padding: const EdgeInsets.symmetric(
@@ -2856,7 +2936,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   setState(() {
                     artistStats = updatedStats;
                   });
-                  _saveUserProfile(); // Save stats to Firestore
+                  _debouncedSave(); // Save stats to Firestore (debounced)
                 },
                 currentGameDate: currentGameDate ?? DateTime.now(),
               ),
@@ -2873,7 +2953,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   setState(() {
                     artistStats = updatedStats;
                   });
-                  _saveUserProfile(); // Save stats to Firestore
+                  _immediateSave(); // Immediate save - song releases are critical multiplayer events
                 },
               ),
             ),
@@ -2889,7 +2969,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   setState(() {
                     artistStats = updatedStats;
                   });
-                  _saveUserProfile(); // Save stats to Firestore
+                  _debouncedSave(); // Debounced - social media posts can wait 500ms
                 },
               ),
             ),
@@ -2905,7 +2985,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   setState(() {
                     artistStats = updatedStats;
                   });
-                  _saveUserProfile(); // Save region change to Firestore
+                  _immediateSave(); // Immediate save - region changes affect multiplayer matchmaking
                 },
               ),
             ),
@@ -3052,8 +3132,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     if (_isOnlineMode) {
-      // Update player stats periodically
-      Timer.periodic(const Duration(minutes: 5), (timer) {
+      // Update player stats periodically (with proper disposal)
+      _multiplayerStatsTimer =
+          Timer.periodic(const Duration(minutes: 5), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
         _multiplayerService.updatePlayerStats(artistStats);
       });
 

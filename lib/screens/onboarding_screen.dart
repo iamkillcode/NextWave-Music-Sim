@@ -107,6 +107,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'currentMoney': 5000, // Starting money - enough to get started!
         'currentFame': 0,
         'level': 1,
+        'fanbase': 1, // Starting fanbase (you're your own first fan!)
         'loyalFanbase': 0,
         'totalStreams': 0,
         'songsPublished': 0,
@@ -130,13 +131,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           .doc(widget.user.uid)
           .set(playerData)
           .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception(
-                'Connection timeout. Please check your internet connection and Firebase setup.',
-              );
-            },
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception(
+            'Connection timeout. Please check your internet connection and Firebase setup.',
           );
+        },
+      );
 
       if (mounted) {
         // Show success message
@@ -754,9 +755,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         : const Color(0xFF21262D),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF00D9FF)
-                          : Colors.white30,
+                      color:
+                          isSelected ? const Color(0xFF00D9FF) : Colors.white30,
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -764,13 +764,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Text(
                       genre,
                       style: TextStyle(
-                        color: isSelected
-                            ? const Color(0xFF00D9FF)
-                            : Colors.white,
+                        color:
+                            isSelected ? const Color(0xFF00D9FF) : Colors.white,
                         fontSize: 18,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.w600,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.w600,
                       ),
                     ),
                   ),
@@ -824,9 +822,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         : const Color(0xFF21262D),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFF00D9FF)
-                          : Colors.white30,
+                      color:
+                          isSelected ? const Color(0xFF00D9FF) : Colors.white30,
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -845,9 +842,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ? const Color(0xFF00D9FF)
                                 : Colors.white,
                             fontSize: 20,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.w600,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.w600,
                           ),
                         ),
                       ),
