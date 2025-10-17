@@ -286,6 +286,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             color: Colors.orange,
             onPressed: _showSendNotificationDialog,
           ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.card_giftcard,
+            label: 'Send Gift to Player',
+            description: 'Gift money, fame, or items to testers',
+            color: Colors.pink,
+            onPressed: _showSendGiftDialog,
+          ),
         ],
       ),
     );
@@ -773,17 +781,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               onPressed: selectedNpcId == null
                   ? null
                   : () async {
-                      Navigator.pop(context);
+                      // Close the selection dialog
+                      Navigator.of(context, rootNavigator: true).pop();
 
+                      // Show loading dialog
                       _showLoadingDialog('Generating song for NPC...');
 
                       try {
-                        final result = await _adminService
-                            .forceNPCRelease(selectedNpcId!);
+                        final result =
+                            await _adminService.forceNPCRelease(selectedNpcId!);
+
+                        // Close loading dialog if still mounted
+                        if (mounted && Navigator.canPop(context)) {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
 
                         if (mounted) {
-                          Navigator.pop(context);
-
                           if (result['success'] == true) {
                             final data = result['data'];
                             _showSuccessDialog(
@@ -794,12 +807,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   'Total Songs: ${data['totalSongs']}',
                             );
                           } else {
-                            _showError('Error', result['error'] ?? 'Unknown error');
+                            _showError(
+                                'Error', result['error'] ?? 'Unknown error');
                           }
                         }
                       } catch (e) {
+                        // Close loading dialog if still mounted
+                        if (mounted && Navigator.canPop(context)) {
+                          Navigator.of(context, rootNavigator: true).pop();
+                        }
+
                         if (mounted) {
-                          Navigator.pop(context);
                           _showError('Error', e.toString());
                         }
                       }
@@ -1108,6 +1126,374 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ],
       ),
     );
+  }
+
+  void _showSendGiftDialog() async {
+    // Load player list
+    _showLoadingDialog('Loading players...');
+
+    try {
+      final players = await _adminService.getAllPlayers();
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+      }
+
+      if (players.isEmpty) {
+        _showError('No Players', 'No players found in the database');
+        return;
+      }
+
+      String? selectedPlayerId;
+      String? selectedGiftType;
+      final amountController = TextEditingController();
+      final messageController = TextEditingController();
+
+      showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) {
+            // Get selected gift info
+            final selectedGift = AdminService.GIFT_TYPES.firstWhere(
+              (g) => g['id'] == selectedGiftType,
+              orElse: () => {},
+            );
+
+            // Auto-fill default amount when gift type changes
+            if (selectedGiftType != null &&
+                selectedGift['defaultAmount'] != null &&
+                amountController.text.isEmpty) {
+              amountController.text = selectedGift['defaultAmount'].toString();
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              title: const Row(
+                children: [
+                  Icon(Icons.card_giftcard, color: Colors.pink),
+                  SizedBox(width: 8),
+                  Text(
+                    'Send Gift to Player',
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Player Selection
+                      const Text(
+                        'Select Recipient:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: selectedPlayerId,
+                          hint: const Text(
+                            'Choose player...',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                          dropdownColor: const Color(0xFF1A1A1A),
+                          underline: const SizedBox(),
+                          items: players.map((player) {
+                            return DropdownMenuItem<String>(
+                              value: player['id'],
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Icon(
+                                      Icons.person,
+                                      color: Colors.blue,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          player['name'],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          '⭐${player['fame']} | \$${player['money']} | 👥${player['fanbase']}',
+                                          style: const TextStyle(
+                                            color: Colors.white60,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedPlayerId = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Gift Type Selection
+                      const Text(
+                        'Gift Type:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: selectedGiftType,
+                          hint: const Text(
+                            'Choose gift type...',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                          dropdownColor: const Color(0xFF1A1A1A),
+                          underline: const SizedBox(),
+                          items: AdminService.GIFT_TYPES.map((gift) {
+                            return DropdownMenuItem<String>(
+                              value: gift['id'],
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    gift['name'],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    gift['description'],
+                                    style: const TextStyle(
+                                      color: Colors.white60,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedGiftType = value;
+                              // Clear amount for pack types
+                              final gift = AdminService.GIFT_TYPES
+                                  .firstWhere((g) => g['id'] == value);
+                              if (gift['defaultAmount'] != null) {
+                                amountController.text =
+                                    gift['defaultAmount'].toString();
+                              } else {
+                                amountController.clear();
+                              }
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Amount (if applicable)
+                      if (selectedGift['defaultAmount'] != null) ...[
+                        const Text(
+                          'Amount:',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: amountController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Enter amount...',
+                            hintStyle: const TextStyle(color: Colors.white30),
+                            filled: true,
+                            fillColor: Colors.black26,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.white10),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: Colors.white10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // Optional Message
+                      const Text(
+                        'Message (Optional):',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: messageController,
+                        maxLines: 2,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText:
+                              'Add a personal message to the recipient...',
+                          hintStyle: const TextStyle(color: Colors.white30),
+                          filled: true,
+                          fillColor: Colors.black26,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.white10),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.white10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: (selectedPlayerId == null ||
+                          selectedGiftType == null)
+                      ? null
+                      : () async {
+                          // Parse amount if needed
+                          int? amount;
+                          if (selectedGift['defaultAmount'] != null) {
+                            amount = int.tryParse(amountController.text) ??
+                                selectedGift['defaultAmount'];
+                          }
+
+                          final recipientName = players.firstWhere(
+                              (p) => p['id'] == selectedPlayerId)['name'];
+
+                          // Close gift selection dialog
+                          Navigator.of(context, rootNavigator: true).pop();
+
+                          // Show loading dialog
+                          _showLoadingDialog(
+                              'Sending gift to $recipientName...');
+
+                          try {
+                            final result = await _adminService.sendGiftToPlayer(
+                              recipientId: selectedPlayerId!,
+                              giftType: selectedGiftType!,
+                              amount: amount,
+                              message: messageController.text.trim().isEmpty
+                                  ? null
+                                  : messageController.text.trim(),
+                            );
+
+                            // Close loading dialog if still mounted
+                            if (mounted && Navigator.canPop(context)) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (mounted) {
+                              if (result['success'] == true) {
+                                final data = result['data'];
+                                _showSuccessDialog(
+                                  '🎁 Gift Sent!',
+                                  'Successfully sent ${data['giftDescription']} to ${data['recipientName']}!\n\n'
+                                      'They will receive a notification about the gift.',
+                                );
+                              } else {
+                                _showError('Error',
+                                    result['error'] ?? 'Unknown error');
+                              }
+                            }
+                          } catch (e) {
+                            // Close loading dialog if still mounted
+                            if (mounted && Navigator.canPop(context)) {
+                              Navigator.of(context, rootNavigator: true).pop();
+                            }
+
+                            if (mounted) {
+                              _showError('Error', e.toString());
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.pink,
+                    disabledBackgroundColor: Colors.grey,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.send, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Send Gift',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+      }
+      _showError('Error Loading Players', e.toString());
+    }
   }
 
   void _showSnackBar(String message) {

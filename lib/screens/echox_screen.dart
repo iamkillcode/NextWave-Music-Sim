@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
+import 'echox_comments_screen.dart';
 
 class EchoPost {
   final String id;
@@ -11,6 +12,7 @@ class EchoPost {
   final DateTime timestamp;
   final int likes;
   final int echoes; // Retweets/shares
+  final int comments; // Comment count
   final List<String> likedBy;
 
   EchoPost({
@@ -21,6 +23,7 @@ class EchoPost {
     required this.timestamp,
     this.likes = 0,
     this.echoes = 0,
+    this.comments = 0,
     this.likedBy = const [],
   });
 
@@ -33,6 +36,7 @@ class EchoPost {
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       likes: data['likes'] ?? 0,
       echoes: data['echoes'] ?? 0,
+      comments: data['comments'] ?? 0,
       likedBy: List<String>.from(data['likedBy'] ?? []),
     );
   }
@@ -45,6 +49,54 @@ class EchoPost {
       'timestamp': Timestamp.fromDate(timestamp),
       'likes': likes,
       'echoes': echoes,
+      'comments': comments,
+      'likedBy': likedBy,
+    };
+  }
+}
+
+class EchoComment {
+  final String id;
+  final String postId;
+  final String authorId;
+  final String authorName;
+  final String content;
+  final DateTime timestamp;
+  final int likes;
+  final List<String> likedBy;
+
+  EchoComment({
+    required this.id,
+    required this.postId,
+    required this.authorId,
+    required this.authorName,
+    required this.content,
+    required this.timestamp,
+    this.likes = 0,
+    this.likedBy = const [],
+  });
+
+  factory EchoComment.fromFirestore(Map<String, dynamic> data, String id) {
+    return EchoComment(
+      id: id,
+      postId: data['postId'] ?? '',
+      authorId: data['authorId'] ?? '',
+      authorName: data['authorName'] ?? 'Unknown Artist',
+      content: data['content'] ?? '',
+      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      likes: data['likes'] ?? 0,
+      likedBy: List<String>.from(data['likedBy'] ?? []),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'postId': postId,
+      'authorId': authorId,
+      'authorName': authorName,
+      'content': content,
+      'timestamp': Timestamp.fromDate(timestamp),
+      'likes': likes,
       'likedBy': likedBy,
     };
   }
@@ -409,17 +461,17 @@ class _EchoXScreenState extends State<EchoXScreen>
               ),
               const SizedBox(width: 24),
               _buildInteractionButton(
+                icon: Icons.chat_bubble_outline,
+                count: post.comments,
+                color: Colors.white54,
+                onTap: () => _navigateToComments(post),
+              ),
+              const SizedBox(width: 24),
+              _buildInteractionButton(
                 icon: Icons.repeat,
                 count: post.echoes,
                 color: Colors.white54,
                 onTap: () => _echoPost(post),
-              ),
-              const SizedBox(width: 24),
-              _buildInteractionButton(
-                icon: Icons.share,
-                count: 0,
-                color: Colors.white54,
-                onTap: () => _showMessage('Share feature coming soon! 🚀'),
               ),
             ],
           ),
@@ -648,6 +700,7 @@ class _EchoXScreenState extends State<EchoXScreen>
       _currentStats = _currentStats.copyWith(
         energy: _currentStats.energy - 3,
         fame: _currentStats.fame + 1,
+        lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
       widget.onStatsUpdated(_currentStats);
 
@@ -684,6 +737,29 @@ class _EchoXScreenState extends State<EchoXScreen>
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
     if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
     return count.toString();
+  }
+
+  void _navigateToComments(EchoPost post) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EchoXCommentsScreen(
+          post: post,
+          artistStats: _currentStats,
+          onStatsUpdated: (updatedStats) {
+            setState(() {
+              _currentStats = updatedStats;
+            });
+            widget.onStatsUpdated(updatedStats);
+          },
+        ),
+      ),
+    );
+
+    // Refresh if stats were updated
+    if (result != null && mounted) {
+      setState(() {});
+    }
   }
 
   void _showMessage(String message) {

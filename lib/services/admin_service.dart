@@ -10,7 +10,8 @@ class AdminService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'us-central1');
 
   // Cache admin status to avoid repeated queries
   bool? _isAdminCached;
@@ -351,5 +352,132 @@ class AdminService {
     {'id': 'npc_dante_noir', 'name': 'Dante Noir', 'genre': 'R&B'},
     {'id': 'npc_kira_blaze', 'name': 'Kira Blaze', 'genre': 'Indie'},
     {'id': 'npc_phoenix_reid', 'name': 'Phoenix Reid', 'genre': 'Country'},
+  ];
+
+  /// Send a gift to a player (Admin Only)
+  Future<Map<String, dynamic>> sendGiftToPlayer({
+    required String recipientId,
+    required String giftType,
+    int? amount,
+    String? message,
+  }) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final result = await _functions.httpsCallable('sendGiftToPlayer').call({
+        'recipientId': recipientId,
+        'giftType': giftType,
+        'amount': amount,
+        'message': message,
+      });
+
+      return {
+        'success': true,
+        'data': result.data,
+      };
+    } catch (e) {
+      print('Error sending gift: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Get list of all players (for gift recipient selection)
+  Future<List<Map<String, dynamic>>> getAllPlayers() async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection('players')
+          .limit(100) // Limit to prevent loading too many
+          .get();
+
+      final playersList = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'name': data['displayName'] ?? data['name'] ?? 'Unknown Player',
+          'fame': data['fame'] ?? 0,
+          'money': data['money'] ?? 0,
+          'fanbase': data['fanbase'] ?? 0,
+        };
+      }).toList();
+
+      // Sort by name in Dart instead of Firestore
+      playersList
+          .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+
+      print('✅ Loaded ${playersList.length} players');
+      return playersList;
+    } catch (e) {
+      print('❌ Error getting players: $e');
+      rethrow; // Throw the error so the UI can show the actual error message
+    }
+  }
+
+  /// Gift type definitions
+  static const List<Map<String, dynamic>> GIFT_TYPES = [
+    {
+      'id': 'money',
+      'name': '💵 Money',
+      'description': 'Give cash to help with expenses',
+      'defaultAmount': 1000,
+      'icon': '💵',
+    },
+    {
+      'id': 'fame',
+      'name': '⭐ Fame',
+      'description': 'Boost their fame points',
+      'defaultAmount': 10,
+      'icon': '⭐',
+    },
+    {
+      'id': 'energy',
+      'name': '⚡ Energy',
+      'description': 'Restore energy (max 100)',
+      'defaultAmount': 50,
+      'icon': '⚡',
+    },
+    {
+      'id': 'fans',
+      'name': '👥 Fans',
+      'description': 'Add to their fanbase',
+      'defaultAmount': 1000,
+      'icon': '👥',
+    },
+    {
+      'id': 'streams',
+      'name': '🎵 Streams',
+      'description': 'Boost total stream count',
+      'defaultAmount': 10000,
+      'icon': '🎵',
+    },
+    {
+      'id': 'starter_pack',
+      'name': '🎁 Starter Pack',
+      'description': '\$5K + 25 Fame + 100 Energy + 500 Fans',
+      'defaultAmount': null,
+      'icon': '🎁',
+    },
+    {
+      'id': 'boost_pack',
+      'name': '📦 Boost Pack',
+      'description': '\$15K + 50 Fame + 2K Fans + 50K Streams',
+      'defaultAmount': null,
+      'icon': '📦',
+    },
+    {
+      'id': 'premium_pack',
+      'name': '👑 Premium Pack',
+      'description': '\$50K + 100 Fame + 10K Fans + 250K Streams',
+      'defaultAmount': null,
+      'icon': '👑',
+    },
   ];
 }

@@ -16,6 +16,7 @@ import 'music_hub_screen.dart';
 import 'media_hub_screen.dart';
 import 'studios_list_screen.dart';
 import 'activity_hub_screen.dart';
+import 'release_manager_screen.dart';
 import '../utils/firebase_status.dart';
 import 'settings_screen.dart';
 
@@ -88,6 +89,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Load user profile from Firestore
     _loadUserProfile();
+
+    // Check for Firebase notifications (gifts from admin, etc.)
+    _loadFirebaseNotifications();
 
     // Initialize Firebase authentication
     _initializeOnlineMode();
@@ -386,6 +390,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       print('❌ Error checking missed days: $e');
       // Don't fail the login if this check fails
+    }
+  }
+
+  /// Load Firebase notifications (gifts from admin, system notifications, etc.)
+  Future<void> _loadFirebaseNotifications() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      print('🔔 Loading Firebase notifications...');
+
+      // Query unread notifications
+      final notificationsSnapshot = await FirebaseFirestore.instance
+          .collection('players')
+          .doc(user.uid)
+          .collection('notifications')
+          .where('read', isEqualTo: false)
+          .orderBy('timestamp', descending: true)
+          .limit(10)
+          .get();
+
+      if (!mounted) return;
+
+      // Process each notification
+      for (var doc in notificationsSnapshot.docs) {
+        final data = doc.data();
+
+        // Add to in-app notification list
+        _addNotification(
+          data['title'] ?? '🔔 Notification',
+          data['message'] ?? '',
+          icon: data['type'] == 'admin_gift'
+              ? Icons.card_giftcard
+              : Icons.info_outline,
+        );
+
+        // Mark as read in Firebase
+        await doc.reference.update({'read': true});
+      }
+
+      if (notificationsSnapshot.docs.isNotEmpty) {
+        print(
+            '✅ Loaded ${notificationsSnapshot.docs.length} new notifications');
+      }
+    } catch (e) {
+      print('❌ Error loading Firebase notifications: $e');
     }
   }
 
@@ -1290,19 +1340,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildGameStatusRow() {
+    // Calculate fame bonuses for tooltip
+    final streamBonus = ((artistStats.fameStreamBonus - 1.0) * 100).round();
+    final fanBonus = ((artistStats.fameFanConversionBonus - 1.0) * 100).round();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       child: Row(
         children: [
           Expanded(
-            child: _buildAdvancedStatusCard(
-              'Fame',
-              artistStats.fame,
-              100, // Max value for progress bar
-              Icons.stars_rounded,
-              const Color(0xFFE94560), // Red
-              const Color(0xFF16213E), // Dark blue
-              'Rising Star',
+            child: Tooltip(
+              message:
+                  'Stream Bonus: +$streamBonus%\nFan Conversion: +$fanBonus%\n\n${artistStats.fameTier}\nTap to see fame benefits',
+              padding: const EdgeInsets.all(12),
+              textStyle: const TextStyle(fontSize: 12, color: Colors.white),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C2128),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE94560), width: 1),
+              ),
+              child: _buildAdvancedStatusCard(
+                'Fame',
+                artistStats.fame,
+                100, // Max value for progress bar
+                Icons.stars_rounded,
+                const Color(0xFFE94560), // Red
+                const Color(0xFF16213E), // Dark blue
+                artistStats
+                    .fameTier, // ✨ Show fame tier instead of generic label
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -1748,6 +1814,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         );
                       },
                       customCostText: 'Record',
+                    ),
+                    _buildActionCard(
+                      'Releases',
+                      Icons.library_music_rounded,
+                      const Color(0xFFE94560),
+                      energyCost: -1,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ReleaseManagerScreen(
+                              artistStats: artistStats,
+                              onStatsUpdated: (updatedStats) {
+                                setState(() {
+                                  artistStats = updatedStats;
+                                });
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      customCostText: 'EPs/Albums',
                     ),
                   ],
                 );

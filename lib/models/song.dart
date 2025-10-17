@@ -12,32 +12,37 @@ class Song {
   final int likes;
   final Map<String, dynamic> metadata;
   final String?
-  coverArtStyle; // e.g., 'minimalist', 'abstract', 'photo', 'illustration'
+      coverArtStyle; // e.g., 'minimalist', 'abstract', 'photo', 'illustration'
   final String? coverArtColor; // Primary color theme
   final List<String>
-  streamingPlatforms; // List of platform IDs like ['tunify', 'maple_music']
+      streamingPlatforms; // List of platform IDs like ['tunify', 'maple_music']
   final String? coverArtUrl; // Uploaded cover art image URL
 
   // Stream growth tracking
   final double
-  viralityScore; // 0.0 to 1.0 - how viral/popular this specific song is
+      viralityScore; // 0.0 to 1.0 - how viral/popular this specific song is
   final int peakDailyStreams; // Track the song's peak performance
   final int daysOnChart; // How many days since release
   final int
-  lastDayStreams; // Streams gained in the last game day (for Daily charts)
+      lastDayStreams; // Streams gained in the last game day (for Daily charts)
   final int
-  last7DaysStreams; // Streams gained in the last 7 game days (for Weekly charts)
+      last7DaysStreams; // Streams gained in the last 7 game days (for Weekly charts)
 
   // Regional tracking - streams per region
   final Map<String, int>
-  regionalStreams; // e.g., {'usa': 10000, 'europe': 5000}
+      regionalStreams; // e.g., {'usa': 10000, 'europe': 5000}
 
   // Track whether this is an album or single (for Spotlight charts)
   final bool isAlbum; // true = album (Spotlight 200), false = single (Hot 100)
 
   // Track last stream update time for realistic delays
   final DateTime?
-  lastStreamUpdateDate; // When streams were last updated (for half-day delay)
+      lastStreamUpdateDate; // When streams were last updated (for half-day delay)
+
+  // Album/EP tracking
+  final String?
+      albumId; // ID of the album/EP this song belongs to (null if standalone single)
+  final String? releaseType; // 'single', 'ep', or 'album'
 
   const Song({
     required this.id,
@@ -64,6 +69,8 @@ class Song {
     this.regionalStreams = const {},
     this.isAlbum = false, // Default to single
     this.lastStreamUpdateDate,
+    this.albumId,
+    this.releaseType = 'single',
   });
 
   Song copyWith({
@@ -91,6 +98,8 @@ class Song {
     Map<String, int>? regionalStreams,
     bool? isAlbum,
     DateTime? lastStreamUpdateDate,
+    String? albumId,
+    String? releaseType,
   }) {
     return Song(
       id: id ?? this.id,
@@ -117,6 +126,8 @@ class Song {
       regionalStreams: regionalStreams ?? this.regionalStreams,
       isAlbum: isAlbum ?? this.isAlbum,
       lastStreamUpdateDate: lastStreamUpdateDate ?? this.lastStreamUpdateDate,
+      albumId: albumId ?? this.albumId,
+      releaseType: releaseType ?? this.releaseType,
     );
   }
 
@@ -142,11 +153,11 @@ class Song {
       'viralityScore': viralityScore,
       'peakDailyStreams': peakDailyStreams,
       'daysOnChart': daysOnChart,
-      'lastDayStreams': lastDayStreams,
-      'last7DaysStreams': last7DaysStreams,
       'regionalStreams': regionalStreams,
       'isAlbum': isAlbum,
       'lastStreamUpdateDate': lastStreamUpdateDate?.toIso8601String(),
+      'albumId': albumId,
+      'releaseType': releaseType,
     };
   }
 
@@ -182,14 +193,12 @@ class Song {
       peakDailyStreams: (json['peakDailyStreams'] as num?)?.toInt() ?? 0,
       daysOnChart: (json['daysOnChart'] as num?)?.toInt() ?? 0,
       lastDayStreams: (json['lastDayStreams'] as num?)?.toInt() ?? 0,
-      last7DaysStreams: (json['last7DaysStreams'] as num?)?.toInt() ?? 0,
-      regionalStreams: Map<String, int>.from(
-        json['regionalStreams'] as Map? ?? {},
-      ),
       isAlbum: json['isAlbum'] as bool? ?? false,
       lastStreamUpdateDate: json['lastStreamUpdateDate'] != null
           ? DateTime.parse(json['lastStreamUpdateDate'] as String)
           : null,
+      albumId: json['albumId'] as String?,
+      releaseType: json['releaseType'] as String? ?? 'single',
     );
   }
 

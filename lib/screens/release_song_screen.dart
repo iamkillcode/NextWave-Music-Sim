@@ -214,84 +214,154 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
   Widget _buildPlatformOption(StreamingPlatform platform) {
     final isSelected = _selectedPlatforms.contains(platform.id);
 
+    // ✨ FAME GATE: Maple Music requires 50 fame
+    final isLocked =
+        platform.id == 'maple_music' && widget.artistStats.fame < 50;
+    final requiredFame = platform.id == 'maple_music' ? 50 : 0;
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (isSelected) {
-            // Don't allow deselecting if it's the only one selected
-            if (_selectedPlatforms.length > 1) {
-              _selectedPlatforms.remove(platform.id);
-            }
-          } else {
-            _selectedPlatforms.add(platform.id);
-          }
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Color(platform.getColorValue()).withOpacity(0.2)
-              : const Color(0xFF30363D),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color:
-                isSelected ? Color(platform.getColorValue()) : Colors.white30,
-            width: isSelected ? 2 : 1,
+      onTap: isLocked
+          ? null
+          : () {
+              setState(() {
+                if (isSelected) {
+                  // Don't allow deselecting if it's the only one selected
+                  if (_selectedPlatforms.length > 1) {
+                    _selectedPlatforms.remove(platform.id);
+                  }
+                } else {
+                  _selectedPlatforms.add(platform.id);
+                }
+              });
+            },
+      child: Opacity(
+        opacity: isLocked ? 0.4 : 1.0,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isLocked
+                ? const Color(0xFF1C2128)
+                : (isSelected
+                    ? Color(platform.getColorValue()).withOpacity(0.2)
+                    : const Color(0xFF30363D)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isLocked
+                  ? Colors.white12
+                  : (isSelected
+                      ? Color(platform.getColorValue())
+                      : Colors.white30),
+              width: isSelected ? 2 : 1,
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(platform.emoji, style: const TextStyle(fontSize: 32)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Stack(
                     children: [
-                      Text(
-                        platform.name,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Color(platform.getColorValue())
-                              : Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Text(platform.emoji,
+                          style: const TextStyle(fontSize: 32)),
+                      if (isLocked)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade900,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.lock,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        platform.description,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 12,
-                        ),
-                      ),
                     ],
                   ),
-                ),
-                if (isSelected)
-                  Icon(
-                    Icons.check_circle,
-                    color: Color(platform.getColorValue()),
-                    size: 28,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              platform.name,
+                              style: TextStyle(
+                                color: isLocked
+                                    ? Colors.white38
+                                    : (isSelected
+                                        ? Color(platform.getColorValue())
+                                        : Colors.white),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (isLocked) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade900.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.red.shade700,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  '$requiredFame Fame Required',
+                                  style: TextStyle(
+                                    color: Colors.red.shade300,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isLocked
+                              ? 'Unlock at $requiredFame fame to access this premium platform'
+                              : platform.description,
+                          style: TextStyle(
+                            color: isLocked ? Colors.white38 : Colors.white60,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildPlatformStat(
-                  '💰',
-                  '\$${platform.royaltiesPerStream.toStringAsFixed(3)}/stream',
-                  platform,
-                ),
-              ],
-            ),
-          ],
+                  if (isSelected && !isLocked)
+                    Icon(
+                      Icons.check_circle,
+                      color: Color(platform.getColorValue()),
+                      size: 28,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildPlatformStat(
+                    '💰',
+                    '\$${platform.royaltiesPerStream.toStringAsFixed(3)}/stream',
+                    platform,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

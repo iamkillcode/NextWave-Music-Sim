@@ -958,8 +958,7 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
     );
     int energyCost = _getEnergyCostForEffort(effort);
 
-    // Calculate rewards based on quality
-    int moneyGain = ((songQuality / 100) * 100 * effort).round();
+    // Calculate rewards based on quality (no money - only from streams!)
     int fameGain = ((songQuality / 100) * 2 * effort).round();
     int creativityGain = effort * 2;
 
@@ -989,7 +988,7 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - energyCost,
         // songsWritten removed - only counts when released
-        money: artistStats.money + moneyGain,
+        // money removed - artists only earn from streams, not writing!
         fame: artistStats.fame + fameGain,
         creativity: artistStats.creativity + creativityGain,
         songs: [...artistStats.songs, newSong], // Add the new song

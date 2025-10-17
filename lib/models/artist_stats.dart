@@ -1,5 +1,6 @@
 import 'song.dart';
 import 'side_hustle.dart';
+import 'album.dart';
 
 class ArtistStats {
   final String name;
@@ -26,6 +27,9 @@ class ArtistStats {
   final int inspirationLevel;
   // Song collection
   final List<Song> songs;
+
+  // Album/EP collection
+  final List<Album> albums;
 
   // World location
   final String currentRegion;
@@ -63,6 +67,7 @@ class ArtistStats {
     this.compositionSkill = 10,
     this.inspirationLevel = 0, // No hype for new artists!
     this.songs = const [],
+    this.albums = const [],
     this.currentRegion = 'usa',
     this.age = 18,
     this.careerStartDate,
@@ -92,6 +97,7 @@ class ArtistStats {
     int? compositionSkill,
     int? inspirationLevel,
     List<Song>? songs,
+    List<Album>? albums,
     String? currentRegion,
     int? age,
     DateTime? careerStartDate,
@@ -121,6 +127,7 @@ class ArtistStats {
       compositionSkill: compositionSkill ?? this.compositionSkill,
       inspirationLevel: inspirationLevel ?? this.inspirationLevel,
       songs: songs ?? this.songs,
+      albums: albums ?? this.albums,
       currentRegion: currentRegion ?? this.currentRegion,
       age: age ?? this.age,
       careerStartDate: careerStartDate ?? this.careerStartDate,
@@ -142,18 +149,49 @@ class ArtistStats {
     return age + yearsPassed;
   }
 
-  // Career level based on overall progress
+  // Career level based on overall progress (15 tiers with exponential growth)
   String get careerLevel {
     int totalPoints =
         fame + (money / 100).round() + fanbase + (albumsSold * 10);
 
-    if (totalPoints < 50 + 1500) return "Street Performer";
-    if (totalPoints < 150 + 1500) return "Local Artist";
-    if (totalPoints < 300 + 1500) return "Rising Star";
-    if (totalPoints < 500 + 1500) return "Popular Artist";
-    if (totalPoints < 800 + 1500) return "Celebrity";
-    if (totalPoints < 1200 + 1500) return "Superstar";
-    return "Legend";
+    // Exponential tier thresholds
+    if (totalPoints < 100) return "Street Busker"; // Tier 1
+    if (totalPoints < 300) return "Open Mic Regular"; // Tier 2
+    if (totalPoints < 600) return "Local Talent"; // Tier 3
+    if (totalPoints < 1000) return "Underground Artist"; // Tier 4
+    if (totalPoints < 1600) return "Rising Star"; // Tier 5
+    if (totalPoints < 2500) return "Breakthrough Act"; // Tier 6
+    if (totalPoints < 4000) return "Chart Regular"; // Tier 7
+    if (totalPoints < 6500) return "Radio Favorite"; // Tier 8
+    if (totalPoints < 10000) return "Platinum Artist"; // Tier 9
+    if (totalPoints < 15000) return "Award Winner"; // Tier 10
+    if (totalPoints < 22000) return "Global Star"; // Tier 11
+    if (totalPoints < 32000) return "Superstar"; // Tier 12
+    if (totalPoints < 45000) return "Icon"; // Tier 13
+    if (totalPoints < 65000) return "Living Legend"; // Tier 14
+    return "Hall of Fame"; // Tier 15
+  }
+
+  // Get career tier number (1-15)
+  int get careerTier {
+    int totalPoints =
+        fame + (money / 100).round() + fanbase + (albumsSold * 10);
+
+    if (totalPoints < 100) return 1;
+    if (totalPoints < 300) return 2;
+    if (totalPoints < 600) return 3;
+    if (totalPoints < 1000) return 4;
+    if (totalPoints < 1600) return 5;
+    if (totalPoints < 2500) return 6;
+    if (totalPoints < 4000) return 7;
+    if (totalPoints < 6500) return 8;
+    if (totalPoints < 10000) return 9;
+    if (totalPoints < 15000) return 10;
+    if (totalPoints < 22000) return 11;
+    if (totalPoints < 32000) return 12;
+    if (totalPoints < 45000) return 13;
+    if (totalPoints < 65000) return 14;
+    return 15;
   }
 
   // Get next career milestone
@@ -163,6 +201,113 @@ class ArtistStats {
     if (fanbase < 100) return "Reach 100K fans!";
     if (fame < 200) return "Become more famous!";
     return "You're doing great! Keep growing!";
+  }
+
+  // ============================================================================
+  // FAME BONUSES - Fame impacts multiple game systems
+  // ============================================================================
+
+  /// Stream growth multiplier based on fame (1.0 = no bonus, 2.0 = double)
+  /// Higher fame = more people discover your music
+  double get fameStreamBonus {
+    if (fame < 10) return 1.0; // No bonus
+    if (fame < 25) return 1.05; // +5%
+    if (fame < 50) return 1.10; // +10%
+    if (fame < 75) return 1.15; // +15%
+    if (fame < 100) return 1.20; // +20%
+    if (fame < 150) return 1.30; // +30%
+    if (fame < 200) return 1.40; // +40%
+    if (fame < 300) return 1.50; // +50%
+    if (fame < 400) return 1.65; // +65%
+    if (fame < 500) return 1.80; // +80%
+    return 2.0; // +100% (double streams!)
+  }
+
+  /// Fan conversion rate multiplier (how likely listeners become fans)
+  /// Higher fame = people more likely to follow you
+  double get fameFanConversionBonus {
+    if (fame < 10) return 1.0; // 15% base rate
+    if (fame < 25) return 1.1; // +10% conversion
+    if (fame < 50) return 1.2; // +20%
+    if (fame < 100) return 1.35; // +35%
+    if (fame < 150) return 1.5; // +50%
+    if (fame < 200) return 1.7; // +70%
+    if (fame < 300) return 1.9; // +90%
+    if (fame < 400) return 2.1; // +110%
+    if (fame < 500) return 2.3; // +130%
+    return 2.5; // +150%
+  }
+
+  /// Concert ticket price multiplier
+  /// More famous = charge more per ticket
+  double get fameTicketPriceMultiplier {
+    if (fame < 10) return 1.0; // $10 base
+    if (fame < 25) return 1.2; // $12
+    if (fame < 50) return 1.5; // $15
+    if (fame < 75) return 1.8; // $18
+    if (fame < 100) return 2.0; // $20
+    if (fame < 150) return 2.5; // $25
+    if (fame < 200) return 3.0; // $30
+    if (fame < 300) return 4.0; // $40
+    if (fame < 400) return 5.0; // $50
+    if (fame < 500) return 6.0; // $60
+    return 8.0; // $80
+  }
+
+  /// Unlock collaboration opportunities based on fame
+  bool get canCollaborateWithLocalArtists => fame >= 25;
+  bool get canCollaborateWithNPCs => fame >= 50;
+  bool get canCollaborateWithStars => fame >= 100;
+  bool get canCollaborateWithLegends => fame >= 200;
+
+  /// Record label interest tier
+  String get recordLabelInterest {
+    if (fame < 50) return "None";
+    if (fame < 100) return "Indie Labels Watching";
+    if (fame < 150) return "Small Label Interest";
+    if (fame < 200) return "Major Label Scouting";
+    if (fame < 300) return "Multiple Offers";
+    if (fame < 400) return "Bidding War";
+    return "Dream Contract Available";
+  }
+
+  /// Check if record labels are interested
+  bool get hasRecordLabelInterest => fame >= 50;
+
+  /// Unlock features based on fame
+  bool get canTourInternationally => fame >= 75;
+  bool get canAccessPremiumStudios => fame >= 100;
+  bool get canHostConcertTour => fame >= 150;
+  bool get canReleaseDeluxeEditions => fame >= 125;
+  bool get canCreateMerchandise => fame >= 175;
+  bool get canStreamOnAllPlatforms => fame >= 50;
+
+  /// Regional unlock based on fame (expands market reach)
+  List<String> get unlockedRegions {
+    List<String> regions = ['usa']; // Everyone starts in USA
+
+    if (fame >= 25) regions.add('uk');
+    if (fame >= 50) regions.add('europe');
+    if (fame >= 75) regions.add('latin_america');
+    if (fame >= 100) regions.add('asia');
+    if (fame >= 150) regions.add('africa');
+    if (fame >= 200) regions.add('oceania');
+
+    return regions;
+  }
+
+  /// Get fame tier name for UI display
+  String get fameTier {
+    if (fame < 10) return "Unknown";
+    if (fame < 25) return "Local Scene";
+    if (fame < 50) return "City Famous";
+    if (fame < 100) return "Regional Star";
+    if (fame < 150) return "National Celebrity";
+    if (fame < 200) return "Chart Topper";
+    if (fame < 300) return "International Star";
+    if (fame < 400) return "Global Icon";
+    if (fame < 500) return "Living Legend";
+    return "Hall of Fame";
   }
 
   // Calculate song quality based on player skills and genre

@@ -369,7 +369,8 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
     const updatedRegionalFanbase = calculateRegionalFanbaseGrowth(
       playerData.regionalFanbase || {},
       updatedSongs,
-      playerData.homeRegion || 'usa'
+      playerData.homeRegion || 'usa',
+      playerData.fame || 0 // Pass fame for conversion bonus
     );
     
     // ✅ FAME DECAY - Fame decreases based on artist idleness
@@ -424,6 +425,10 @@ function calculateDailyStreamGrowth(song, playerData, currentGameDate) {
   const viralityScore = song.viralityScore || 0.5;
   const ageCategory = getAgeCategory(daysSinceRelease);
   
+  // ✨ FAME BONUS: Higher fame = more streams from algorithm boost
+  const fame = playerData.fame || 0;
+  const fameStreamBonus = calculateFameStreamBonus(fame);
+  
   // Age-based discovery modifier
   const discoveryModifier = getDiscoveryModifier(ageCategory, daysSinceRelease);
   
@@ -461,7 +466,9 @@ function calculateDailyStreamGrowth(song, playerData, currentGameDate) {
   if (platformMultiplier === 0) platformMultiplier = 0.5;
   
   const totalStreams = loyalStreams + discoveryStreams + viralStreams + casualStreams;
-  const finalStreams = Math.round(totalStreams * platformMultiplier * (0.8 + Math.random() * 0.4));
+  
+  // ✨ Apply fame bonus to total streams (famous artists get more algorithm promotion)
+  const finalStreams = Math.round(totalStreams * platformMultiplier * fameStreamBonus * (0.8 + Math.random() * 0.4));
   
   return Math.max(0, finalStreams);
 }
@@ -512,8 +519,11 @@ function distributeStreamsRegionally(totalStreams, currentRegion, regionalFanbas
 }
 
 // ✅ NEW: Regional fanbase growth based on streams
-function calculateRegionalFanbaseGrowth(currentFanbase, songs, homeRegion) {
+function calculateRegionalFanbaseGrowth(currentFanbase, songs, homeRegion, playerFame = 0) {
   const updatedFanbase = { ...currentFanbase };
+  
+  // ✨ FAME BONUS: Higher fame = better stream-to-fan conversion
+  const fameFanConversionBonus = calculateFameFanConversionBonus(playerFame);
   
   // Calculate streams per region from all songs
   const regionalStreams = {};
@@ -532,7 +542,9 @@ function calculateRegionalFanbaseGrowth(currentFanbase, songs, homeRegion) {
     // Growth rate: 1 fan per 1000 streams, with diminishing returns
     const baseGrowth = Math.floor(streams / 1000);
     const diminishingFactor = 1.0 / (1.0 + currentFans / 10000);
-    const growth = Math.round(baseGrowth * diminishingFactor);
+    
+    // ✨ Apply fame bonus to conversion rate
+    const growth = Math.round(baseGrowth * diminishingFactor * fameFanConversionBonus);
     
     // Home region gets 2x growth
     const finalGrowth = region === homeRegion ? growth * 2 : growth;
@@ -578,7 +590,73 @@ function getGenreRegionalBonus(genre, region) {
   return preferences[genre]?.[region] || 0.14; // Equal distribution fallback
 }
 
-// ✅ NEW: Apply event bonuses
+// ============================================================================
+// FAME BONUS CALCULATIONS - Match Dart model logic
+// ============================================================================
+
+/**
+ * Calculate stream growth multiplier based on fame
+ * Higher fame = more algorithmic promotion and discovery
+ * @param {number} fame - Player's current fame level
+ * @returns {number} Multiplier (1.0 = no bonus, 2.0 = double streams)
+ */
+function calculateFameStreamBonus(fame) {
+  if (fame < 10) return 1.0;          // No bonus
+  if (fame < 25) return 1.05;         // +5%
+  if (fame < 50) return 1.10;         // +10%
+  if (fame < 75) return 1.15;         // +15%
+  if (fame < 100) return 1.20;        // +20%
+  if (fame < 150) return 1.30;        // +30%
+  if (fame < 200) return 1.40;        // +40%
+  if (fame < 300) return 1.50;        // +50%
+  if (fame < 400) return 1.65;        // +65%
+  if (fame < 500) return 1.80;        // +80%
+  return 2.0;                         // +100% (double streams!)
+}
+
+/**
+ * Calculate fan conversion rate multiplier based on fame
+ * Higher fame = more listeners convert to fans
+ * @param {number} fame - Player's current fame level
+ * @returns {number} Multiplier (1.0 = base 15% rate, 2.5 = 37.5% rate)
+ */
+function calculateFameFanConversionBonus(fame) {
+  if (fame < 10) return 1.0;          // 15% base rate
+  if (fame < 25) return 1.1;          // +10% conversion
+  if (fame < 50) return 1.2;          // +20%
+  if (fame < 100) return 1.35;        // +35%
+  if (fame < 150) return 1.5;         // +50%
+  if (fame < 200) return 1.7;         // +70%
+  if (fame < 300) return 1.9;         // +90%
+  if (fame < 400) return 2.1;         // +110%
+  if (fame < 500) return 2.3;         // +130%
+  return 2.5;                         // +150%
+}
+
+/**
+ * Calculate concert ticket price multiplier based on fame
+ * Higher fame = charge more per ticket
+ * @param {number} fame - Player's current fame level
+ * @returns {number} Multiplier (1.0 = $10 base, 8.0 = $80)
+ */
+function calculateFameTicketPriceMultiplier(fame) {
+  if (fame < 10) return 1.0;          // $10 base
+  if (fame < 25) return 1.2;          // $12
+  if (fame < 50) return 1.5;          // $15
+  if (fame < 75) return 1.8;          // $18
+  if (fame < 100) return 2.0;         // $20
+  if (fame < 150) return 2.5;         // $25
+  if (fame < 200) return 3.0;         // $30
+  if (fame < 300) return 4.0;         // $40
+  if (fame < 400) return 5.0;         // $50
+  if (fame < 500) return 6.0;         // $60
+  return 8.0;                         // $80
+}
+
+// ============================================================================
+// EVENT BONUSES
+// ============================================================================
+
 async function getActiveEvent() {
   try {
     const eventDoc = await db.collection('game_state').doc('active_event').get();
@@ -1713,6 +1791,145 @@ exports.forceNPCRelease = functions.https.onCall(async (data, context) => {
 
   } catch (error) {
     console.error('❌ Error forcing NPC release:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// =============================================================================
+// ADMIN: Send Gift to Player
+// =============================================================================
+exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
+  // Verify admin authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const { recipientId, giftType, amount, message } = data;
+
+  if (!recipientId || !giftType) {
+    throw new functions.https.HttpsError('invalid-argument', 'recipientId and giftType are required');
+  }
+
+  console.log(`🎁 Admin gift: ${giftType} (${amount}) to player ${recipientId}`);
+
+  try {
+    // Get recipient player data
+    const recipientRef = db.collection('players').doc(recipientId);
+    const recipientDoc = await recipientRef.get();
+
+    if (!recipientDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Player not found');
+    }
+
+    const recipientData = recipientDoc.data();
+    const updates = {};
+    let giftDescription = '';
+
+    // Apply gift based on type
+    switch (giftType) {
+      case 'money':
+        const moneyAmount = amount || 1000;
+        updates.money = (recipientData.money || 0) + moneyAmount;
+        giftDescription = `$${moneyAmount.toLocaleString()}`;
+        break;
+
+      case 'fame':
+        const fameAmount = amount || 10;
+        updates.fame = (recipientData.fame || 0) + fameAmount;
+        giftDescription = `${fameAmount} Fame Points`;
+        break;
+
+      case 'energy':
+        const energyAmount = amount || 50;
+        updates.energy = Math.min((recipientData.energy || 0) + energyAmount, 100);
+        giftDescription = `${energyAmount} Energy`;
+        break;
+
+      case 'fans':
+        const fansAmount = amount || 1000;
+        updates.fanbase = (recipientData.fanbase || 0) + fansAmount;
+        giftDescription = `${fansAmount.toLocaleString()} Fans`;
+        break;
+
+      case 'streams':
+        const streamsAmount = amount || 10000;
+        updates.totalStreams = (recipientData.totalStreams || 0) + streamsAmount;
+        giftDescription = `${streamsAmount.toLocaleString()} Streams`;
+        break;
+
+      case 'starter_pack':
+        // Give a nice starter pack
+        updates.money = (recipientData.money || 0) + 5000;
+        updates.fame = (recipientData.fame || 0) + 25;
+        updates.energy = 100;
+        updates.fanbase = (recipientData.fanbase || 0) + 500;
+        giftDescription = 'Starter Pack ($5,000, 25 Fame, 100 Energy, 500 Fans)';
+        break;
+
+      case 'boost_pack':
+        // Give a boost pack
+        updates.money = (recipientData.money || 0) + 15000;
+        updates.fame = (recipientData.fame || 0) + 50;
+        updates.fanbase = (recipientData.fanbase || 0) + 2000;
+        updates.totalStreams = (recipientData.totalStreams || 0) + 50000;
+        giftDescription = 'Boost Pack ($15,000, 50 Fame, 2,000 Fans, 50,000 Streams)';
+        break;
+
+      case 'premium_pack':
+        // Give a premium pack
+        updates.money = (recipientData.money || 0) + 50000;
+        updates.fame = (recipientData.fame || 0) + 100;
+        updates.fanbase = (recipientData.fanbase || 0) + 10000;
+        updates.totalStreams = (recipientData.totalStreams || 0) + 250000;
+        giftDescription = 'Premium Pack ($50,000, 100 Fame, 10,000 Fans, 250,000 Streams)';
+        break;
+
+      default:
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid gift type');
+    }
+
+    // Update player data
+    await recipientRef.update(updates);
+
+    // Create notification for recipient
+    const notificationRef = db.collection('players').doc(recipientId).collection('notifications').doc();
+    await notificationRef.set({
+      id: notificationRef.id,
+      type: 'admin_gift',
+      title: '🎁 Gift Received!',
+      message: message || `You've received a gift from the admin: ${giftDescription}`,
+      giftType: giftType,
+      giftDescription: giftDescription,
+      amount: amount,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      read: false,
+      fromAdmin: true,
+      adminId: context.auth.uid,
+    });
+
+    // Log the gift in a separate collection for audit
+    await db.collection('admin_gifts').add({
+      recipientId: recipientId,
+      recipientName: recipientData.displayName || 'Unknown',
+      giftType: giftType,
+      amount: amount,
+      giftDescription: giftDescription,
+      message: message,
+      adminId: context.auth.uid,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log(`✅ Gift sent successfully to ${recipientData.displayName}`);
+
+    return {
+      success: true,
+      recipientName: recipientData.displayName || 'Unknown',
+      giftDescription: giftDescription,
+      message: 'Gift sent and notification created',
+    };
+
+  } catch (error) {
+    console.error('❌ Error sending gift:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
