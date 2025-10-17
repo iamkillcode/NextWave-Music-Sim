@@ -16,7 +16,8 @@ class StudioScreen extends StatefulWidget {
   State<StudioScreen> createState() => _StudioScreenState();
 }
 
-class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMixin {
+class _StudioScreenState extends State<StudioScreen>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late ArtistStats _currentStats;
 
@@ -33,9 +34,12 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
     super.dispose();
   }
 
-  List<Song> get writtenSongs => _currentStats.songs.where((s) => s.state == SongState.written).toList();
-  List<Song> get recordedSongs => _currentStats.songs.where((s) => s.state == SongState.recorded).toList();
-  List<Song> get releasedSongs => _currentStats.songs.where((s) => s.state == SongState.released).toList();
+  List<Song> get writtenSongs =>
+      _currentStats.songs.where((s) => s.state == SongState.written).toList();
+  List<Song> get recordedSongs =>
+      _currentStats.songs.where((s) => s.state == SongState.recorded).toList();
+  List<Song> get releasedSongs =>
+      _currentStats.songs.where((s) => s.state == SongState.released).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +79,7 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
       ),
     );
   }
+
   Widget _buildWrittenSongsTab() {
     if (writtenSongs.isEmpty) {
       return _buildEmptyState(
@@ -285,13 +290,15 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
 
   Widget _buildRecordButton(Song song) {
     final canAfford = _currentStats.energy >= 30 && _currentStats.money >= 1000;
-    
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: canAfford ? () => _recordSong(song) : null,
         icon: const Icon(Icons.mic),
-        label: Text(canAfford ? 'Record Song (-30 Energy, -\$1K)' : 'Need 30 Energy & \$1K'),
+        label: Text(canAfford
+            ? 'Record Song (-30 Energy, -\$1K)'
+            : 'Need 30 Energy & \$1K'),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF00D9FF),
           foregroundColor: Colors.black,
@@ -308,13 +315,14 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
 
   Widget _buildReleaseButton(Song song) {
     final canAfford = _currentStats.money >= 5000;
-    
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: canAfford ? () => _releaseSong(song) : null,
         icon: const Icon(Icons.publish),
-        label: Text(canAfford ? 'Release on Tunify (-\$5K)' : 'Need \$5K for Release'),
+        label: Text(
+            canAfford ? 'Release on Tunify (-\$5K)' : 'Need \$5K for Release'),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF1DB954), // Spotify green
           foregroundColor: Colors.white,
@@ -406,8 +414,11 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
 
   void _recordSong(Song song) {
     // Calculate recording quality based on current stats and random factors
-    final baseQuality = ((_currentStats.songwritingSkill + _currentStats.compositionSkill) / 2).round();
-    final randomFactor = (DateTime.now().millisecondsSinceEpoch % 21) - 10; // -10 to +10
+    final baseQuality =
+        ((_currentStats.songwritingSkill + _currentStats.compositionSkill) / 2)
+            .round();
+    final randomFactor =
+        (DateTime.now().millisecondsSinceEpoch % 21) - 10; // -10 to +10
     final recordingQuality = (baseQuality + randomFactor).clamp(1, 100);
 
     final updatedSongs = _currentStats.songs.map((s) {
@@ -432,16 +443,18 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
 
     widget.onStatsUpdated(_currentStats);
 
-    _showMessage('🎤 Successfully recorded "${song.title}"!\nRecording Quality: $recordingQuality%');
+    _showMessage(
+        '🎤 Successfully recorded "${song.title}"!\nRecording Quality: $recordingQuality%');
   }
 
   void _releaseSong(Song song) {
     final updatedSongs = _currentStats.songs.map((s) {
       if (s.id == song.id) {
         // Generate initial streams based on quality and genre
-        final initialStreams = (song.estimatedStreams * 0.001).round(); // Start with 0.1% of estimated
+        final initialStreams = (song.estimatedStreams * 0.001)
+            .round(); // Start with 0.1% of estimated
         final initialLikes = (initialStreams * 0.05).round(); // 5% like rate
-        
+
         return s.copyWith(
           state: SongState.released,
           releasedDate: DateTime.now(),
@@ -456,13 +469,17 @@ class _StudioScreenState extends State<StudioScreen> with TickerProviderStateMix
       _currentStats = _currentStats.copyWith(
         money: _currentStats.money - 5000,
         fame: _currentStats.fame + (song.finalQuality ~/ 10),
+        songsWritten:
+            _currentStats.songsWritten + 1, // ✅ Increment when released!
         songs: updatedSongs,
+        lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
     });
 
     widget.onStatsUpdated(_currentStats);
 
-    _showMessage('🎵 "${song.title}" is now live on Tunify!\n+${song.finalQuality ~/ 10} Fame');
+    _showMessage(
+        '🎵 "${song.title}" is now live on Tunify!\n+${song.finalQuality ~/ 10} Fame');
   }
 
   Color _getStateColor(SongState state) {

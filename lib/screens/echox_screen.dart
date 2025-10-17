@@ -64,7 +64,8 @@ class EchoXScreen extends StatefulWidget {
   State<EchoXScreen> createState() => _EchoXScreenState();
 }
 
-class _EchoXScreenState extends State<EchoXScreen> with SingleTickerProviderStateMixin {
+class _EchoXScreenState extends State<EchoXScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late ArtistStats _currentStats;
   final TextEditingController _postController = TextEditingController();
@@ -200,11 +201,12 @@ class _EchoXScreenState extends State<EchoXScreen> with SingleTickerProviderStat
         }
 
         final posts = snapshot.data?.docs
-            .map((doc) => EchoPost.fromFirestore(
-                  doc.data() as Map<String, dynamic>,
-                  doc.id,
-                ))
-            .toList() ?? [];
+                .map((doc) => EchoPost.fromFirestore(
+                      doc.data() as Map<String, dynamic>,
+                      doc.id,
+                    ))
+                .toList() ??
+            [];
 
         if (posts.isEmpty) {
           return Center(
@@ -268,11 +270,12 @@ class _EchoXScreenState extends State<EchoXScreen> with SingleTickerProviderStat
         }
 
         final posts = snapshot.data?.docs
-            .map((doc) => EchoPost.fromFirestore(
-                  doc.data() as Map<String, dynamic>,
-                  doc.id,
-                ))
-            .toList() ?? [];
+                .map((doc) => EchoPost.fromFirestore(
+                      doc.data() as Map<String, dynamic>,
+                      doc.id,
+                    ))
+                .toList() ??
+            [];
 
         if (posts.isEmpty) {
           return Center(
@@ -586,6 +589,7 @@ class _EchoXScreenState extends State<EchoXScreen> with SingleTickerProviderStat
         energy: _currentStats.energy - 5,
         fame: _currentStats.fame + 1,
         creativity: _currentStats.creativity + 2,
+        lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
       widget.onStatsUpdated(_currentStats);
 
@@ -607,7 +611,7 @@ class _EchoXScreenState extends State<EchoXScreen> with SingleTickerProviderStat
 
     final isLiked = post.likedBy.contains(userId);
     final newLikedBy = List<String>.from(post.likedBy);
-    
+
     if (isLiked) {
       newLikedBy.remove(userId);
     } else {

@@ -10,7 +10,7 @@ class ArtistStats {
   final int fanbase;
   final int loyalFanbase; // Dedicated fans who consistently stream your music
   final Map<String, int>
-  regionalFanbase; // Fans per region (e.g., {'usa': 500, 'europe': 200})
+      regionalFanbase; // Fans per region (e.g., {'usa': 500, 'europe': 200})
   final int albumsSold;
   final int songsWritten;
   final int concertsPerformed;
@@ -37,6 +37,14 @@ class ArtistStats {
   // Artist profile image
   final String? avatarUrl;
 
+  // Last activity tracking for fame decay
+  final DateTime? lastActivityDate;
+
+  // Genre system - PRIMARY GENRE & MASTERY
+  final String primaryGenre; // Genre chosen during onboarding
+  final Map<String, int> genreMastery; // Mastery level per genre (0-100)
+  final List<String> unlockedGenres; // Genres player can use
+
   const ArtistStats({
     required this.name,
     required this.fame,
@@ -59,7 +67,12 @@ class ArtistStats {
     this.age = 18,
     this.careerStartDate,
     this.avatarUrl,
+    this.lastActivityDate,
     this.activeSideHustle,
+    this.primaryGenre = 'Hip Hop', // Default to Hip Hop if not specified
+    this.genreMastery = const {}, // Empty initially
+    this.unlockedGenres =
+        const [], // Empty initially, will be populated with primaryGenre
   });
   ArtistStats copyWith({
     String? name,
@@ -83,8 +96,12 @@ class ArtistStats {
     int? age,
     DateTime? careerStartDate,
     String? avatarUrl,
+    DateTime? lastActivityDate,
     SideHustle? activeSideHustle,
     bool clearSideHustle = false, // Flag to explicitly clear side hustle
+    String? primaryGenre,
+    Map<String, int>? genreMastery,
+    List<String>? unlockedGenres,
   }) {
     return ArtistStats(
       name: name ?? this.name,
@@ -108,9 +125,12 @@ class ArtistStats {
       age: age ?? this.age,
       careerStartDate: careerStartDate ?? this.careerStartDate,
       avatarUrl: avatarUrl ?? this.avatarUrl,
-      activeSideHustle: clearSideHustle
-          ? null
-          : (activeSideHustle ?? this.activeSideHustle),
+      lastActivityDate: lastActivityDate ?? this.lastActivityDate,
+      activeSideHustle:
+          clearSideHustle ? null : (activeSideHustle ?? this.activeSideHustle),
+      primaryGenre: primaryGenre ?? this.primaryGenre,
+      genreMastery: genreMastery ?? this.genreMastery,
+      unlockedGenres: unlockedGenres ?? this.unlockedGenres,
     );
   }
 
@@ -127,12 +147,12 @@ class ArtistStats {
     int totalPoints =
         fame + (money / 100).round() + fanbase + (albumsSold * 10);
 
-    if (totalPoints < 50) return "Street Performer";
-    if (totalPoints < 150) return "Local Artist";
-    if (totalPoints < 300) return "Rising Star";
-    if (totalPoints < 500) return "Popular Artist";
-    if (totalPoints < 800) return "Celebrity";
-    if (totalPoints < 1200) return "Superstar";
+    if (totalPoints < 50 + 1500) return "Street Performer";
+    if (totalPoints < 150 + 1500) return "Local Artist";
+    if (totalPoints < 300 + 1500) return "Rising Star";
+    if (totalPoints < 500 + 1500) return "Popular Artist";
+    if (totalPoints < 800 + 1500) return "Celebrity";
+    if (totalPoints < 1200 + 1500) return "Superstar";
     return "Legend";
   }
 
@@ -150,6 +170,14 @@ class ArtistStats {
     // Base quality from skills
     double baseQuality =
         (songwritingSkill + lyricsSkill + compositionSkill) / 3.0;
+
+    // 🎸 GENRE MASTERY BONUS - Higher mastery = Better quality!
+    // 0% mastery = 1.0x (no bonus)
+    // 50% mastery = 1.15x (+15% quality)
+    // 100% mastery = 1.3x (+30% quality boost!)
+    int genreMasteryLevel = genreMastery[genre] ?? 0;
+    double masteryBonus = 1.0 + (genreMasteryLevel / 100.0 * 0.3);
+
     // Genre skill multipliers
     double genreMultiplier = 1.0;
     switch (genre.toLowerCase()) {
@@ -207,13 +235,13 @@ class ArtistStats {
     // Experience bonus
     double experienceBonus = 1.0 + (experience / 1000.0 * 0.2);
 
-    // Calculate final quality (0-100)
-    double quality =
-        baseQuality *
+    // Calculate final quality (0-100) with mastery bonus!
+    double quality = baseQuality *
         genreMultiplier *
         effortMultiplier *
         inspirationFactor *
-        experienceBonus;
+        experienceBonus *
+        masteryBonus; // 🎸 Mastery multiplier added!
 
     return quality.clamp(1.0, 100.0);
   }
@@ -228,8 +256,8 @@ class ArtistStats {
     int bonusGain = songQuality > 70
         ? 2
         : songQuality > 50
-        ? 1
-        : 0;
+            ? 1
+            : 0;
 
     Map<String, int> gains = {
       'songwritingSkill': baseGain + bonusGain,
@@ -299,5 +327,46 @@ class ArtistStats {
     if (quality >= 30) return "Average";
     if (quality >= 20) return "Poor";
     return "Terrible";
+  }
+
+  // Calculate genre mastery gain from writing a song
+  // Returns the amount to add to that genre's mastery (0-100 scale)
+  int calculateGenreMasteryGain(
+      String genre, int effortLevel, double songQuality) {
+    // Base gain from effort (1-4 effort = 5-20 base points)
+    int baseGain = effortLevel * 5;
+
+    // Quality bonus (0-15 points based on song quality)
+    int qualityBonus = (songQuality / 100 * 15).round();
+
+    // Total gain (clamped to 5-35 range to prevent too fast progression)
+    int totalGain = (baseGain + qualityBonus).clamp(5, 35);
+
+    return totalGain;
+  }
+
+  // Apply mastery gain to the genre mastery map
+  // Returns updated genreMastery map with the gain applied (capped at 100)
+  Map<String, int> applyGenreMasteryGain(String genre, int masteryGain) {
+    Map<String, int> updatedMastery = Map.from(genreMastery);
+    int currentMastery = updatedMastery[genre] ?? 0;
+    int newMastery = (currentMastery + masteryGain).clamp(0, 100);
+    updatedMastery[genre] = newMastery;
+    return updatedMastery;
+  }
+
+  // Get mastery level description
+  String getGenreMasteryLevel(String genre) {
+    int mastery = genreMastery[genre] ?? 0;
+    if (mastery >= 90) return "Master";
+    if (mastery >= 80) return "Expert";
+    if (mastery >= 70) return "Advanced";
+    if (mastery >= 60) return "Proficient";
+    if (mastery >= 50) return "Skilled";
+    if (mastery >= 40) return "Competent";
+    if (mastery >= 30) return "Intermediate";
+    if (mastery >= 20) return "Learning";
+    if (mastery >= 10) return "Novice";
+    return "Beginner";
   }
 }

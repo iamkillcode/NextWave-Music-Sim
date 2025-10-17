@@ -372,13 +372,39 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       playerData.homeRegion || 'usa'
     );
     
-    if (totalNewStreams > 0) {
-      return {
+    // ✅ FAME DECAY - Fame decreases based on artist idleness
+    let famePenalty = 0;
+    const lastActivityDate = playerData.lastActivityDate 
+      ? new Date(playerData.lastActivityDate._seconds * 1000)
+      : null;
+    
+    if (lastActivityDate) {
+      const daysSinceActivity = Math.floor((currentGameDate - lastActivityDate) / (1000 * 60 * 60 * 24));
+      
+      // After 7 days of inactivity, start losing 1% fame per day
+      if (daysSinceActivity > 7) {
+        const inactiveDays = daysSinceActivity - 7;
+        const currentFame = playerData.fame || 0;
+        famePenalty = Math.floor(currentFame * 0.01 * inactiveDays);
+        console.log(`⚠️ ${playerData.name}: ${inactiveDays} inactive days, -${famePenalty} fame`);
+      }
+    }
+    
+    if (totalNewStreams > 0 || famePenalty > 0) {
+      const updates = {
         songs: updatedSongs,
         currentMoney: (playerData.currentMoney || 0) + totalNewIncome,
         regionalFanbase: updatedRegionalFanbase, // ✅ UPDATE REGIONAL FANBASE
         lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
       };
+      
+      // Apply fame decay if needed
+      if (famePenalty > 0) {
+        const currentFame = playerData.fame || 0;
+        updates.fame = Math.max(0, currentFame - famePenalty);
+      }
+      
+      return updates;
     }
     
     return null;
@@ -986,11 +1012,22 @@ exports.triggerDailyUpdate = functions.https.onCall(async (data, context) => {
     const gameTimeRef = db.collection('game_state').doc('global_time');
     const gameTimeDoc = await gameTimeRef.get();
     
+    // Initialize game time if it doesn't exist
     if (!gameTimeDoc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Game time not initialized');
+      console.log('⚠️ Game time not found. Initializing...');
+      const startDate = new Date('2020-01-01T00:00:00Z');
+      await gameTimeRef.set({
+        currentGameDate: admin.firestore.Timestamp.fromDate(startDate),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        realWorldStartDate: admin.firestore.Timestamp.fromDate(new Date('2025-10-01T00:00:00Z')),
+        gameWorldStartDate: admin.firestore.Timestamp.fromDate(startDate),
+      });
+      console.log('✅ Game time initialized successfully');
     }
     
-    const currentGameDate = gameTimeDoc.data().currentGameDate.toDate();
+    // Fetch again after potential initialization
+    const updatedGameTimeDoc = await gameTimeRef.get();
+    const currentGameDate = updatedGameTimeDoc.data().currentGameDate.toDate();
     const newGameDate = new Date(currentGameDate);
     newGameDate.setDate(newGameDate.getDate() + 1);
     
@@ -1544,3 +1581,138 @@ async function createNPCEchoXPost(npc) {
     console.error(`❌ Error creating EchoX post for ${npc.name}:`, error);
   }
 }
+
+// ============================================================================
+// 9. ADMIN: Force NPC Release
+// ============================================================================
+
+/**
+ * Admin endpoint to force a specific NPC to release a new song
+ * Useful for testing and content management
+ */
+exports.forceNPCRelease = functions.https.onCall(async (data, context) => {
+  // Verify admin authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const { npcId } = data;
+
+  if (!npcId) {
+    throw new functions.https.HttpsError('invalid-argument', 'npcId is required');
+  }
+
+  console.log(`🎵 Admin force release for NPC: ${npcId}`);
+
+  try {
+    // Find the NPC in the SIGNATURE_NPCS array
+    const npc = SIGNATURE_NPCS.find(n => n.id === npcId);
+
+    if (!npc) {
+      throw new functions.https.HttpsError('not-found', `NPC ${npcId} not found`);
+    }
+
+    // Get or create NPC document
+    const npcRef = db.collection('npcs').doc(npcId);
+    const npcDoc = await npcRef.get();
+
+    let npcData;
+    if (!npcDoc.exists) {
+      // Create new NPC if doesn't exist
+      npcData = {
+        id: npc.id,
+        name: npc.name,
+        region: npc.region,
+        primaryGenre: npc.primaryGenre,
+        secondaryGenre: npc.secondaryGenre,
+        tier: npc.tier,
+        bio: npc.bio,
+        traits: npc.traits,
+        avatar: npc.avatar,
+        baseStreams: npc.baseStreams,
+        growthRate: npc.growthRate,
+        releaseFrequency: npc.releaseFrequency,
+        socialActivity: npc.socialActivity,
+        songs: [],
+        totalStreams: 0,
+        fanbase: Math.floor(npc.baseStreams * 0.1), // 10% of weekly streams
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      await npcRef.set(npcData);
+    } else {
+      npcData = npcDoc.data();
+    }
+
+    // Generate a new song for the NPC
+    const songTitles = [
+      'Midnight Vibes', 'City Lights', 'Dreams & Nightmares', 'Rising Up',
+      'On My Way', 'Lost in the Music', 'Summer Nights', 'Heart & Soul',
+      'Chasing Stars', 'No Turning Back', 'Feel the Beat', 'Paradise Found',
+      'Breaking Free', 'One More Time', 'Golden Hour', 'Never Give Up'
+    ];
+
+    const songTitle = songTitles[Math.floor(Math.random() * songTitles.length)];
+    const quality = 70 + Math.floor(Math.random() * 25); // 70-95 quality
+    const initialStreams = Math.floor(npc.baseStreams * (0.5 + Math.random() * 0.5));
+
+    const newSong = {
+      id: `${npcId}_${Date.now()}`,
+      title: songTitle,
+      genre: Math.random() > 0.5 ? npc.primaryGenre : npc.secondaryGenre,
+      quality,
+      createdDate: admin.firestore.Timestamp.now(),
+      state: 'released',
+      releasedDate: admin.firestore.Timestamp.now(),
+      streams: initialStreams,
+      likes: Math.floor(initialStreams * 0.05),
+      viralityScore: 0.5 + Math.random() * 0.3,
+      peakDailyStreams: Math.floor(initialStreams * 0.3),
+      daysOnChart: 0,
+      lastDayStreams: Math.floor(initialStreams * 0.3),
+      last7DaysStreams: initialStreams,
+      isAlbum: false,
+      metadata: {
+        npcGenerated: true,
+        forcedRelease: true,
+        releasedBy: context.auth.uid,
+      }
+    };
+
+    // Update NPC with new song
+    const updatedSongs = [...(npcData.songs || []), newSong];
+    const updatedTotalStreams = (npcData.totalStreams || 0) + initialStreams;
+
+    await npcRef.update({
+      songs: updatedSongs,
+      totalStreams: updatedTotalStreams,
+      lastReleaseDate: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create EchoX post announcing the release
+    await db.collection('echox_posts').add({
+      authorId: npc.id,
+      authorName: npc.name,
+      content: `Just dropped "${songTitle}"! 🎵 Stream it now! 🔥`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      likes: Math.floor(Math.random() * 50),
+      echos: 0,
+      likedBy: [],
+      isNPC: true,
+    });
+
+    console.log(`✅ ${npc.name} released "${songTitle}" (${initialStreams} initial streams)`);
+
+    return {
+      success: true,
+      npcName: npc.name,
+      songTitle,
+      quality,
+      initialStreams,
+      totalSongs: updatedSongs.length,
+    };
+
+  } catch (error) {
+    console.error('❌ Error forcing NPC release:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});

@@ -264,6 +264,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 12),
           _buildActionButton(
+            icon: Icons.music_note,
+            label: 'Force NPC Release',
+            description: 'Make a specific NPC release a new song',
+            color: Colors.purple,
+            onPressed: _showForceNPCReleaseDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
             icon: Icons.update,
             label: 'Trigger Daily Update',
             description: 'Manually run daily game update',
@@ -658,6 +666,157 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _showError('Error', e.toString());
       }
     }
+  }
+
+  void _showForceNPCReleaseDialog() {
+    String? selectedNpcId;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Row(
+            children: [
+              Icon(Icons.music_note, color: Colors.purple),
+              SizedBox(width: 8),
+              Text(
+                'Force NPC Release',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Select an NPC to force a new song release:',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: selectedNpcId,
+                  hint: const Text(
+                    'Choose NPC...',
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                  dropdownColor: const Color(0xFF1A1A1A),
+                  underline: const SizedBox(),
+                  items: AdminService.AVAILABLE_NPCS.map((npc) {
+                    return DropdownMenuItem<String>(
+                      value: npc['id'],
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.purple,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  npc['name']!,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  npc['genre']!,
+                                  style: const TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedNpcId = value;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selectedNpcId == null
+                  ? null
+                  : () async {
+                      Navigator.pop(context);
+
+                      _showLoadingDialog('Generating song for NPC...');
+
+                      try {
+                        final result = await _adminService
+                            .forceNPCRelease(selectedNpcId!);
+
+                        if (mounted) {
+                          Navigator.pop(context);
+
+                          if (result['success'] == true) {
+                            final data = result['data'];
+                            _showSuccessDialog(
+                              '🎵 Song Released!',
+                              '${data['npcName']} released "${data['songTitle']}"\n\n'
+                                  'Quality: ${data['quality']}\n'
+                                  'Initial Streams: ${data['initialStreams']}\n'
+                                  'Total Songs: ${data['totalSongs']}',
+                            );
+                          } else {
+                            _showError('Error', result['error'] ?? 'Unknown error');
+                          }
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          Navigator.pop(context);
+                          _showError('Error', e.toString());
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: const Text(
+                'Release Song',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showSendNotificationDialog() {

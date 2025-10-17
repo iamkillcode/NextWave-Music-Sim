@@ -54,9 +54,8 @@ class StreamGrowthService {
     }
 
     // Calculate days since release
-    final daysSinceRelease = currentGameDate
-        .difference(song.releasedDate!)
-        .inDays;
+    final daysSinceRelease =
+        currentGameDate.difference(song.releasedDate!).inDays;
 
     // Base streams from loyal fanbase (they always stream)
     final loyalStreams = _calculateLoyalFanStreams(artistStats.loyalFanbase);
@@ -87,11 +86,30 @@ class StreamGrowthService {
         (loyalStreams + discoveryStreams + viralStreams + casualStreams) * 0.65;
 
     // Total streams (some users are on both platforms)
-    final totalDailyStreams = (tunifyStreams + mapleStreams * 0.4).round();
+    var totalDailyStreams = (tunifyStreams + mapleStreams * 0.4).round();
+
+    // 🎸 GENRE MASTERY BONUS - Higher mastery = More streams!
+    // Mastered genres get recommended more by algorithms
+    // 0% mastery = 1.0x (no bonus)
+    // 50% mastery = 1.2x (+20% streams)
+    // 100% mastery = 1.5x (+50% streams boost!)
+    final genreMastery = artistStats.genreMastery[song.genre] ?? 0;
+    final masteryStreamBonus = 1.0 + (genreMastery / 100.0 * 0.5);
+    totalDailyStreams = (totalDailyStreams * masteryStreamBonus).round();
 
     // Add randomness (±20% variance)
     final variance = 0.8 + (_random.nextDouble() * 0.4);
-    final finalStreams = (totalDailyStreams * variance).round();
+    var finalStreams = (totalDailyStreams * variance).round();
+
+    // 🔥 FIX: Guarantee minimum streams for released songs
+    // Even with 0 fans, songs should get SOME organic discovery
+    // Quality-based minimum: 50-500 streams per day for new artists
+    if (finalStreams < 50) {
+      final qualityBonus =
+          (song.finalQuality / 100 * 450).round(); // 0-450 based on quality
+      final minimumStreams = 50 + qualityBonus; // 50-500 range
+      finalStreams = minimumStreams;
+    }
 
     return finalStreams.clamp(0, double.infinity).toInt();
   }
@@ -302,15 +320,15 @@ class StreamGrowthService {
   }) {
     // Release day spike
     if (daysSinceRelease == 0) {
-      final releaseHype = (artistStats.fanbase * 0.3 * song.finalQuality / 100)
-          .round();
+      final releaseHype =
+          (artistStats.fanbase * 0.3 * song.finalQuality / 100).round();
       return (releaseHype * (1.5 + _random.nextDouble())).round();
     }
 
     // Week 1: High discovery (algorithm boost)
     if (daysSinceRelease <= 7) {
-      final weekOneDiscovery = (artistStats.fanbase * 0.2 * song.viralityScore)
-          .round();
+      final weekOneDiscovery =
+          (artistStats.fanbase * 0.2 * song.viralityScore).round();
       final dayDecay =
           1.0 - (daysSinceRelease / 7.0 * 0.4); // 40% decay over week
       return (weekOneDiscovery * dayDecay).round();
@@ -318,8 +336,8 @@ class StreamGrowthService {
 
     // Week 2-4: Medium discovery
     if (daysSinceRelease <= 30) {
-      final monthOneDiscovery = (artistStats.fanbase * 0.1 * song.viralityScore)
-          .round();
+      final monthOneDiscovery =
+          (artistStats.fanbase * 0.1 * song.viralityScore).round();
       final weekDecay =
           1.0 - ((daysSinceRelease - 7) / 23.0 * 0.5); // Further 50% decay
       return (monthOneDiscovery * weekDecay).round();
@@ -327,14 +345,14 @@ class StreamGrowthService {
 
     // Month 2-3: Low but consistent discovery
     if (daysSinceRelease <= 90) {
-      final lateDiscovery = (artistStats.fanbase * 0.05 * song.viralityScore)
-          .round();
+      final lateDiscovery =
+          (artistStats.fanbase * 0.05 * song.viralityScore).round();
       return (lateDiscovery * (0.5 + _random.nextDouble() * 0.5)).round();
     }
 
     // After 3 months: Long tail (very low, quality matters more)
-    final longTail = (artistStats.fanbase * 0.02 * (song.finalQuality / 100))
-        .round();
+    final longTail =
+        (artistStats.fanbase * 0.02 * (song.finalQuality / 100)).round();
     return (longTail * (0.3 + _random.nextDouble() * 0.4)).round();
   }
 
@@ -351,8 +369,8 @@ class StreamGrowthService {
       // Viral spike! (can happen anytime but more likely for high virality)
       final spikeMultiplier =
           2.0 + (_random.nextDouble() * 5.0); // 2x to 7x spike
-      final baseViralStreams = (song.streams * 0.05)
-          .round(); // 5% of current streams
+      final baseViralStreams =
+          (song.streams * 0.05).round(); // 5% of current streams
       return (baseViralStreams * spikeMultiplier).round();
     }
 
@@ -525,8 +543,7 @@ class StreamGrowthService {
         song.peakDailyStreams,
         dailyStreams,
       ),
-      'daysOnChart':
-          song.daysOnChart +
+      'daysOnChart': song.daysOnChart +
           (shouldChart(dailyStreams: dailyStreams, artistFanbase: 1000)
               ? 1
               : 0),

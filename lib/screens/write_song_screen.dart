@@ -339,8 +339,7 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
     Navigator.of(context).pop(); // Close dialog
 
     // Calculate skill gains based on effort level (quick songs give moderate skill gain)
-    int effort =
-        (songType['energy'] as int) ~/
+    int effort = (songType['energy'] as int) ~/
         10; // Convert energy cost to effort level
     String genre = songType['genre'] as String;
     double songQuality = artistStats.calculateSongQuality(genre, effort);
@@ -361,10 +360,21 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
       state: SongState.written,
     );
 
+    // Calculate genre mastery gain
+    int masteryGain = artistStats.calculateGenreMasteryGain(
+      genre,
+      effort,
+      songQuality,
+    );
+    Map<String, int> updatedMastery = artistStats.applyGenreMasteryGain(
+      genre,
+      masteryGain,
+    );
+
     setState(() {
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - (songType['energy'] as int),
-        songsWritten: artistStats.songsWritten + 1,
+        // songsWritten removed - only counts when released
         creativity: artistStats.creativity + (songType['creativity'] as int),
         fame: artistStats.fame + (songType['fame'] as int),
         songs: [...artistStats.songs, newSong], // Add the new song
@@ -384,6 +394,9 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
         inspirationLevel:
             (artistStats.inspirationLevel + skillGains['inspirationLevel']!)
                 .clamp(0, 100),
+        // Update genre mastery
+        genreMastery: updatedMastery,
+        lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
     });
 
@@ -400,14 +413,16 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
 
   void _showCustomSongForm() {
     final TextEditingController songTitleController = TextEditingController();
-    String selectedGenre = 'R&B';
+    // 🎸 Start with player's primary genre (first unlocked genre)
+    String selectedGenre = artistStats.unlockedGenres.isNotEmpty
+        ? artistStats.unlockedGenres.first
+        : artistStats.primaryGenre;
     int selectedEffort = 2; // 1-4 scale
     List<String> nameSuggestions = [];
 
     // Generate initial suggestions based on default genre
-    int estimatedQuality = artistStats
-        .calculateSongQuality(selectedGenre, selectedEffort)
-        .round();
+    int estimatedQuality =
+        artistStats.calculateSongQuality(selectedGenre, selectedEffort).round();
     nameSuggestions = SongNameGenerator.getSuggestions(
       selectedGenre,
       count: 4,
@@ -472,10 +487,10 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                                     .round();
                                 nameSuggestions =
                                     SongNameGenerator.getSuggestions(
-                                      selectedGenre,
-                                      count: 4,
-                                      quality: quality,
-                                    );
+                                  selectedGenre,
+                                  count: 4,
+                                  quality: quality,
+                                );
                               });
                             },
                             icon: const Icon(
@@ -595,46 +610,77 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                             value: selectedGenre,
                             dropdownColor: const Color(0xFF30363D),
                             style: const TextStyle(color: Colors.white),
-                            items:
-                                [
-                                  'R&B',
-                                  'Hip Hop',
-                                  'Rap',
-                                  'Trap',
-                                  'Drill',
-                                  'Afrobeat',
-                                  'Country',
-                                  'Jazz',
-                                  'Reggae',
-                                ].map((genre) {
-                                  return DropdownMenuItem(
-                                    value: genre,
-                                    child: Row(
-                                      children: [
-                                        _getGenreIcon(genre),
-                                        const SizedBox(width: 8),
-                                        Text(genre),
-                                      ],
+                            items: [
+                              'R&B',
+                              'Hip Hop',
+                              'Rap',
+                              'Trap',
+                              'Drill',
+                              'Afrobeat',
+                              'Country',
+                              'Jazz',
+                              'Reggae',
+                            ].map((genre) {
+                              // 🔒 Check if genre is unlocked
+                              final bool isUnlocked =
+                                  artistStats.unlockedGenres.contains(genre);
+
+                              return DropdownMenuItem(
+                                value: genre,
+                                enabled: isUnlocked, // Disable locked genres
+                                child: Row(
+                                  children: [
+                                    // Show lock icon for locked genres
+                                    if (!isUnlocked)
+                                      const Icon(
+                                        Icons.lock,
+                                        size: 16,
+                                        color: Colors.grey,
+                                      ),
+                                    if (!isUnlocked) const SizedBox(width: 4),
+                                    _getGenreIcon(genre),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      genre,
+                                      style: TextStyle(
+                                        color: isUnlocked
+                                            ? Colors.white
+                                            : Colors.grey,
+                                      ),
                                     ),
-                                  );
-                                }).toList(),
+                                    if (!isUnlocked)
+                                      const Text(
+                                        ' (Locked)',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
                             onChanged: (value) {
-                              dialogSetState(() {
-                                selectedGenre = value!;
-                                // Regenerate suggestions when genre changes
-                                int quality = artistStats
-                                    .calculateSongQuality(
-                                      selectedGenre,
-                                      selectedEffort,
-                                    )
-                                    .round();
-                                nameSuggestions =
-                                    SongNameGenerator.getSuggestions(
-                                      selectedGenre,
-                                      count: 4,
-                                      quality: quality,
-                                    );
-                              });
+                              // Only allow changing to unlocked genres
+                              if (value != null &&
+                                  artistStats.unlockedGenres.contains(value)) {
+                                dialogSetState(() {
+                                  selectedGenre = value;
+                                  // Regenerate suggestions when genre changes
+                                  int quality = artistStats
+                                      .calculateSongQuality(
+                                        selectedGenre,
+                                        selectedEffort,
+                                      )
+                                      .round();
+                                  nameSuggestions =
+                                      SongNameGenerator.getSuggestions(
+                                    selectedGenre,
+                                    count: 4,
+                                    quality: quality,
+                                  );
+                                });
+                              }
                             },
                             isExpanded: true,
                           ),
@@ -656,8 +702,7 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [1, 2, 3, 4].map((effort) {
                           bool isSelected = selectedEffort == effort;
-                          bool canAfford =
-                              artistStats.energy >=
+                          bool canAfford = artistStats.energy >=
                               _getEnergyCostForEffort(effort);
 
                           return GestureDetector(
@@ -674,10 +719,10 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                                           .round();
                                       nameSuggestions =
                                           SongNameGenerator.getSuggestions(
-                                            selectedGenre,
-                                            count: 4,
-                                            quality: quality,
-                                          );
+                                        selectedGenre,
+                                        count: 4,
+                                        quality: quality,
+                                      );
                                     });
                                   }
                                 : null,
@@ -690,8 +735,9 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                                 color: isSelected
                                     ? const Color(0xFF00D9FF)
                                     : canAfford
-                                    ? const Color(0xFF30363D)
-                                    : const Color(0xFF30363D).withOpacity(0.3),
+                                        ? const Color(0xFF30363D)
+                                        : const Color(0xFF30363D)
+                                            .withOpacity(0.3),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: isSelected
@@ -795,13 +841,13 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                             child: ElevatedButton(
                               onPressed:
                                   (songTitleController.text.trim().isNotEmpty &&
-                                      artistStats.energy >= energyCost)
-                                  ? () => _createCustomSong(
-                                      songTitleController.text.trim(),
-                                      selectedGenre,
-                                      selectedEffort,
-                                    )
-                                  : null,
+                                          artistStats.energy >= energyCost)
+                                      ? () => _createCustomSong(
+                                            songTitleController.text.trim(),
+                                            selectedGenre,
+                                            selectedEffort,
+                                          )
+                                      : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00D9FF),
                                 padding: const EdgeInsets.symmetric(
@@ -927,11 +973,22 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
       state: SongState.written,
     );
 
+    // Calculate genre mastery gain
+    int masteryGain = artistStats.calculateGenreMasteryGain(
+      genre,
+      effort,
+      songQuality,
+    );
+    Map<String, int> updatedMastery = artistStats.applyGenreMasteryGain(
+      genre,
+      masteryGain,
+    );
+
     setState(() {
       // Update main stats
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - energyCost,
-        songsWritten: artistStats.songsWritten + 1,
+        // songsWritten removed - only counts when released
         money: artistStats.money + moneyGain,
         fame: artistStats.fame + fameGain,
         creativity: artistStats.creativity + creativityGain,
@@ -952,6 +1009,9 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
         inspirationLevel:
             (artistStats.inspirationLevel + skillGains['inspirationLevel']!)
                 .clamp(0, 100),
+        // Update genre mastery
+        genreMastery: updatedMastery,
+        lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
     });
 

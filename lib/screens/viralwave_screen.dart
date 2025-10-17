@@ -68,8 +68,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
         .where((s) => s.state == SongState.released)
         .toList();
 
-    final canPromote =
-        widget.artistStats.energy >= _currentEnergyCost &&
+    final canPromote = widget.artistStats.energy >= _currentEnergyCost &&
         widget.artistStats.money >= _currentMoneyCost;
 
     return Scaffold(
@@ -125,6 +124,40 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
                     _buildPromotionTypeSelector(),
 
+                    const SizedBox(height: 12),
+
+                    // Show validation message if selected type is not available
+                    if (!_isPromotionTypeAvailable(_selectedPromotionType))
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF453A).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFFF453A).withOpacity(0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.lock,
+                              color: Color(0xFFFF453A),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _getValidationMessage(_selectedPromotionType),
+                                style: const TextStyle(
+                                  color: Color(0xFFFF453A),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     const SizedBox(height: 24),
 
                     // Song/Album selector
@@ -179,6 +212,56 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
   int get _currentMoneyCost =>
       _promotionTypes[_selectedPromotionType]!['moneyCost'] as int;
+
+  /// Check if a promotion type is available based on released songs
+  bool _isPromotionTypeAvailable(String promotionType) {
+    final releasedSongs = widget.artistStats.songs
+        .where((s) => s.state == SongState.released)
+        .toList();
+
+    final releasedSingles = releasedSongs.where((s) => !s.isAlbum).toList();
+    final releasedAlbumSongs = releasedSongs.where((s) => s.isAlbum).toList();
+
+    switch (promotionType) {
+      case 'song':
+        // Need at least 1 released single
+        return releasedSingles.isNotEmpty;
+      case 'single':
+        // Need at least 1-2 released singles
+        return releasedSingles.isNotEmpty;
+      case 'ep':
+        // Need at least 3 released singles
+        return releasedSingles.length >= 3;
+      case 'lp':
+        // Need at least 7 released album songs
+        return releasedAlbumSongs.length >= 7;
+      default:
+        return false;
+    }
+  }
+
+  /// Get the validation message for unavailable promotion types
+  String _getValidationMessage(String promotionType) {
+    final releasedSongs = widget.artistStats.songs
+        .where((s) => s.state == SongState.released)
+        .toList();
+
+    final releasedSingles = releasedSongs.where((s) => !s.isAlbum).toList();
+    final releasedAlbumSongs = releasedSongs.where((s) => s.isAlbum).toList();
+
+    switch (promotionType) {
+      case 'song':
+        return 'Need at least 1 released single';
+      case 'single':
+        return 'Need at least 1 released single';
+      case 'ep':
+        return 'Need at least 3 released singles (you have ${releasedSingles.length})';
+      case 'lp':
+        return 'Need at least 7 released album songs (you have ${releasedAlbumSongs.length})';
+      default:
+        return 'Not available';
+    }
+  }
 
   Widget _buildNoSongsView() {
     return Center(
@@ -327,52 +410,72 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       children: _promotionTypes.entries.map((entry) {
         final isSelected = _selectedPromotionType == entry.key;
         final data = entry.value;
+        final isAvailable = _isPromotionTypeAvailable(entry.key);
 
         return GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedPromotionType = entry.key;
-              _selectedSong = null;
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? (data['color'] as Color).withOpacity(0.2)
-                  : const Color(0xFF161B22),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
+          onTap: isAvailable
+              ? () {
+                  setState(() {
+                    _selectedPromotionType = entry.key;
+                    _selectedSong = null;
+                  });
+                }
+              : null,
+          child: Opacity(
+            opacity: isAvailable ? 1.0 : 0.4,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
                 color: isSelected
-                    ? (data['color'] as Color)
-                    : Colors.white.withOpacity(0.1),
-                width: isSelected ? 2 : 1,
+                    ? (data['color'] as Color).withOpacity(0.2)
+                    : const Color(0xFF161B22),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected
+                      ? (data['color'] as Color)
+                      : Colors.white.withOpacity(0.1),
+                  width: isSelected ? 2 : 1,
+                ),
               ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(data['emoji'], style: const TextStyle(fontSize: 32)),
-                const SizedBox(height: 8),
-                Text(
-                  data['name'],
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+              child: Stack(
+                children: [
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(data['emoji'], style: const TextStyle(fontSize: 32)),
+                      const SizedBox(height: 8),
+                      Text(
+                        data['name'],
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${data['energyCost']} ⚡ | \$${data['moneyCost']}',
+                        style: TextStyle(
+                          color: data['color'],
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${data['energyCost']} ⚡ | \$${data['moneyCost']}',
-                  style: TextStyle(
-                    color: data['color'],
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+                  if (!isAvailable)
+                    const Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Icon(
+                        Icons.lock,
+                        color: Colors.red,
+                        size: 16,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -629,8 +732,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               needsEnergy && needsMoney
                   ? 'Need more energy and money'
                   : needsEnergy
-                  ? 'Not enough energy'
-                  : 'Not enough money',
+                      ? 'Not enough energy'
+                      : 'Not enough money',
               style: const TextStyle(color: Color(0xFFFF453A), fontSize: 13),
             ),
           ),
@@ -640,13 +743,23 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   bool _canLaunchCampaign() {
+    // Check if promotion type is available
+    if (!_isPromotionTypeAvailable(_selectedPromotionType)) {
+      return false;
+    }
+
+    // For song promotion, need to select a song
     if (_selectedPromotionType == 'song') {
       return _selectedSong != null;
     }
+
     return true;
   }
 
   String _getButtonText(bool canPromote) {
+    if (!_isPromotionTypeAvailable(_selectedPromotionType)) {
+      return 'Requirements Not Met';
+    }
     if (!_canLaunchCampaign()) {
       return _selectedPromotionType == 'song'
           ? 'Select a Song'
@@ -689,10 +802,10 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     // Calculate actual results with some randomness (80-120% of estimate)
     final reachMultiplier = 0.8 + random.nextDouble() * 0.4;
     final actualReach = (potentialReach * reachMultiplier).round();
-    final fansGained = (actualReach * (0.12 + random.nextDouble() * 0.06))
-        .round();
-    final streamsGained = (actualReach * (0.25 + random.nextDouble() * 0.1))
-        .round();
+    final fansGained =
+        (actualReach * (0.12 + random.nextDouble() * 0.06)).round();
+    final streamsGained =
+        (actualReach * (0.25 + random.nextDouble() * 0.1)).round();
     final fameGain = _calculateFameGain();
 
     // Update songs
@@ -712,12 +825,11 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       // Promote all released songs
       updatedSongs = updatedSongs.map((song) {
         if (song.state == SongState.released) {
-          final songBoost =
-              (streamsGained /
-                      updatedSongs
-                          .where((s) => s.state == SongState.released)
-                          .length)
-                  .round();
+          final songBoost = (streamsGained /
+                  updatedSongs
+                      .where((s) => s.state == SongState.released)
+                      .length)
+              .round();
           return song.copyWith(streams: song.streams + songBoost);
         }
         return song;
@@ -731,6 +843,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       fanbase: widget.artistStats.fanbase + fansGained,
       fame: widget.artistStats.fame + fameGain,
       songs: updatedSongs,
+      lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
     );
 
     widget.onStatsUpdated(updatedStats);

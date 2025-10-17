@@ -261,6 +261,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         }
 
+        // 🎸 GENRE SYSTEM: Load genre mastery data
+        final String primaryGenre = data['primaryGenre'] ?? 'Hip Hop';
+
+        // Load genre mastery map (default empty for new players)
+        Map<String, int> loadedGenreMastery = {};
+        if (data['genreMastery'] != null) {
+          final masteryData = data['genreMastery'] as Map<dynamic, dynamic>;
+          loadedGenreMastery = masteryData.map(
+            (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+          );
+        }
+
+        // Load or initialize unlocked genres
+        List<String> loadedUnlockedGenres = [];
+        if (data['unlockedGenres'] != null) {
+          loadedUnlockedGenres = List<String>.from(data['unlockedGenres']);
+        } else {
+          // First time: unlock only the primary genre
+          loadedUnlockedGenres = [primaryGenre];
+          // Initialize mastery for primary genre at 0
+          loadedGenreMastery[primaryGenre] = 0;
+        }
+
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? 'Unknown Artist',
@@ -288,6 +311,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             regionalFanbase: loadedRegionalFanbase,
             avatarUrl: data['avatarUrl'] as String?,
             activeSideHustle: loadedSideHustle,
+            primaryGenre: primaryGenre,
+            genreMastery: loadedGenreMastery,
+            unlockedGenres: loadedUnlockedGenres,
           );
         });
 
@@ -395,6 +421,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'homeRegion': artistStats.currentRegion,
         'age': artistStats.age,
         'regionalFanbase': artistStats.regionalFanbase,
+        'primaryGenre': artistStats.primaryGenre, // 🎸 Save primary genre
+        'genreMastery': artistStats.genreMastery, // 🎸 Save genre mastery
+        'unlockedGenres': artistStats.unlockedGenres, // 🎸 Save unlocked genres
         'lastActive': Timestamp.fromDate(
           DateTime.now(),
         ), // Track last activity
@@ -1473,14 +1502,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: artistStats.avatarUrl == null
+                        ? Colors.white.withOpacity(0.2)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(25),
+                    image: artistStats.avatarUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(artistStats.avatarUrl!),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  child: artistStats.avatarUrl == null
+                      ? const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 30,
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Column(
@@ -1870,6 +1909,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             artistStats = artistStats.copyWith(
               energy: artistStats.energy - 40,
               albumsSold: artistStats.albumsSold + 1,
+              songsWritten:
+                  artistStats.songsWritten + 3, // ✅ Count 3 released songs!
               money: artistStats.money + albumEarnings,
               fame: artistStats.fame + fameGain,
               songs: updatedSongs,
@@ -2295,10 +2336,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
       state: SongState.written,
     );
 
+    // Calculate genre mastery gain
+    int masteryGain = artistStats.calculateGenreMasteryGain(
+      genre,
+      effort,
+      songQuality,
+    );
+    Map<String, int> updatedMastery = artistStats.applyGenreMasteryGain(
+      genre,
+      masteryGain,
+    );
+
     setState(() {
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - (songType['energy'] as int),
-        songsWritten: artistStats.songsWritten + 1,
+        // songsWritten removed - only counts when released
         creativity: artistStats.creativity + (songType['creativity'] as int),
         fame: artistStats.fame + (songType['fame'] as int),
         songs: [...artistStats.songs, newSong], // Add the new song
@@ -2318,6 +2370,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         inspirationLevel:
             (artistStats.inspirationLevel + skillGains['inspirationLevel']!)
                 .clamp(0, 100),
+        // Update genre mastery
+        genreMastery: updatedMastery,
       );
     });
 
@@ -2337,7 +2391,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _showCustomSongForm() {
     final TextEditingController songTitleController = TextEditingController();
-    String selectedGenre = 'R&B';
+    // 🎸 Start with player's primary genre (first unlocked genre)
+    String selectedGenre = artistStats.unlockedGenres.isNotEmpty
+        ? artistStats.unlockedGenres.first
+        : artistStats.primaryGenre;
     int selectedEffort = 2; // 1-4 scale
     List<String> nameSuggestions = [];
 
@@ -2541,34 +2598,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               'Jazz',
                               'Reggae',
                             ].map((genre) {
+                              // 🔒 Check if genre is unlocked
+                              final bool isUnlocked =
+                                  artistStats.unlockedGenres.contains(genre);
+
                               return DropdownMenuItem(
                                 value: genre,
+                                enabled: isUnlocked, // Disable locked genres
                                 child: Row(
                                   children: [
+                                    // Show lock icon for locked genres
+                                    if (!isUnlocked)
+                                      const Icon(
+                                        Icons.lock,
+                                        size: 16,
+                                        color: Colors.grey,
+                                      ),
+                                    if (!isUnlocked) const SizedBox(width: 4),
                                     _getGenreIcon(genre),
                                     const SizedBox(width: 8),
-                                    Text(genre),
+                                    Text(
+                                      genre,
+                                      style: TextStyle(
+                                        color: isUnlocked
+                                            ? Colors.white
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                    if (!isUnlocked)
+                                      const Text(
+                                        ' (Locked)',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                   ],
                                 ),
                               );
                             }).toList(),
                             onChanged: (value) {
-                              dialogSetState(() {
-                                selectedGenre = value!;
-                                // Regenerate suggestions when genre changes
-                                int quality = artistStats
-                                    .calculateSongQuality(
-                                      selectedGenre,
-                                      selectedEffort,
-                                    )
-                                    .round();
-                                nameSuggestions =
-                                    SongNameGenerator.getSuggestions(
-                                  selectedGenre,
-                                  count: 4,
-                                  quality: quality,
-                                );
-                              });
+                              // Only allow changing to unlocked genres
+                              if (value != null &&
+                                  artistStats.unlockedGenres.contains(value)) {
+                                dialogSetState(() {
+                                  selectedGenre = value;
+                                  // Regenerate suggestions when genre changes
+                                  int quality = artistStats
+                                      .calculateSongQuality(
+                                        selectedGenre,
+                                        selectedEffort,
+                                      )
+                                      .round();
+                                  nameSuggestions =
+                                      SongNameGenerator.getSuggestions(
+                                    selectedGenre,
+                                    count: 4,
+                                    quality: quality,
+                                  );
+                                });
+                              }
                             },
                             isExpanded: true,
                           ),
@@ -2859,11 +2948,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       state: SongState.written,
     );
 
+    // Calculate genre mastery gain
+    int masteryGain = artistStats.calculateGenreMasteryGain(
+      genre,
+      effort,
+      songQuality,
+    );
+    Map<String, int> updatedMastery = artistStats.applyGenreMasteryGain(
+      genre,
+      masteryGain,
+    );
+
     setState(() {
       // Update main stats
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - energyCost,
-        songsWritten: artistStats.songsWritten + 1,
+        // songsWritten removed - only counts when released
         money: artistStats.money + moneyGain,
         fame: artistStats.fame + fameGain,
         creativity: artistStats.creativity + creativityGain,
@@ -2884,6 +2984,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         inspirationLevel:
             (artistStats.inspirationLevel + skillGains['inspirationLevel']!)
                 .clamp(0, 100),
+        // Update genre mastery
+        genreMastery: updatedMastery,
       );
     }); // Publish song to Firebase if online
     if (_isOnlineMode) {

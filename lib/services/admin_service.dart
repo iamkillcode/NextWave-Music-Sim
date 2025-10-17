@@ -202,12 +202,16 @@ class AdminService {
           .get();
       final totalNPCs = npcSnapshot.size;
 
-      // Get active side hustles
-      final hustleSnapshot = await _firestore
-          .collection('side_hustle_contracts')
-          .where('isActive', isEqualTo: true)
-          .get();
-      final activeHustles = hustleSnapshot.size;
+      // Get active side hustles (count players with activeSideHustle)
+      int activeHustles = 0;
+      for (var player in playersSnapshot.docs) {
+        final playerData = player.data();
+        // Check if activeSideHustle field exists and is not null
+        if (playerData.containsKey('activeSideHustle') &&
+            playerData['activeSideHustle'] != null) {
+          activeHustles++;
+        }
+      }
 
       return {
         'totalPlayers': totalPlayers,
@@ -310,4 +314,42 @@ class AdminService {
       return [];
     }
   }
+
+  /// Force an NPC to release a new song (Admin Only - for testing)
+  Future<Map<String, dynamic>> forceNPCRelease(String npcId) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final result = await _functions
+          .httpsCallable('forceNPCRelease')
+          .call({'npcId': npcId});
+
+      return {
+        'success': true,
+        'data': result.data,
+      };
+    } catch (e) {
+      print('Error forcing NPC release: $e');
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Get list of available NPCs
+  static const List<Map<String, String>> AVAILABLE_NPCS = [
+    {'id': 'npc_jaylen_sky', 'name': 'Jaylen Sky', 'genre': 'Hip Hop'},
+    {'id': 'npc_luna_grey', 'name': 'Luna Grey', 'genre': 'Pop'},
+    {'id': 'npc_elodie_rain', 'name': 'Élodie Rain', 'genre': 'Electronic'},
+    {'id': 'npc_santiago_vega', 'name': 'Santiago Vega', 'genre': 'Latin'},
+    {'id': 'npc_zyrah', 'name': 'Zyrah', 'genre': 'Afrobeat'},
+    {'id': 'npc_kazuya_rin', 'name': 'Kazuya Rin', 'genre': 'Electronic'},
+    {'id': 'npc_maya_cross', 'name': 'Maya Cross', 'genre': 'Rock'},
+    {'id': 'npc_dante_noir', 'name': 'Dante Noir', 'genre': 'R&B'},
+    {'id': 'npc_kira_blaze', 'name': 'Kira Blaze', 'genre': 'Indie'},
+    {'id': 'npc_phoenix_reid', 'name': 'Phoenix Reid', 'genre': 'Country'},
+  ];
 }
