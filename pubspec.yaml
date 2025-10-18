@@ -48,6 +48,9 @@ dependencies:
   # Image picker for cross-platform image uploads
   image_picker: ^1.0.7
   uuid: ^4.5.1
+  
+  # Cached network images for better performance
+  cached_network_image: ^3.3.1
 
 dev_dependencies:
   flutter_test:

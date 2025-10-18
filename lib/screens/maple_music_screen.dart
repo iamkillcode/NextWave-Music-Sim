@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 
@@ -46,8 +47,8 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
 
   @override
   Widget build(BuildContext context) {
-    final followers = (_currentStats.fanbase * 0.4)
-        .round(); // 40% of fanbase on Maple Music
+    final followers =
+        (_currentStats.fanbase * 0.4).round(); // 40% of fanbase on Maple Music
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
@@ -352,9 +353,8 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
                 height: 2,
                 width: 50,
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFFC3C44)
-                      : Colors.transparent,
+                  color:
+                      isSelected ? const Color(0xFFFC3C44) : Colors.transparent,
                   borderRadius: BorderRadius.circular(1),
                 ),
               ),
@@ -462,29 +462,82 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFFFC3C44).withOpacity(0.3),
-                const Color(0xFFFF6B9D).withOpacity(0.3),
-              ],
+        leading: (() {
+          final cover = song.coverArtUrl;
+          if (cover != null && cover.isNotEmpty) {
+            return Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: CachedNetworkImage(
+                  imageUrl: cover,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[800],
+                    child: const Center(
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFFC3C44),
+                        ),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFFC3C44).withOpacity(0.3),
+                          const Color(0xFFFF6B9D).withOpacity(0.3),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$number',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+          return Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFFC3C44).withOpacity(0.3),
+                  const Color(0xFFFF6B9D).withOpacity(0.3),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(6),
             ),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Center(
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            child: Center(
+              child: Text(
+                '$number',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        }()),
         title: Text(
           song.title,
           style: const TextStyle(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../services/unified_chart_service.dart';
 
 /// Unified Charts Screen - One screen for all chart types
@@ -451,7 +452,42 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
-        leading: _buildPositionBadge(position),
+        leading: (() {
+          final coverUrl = entry['coverArtUrl'] as String?;
+          if (coverUrl != null && coverUrl.isNotEmpty) {
+            return Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: coverUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[800],
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white30,
+                        ),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) =>
+                      _buildPositionBadge(position),
+                ),
+              ),
+            );
+          }
+          return _buildPositionBadge(position);
+        }()),
         title: Row(
           children: [
             Expanded(
@@ -498,9 +534,8 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             ),
           ],
         ),
-        trailing: isUserSong
-            ? const Icon(Icons.star, color: Colors.amber)
-            : null,
+        trailing:
+            isUserSong ? const Icon(Icons.star, color: Colors.amber) : null,
       ),
     );
   }
@@ -519,7 +554,41 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
-        leading: _buildPositionBadge(position),
+        leading: (() {
+          final avatar = entry['avatarUrl'] as String?;
+          if (avatar != null && avatar.isNotEmpty) {
+            return Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: avatar,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[800],
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white30,
+                        ),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) =>
+                      _buildPositionBadge(position),
+                ),
+              ),
+            );
+          }
+          return _buildPositionBadge(position);
+        }()),
         title: Row(
           children: [
             Expanded(
@@ -554,9 +623,8 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             ),
           ],
         ),
-        trailing: isCurrentUser
-            ? const Icon(Icons.star, color: Colors.amber)
-            : null,
+        trailing:
+            isCurrentUser ? const Icon(Icons.star, color: Colors.amber) : null,
       ),
     );
   }
@@ -613,8 +681,8 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
     String type = _selectedType == 'singles'
         ? 'Singles'
         : _selectedType == 'albums'
-        ? 'Albums'
-        : 'Artists';
+            ? 'Albums'
+            : 'Artists';
 
     return '$period $type Chart';
   }

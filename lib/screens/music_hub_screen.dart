@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import 'write_song_screen.dart';
@@ -20,7 +21,8 @@ class MusicHubScreen extends StatefulWidget {
   State<MusicHubScreen> createState() => _MusicHubScreenState();
 }
 
-class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProviderStateMixin {
+class _MusicHubScreenState extends State<MusicHubScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late ArtistStats _currentStats;
 
@@ -131,8 +133,11 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
   }
 
   Widget _buildMySongsTab() {
-    final writtenSongs = _currentStats.songs.where((s) => s.state == SongState.written).toList();
-    final recordedSongs = _currentStats.songs.where((s) => s.state == SongState.recorded).toList();
+    final writtenSongs =
+        _currentStats.songs.where((s) => s.state == SongState.written).toList();
+    final recordedSongs = _currentStats.songs
+        .where((s) => s.state == SongState.recorded)
+        .toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -142,7 +147,8 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
           if (recordedSongs.isNotEmpty) ...[
             Row(
               children: [
-                const Icon(Icons.check_circle, color: Color(0xFF32D74B), size: 20),
+                const Icon(Icons.check_circle,
+                    color: Color(0xFF32D74B), size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'Recorded Songs (${recordedSongs.length})',
@@ -155,7 +161,8 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
               ],
             ),
             const SizedBox(height: 12),
-            ...recordedSongs.map((song) => _buildSongCard(song, isRecorded: true)),
+            ...recordedSongs
+                .map((song) => _buildSongCard(song, isRecorded: true)),
             const SizedBox(height: 24),
           ],
           if (writtenSongs.isNotEmpty) ...[
@@ -174,7 +181,8 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
               ],
             ),
             const SizedBox(height: 12),
-            ...writtenSongs.map((song) => _buildSongCard(song, isRecorded: false)),
+            ...writtenSongs
+                .map((song) => _buildSongCard(song, isRecorded: false)),
           ],
           if (writtenSongs.isEmpty && recordedSongs.isEmpty)
             Center(
@@ -199,7 +207,8 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
                     const SizedBox(height: 8),
                     Text(
                       'Go to the Create tab to write your first song!',
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.4), fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -212,8 +221,11 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
   }
 
   Widget _buildReleasedTab() {
-    final releasedSongs = _currentStats.songs.where((s) => s.state == SongState.released).toList()
-      ..sort((a, b) => (b.releasedDate ?? DateTime.now()).compareTo(a.releasedDate ?? DateTime.now()));
+    final releasedSongs = _currentStats.songs
+        .where((s) => s.state == SongState.released)
+        .toList()
+      ..sort((a, b) => (b.releasedDate ?? DateTime.now())
+          .compareTo(a.releasedDate ?? DateTime.now()));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -222,7 +234,8 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
         children: [
           Row(
             children: [
-              const Icon(Icons.rocket_launch, color: Color(0xFFFFD700), size: 20),
+              const Icon(Icons.rocket_launch,
+                  color: Color(0xFFFFD700), size: 20),
               const SizedBox(width: 8),
               Text(
                 'Released Songs (${releasedSongs.length})',
@@ -258,7 +271,8 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
                     const SizedBox(height: 8),
                     Text(
                       'Record your songs and release them to the world!',
-                      style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.4), fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -296,7 +310,9 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: canPerform ? color.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+            color: canPerform
+                ? color.withOpacity(0.5)
+                : Colors.grey.withOpacity(0.3),
             width: 2,
           ),
         ),
@@ -305,10 +321,13 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: canPerform ? color.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                color: canPerform
+                    ? color.withOpacity(0.2)
+                    : Colors.grey.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: canPerform ? color : Colors.grey, size: 28),
+              child:
+                  Icon(icon, color: canPerform ? color : Colors.grey, size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -336,9 +355,12 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
             ),
             if (energyCost > 0)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: canPerform ? color.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                  color: canPerform
+                      ? color.withOpacity(0.2)
+                      : Colors.grey.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -364,12 +386,72 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
         color: const Color(0xFF21262D),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isRecorded ? const Color(0xFF32D74B).withOpacity(0.3) : Colors.white.withOpacity(0.1),
+          color: isRecorded
+              ? const Color(0xFF32D74B).withOpacity(0.3)
+              : Colors.white.withOpacity(0.1),
         ),
       ),
       child: Row(
         children: [
-          Text(song.genreEmoji, style: const TextStyle(fontSize: 32)),
+          // Cover Art - show cover art if available
+          song.coverArtUrl != null && song.coverArtUrl!.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: CachedNetworkImage(
+                    imageUrl: song.coverArtUrl!,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: isRecorded
+                                ? const Color(0xFF32D74B)
+                                : const Color(0xFF00D9FF),
+                          ),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF30363D),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          song.genreEmoji,
+                          style: const TextStyle(fontSize: 24),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF30363D),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Center(
+                    child: Text(
+                      song.genreEmoji,
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                  ),
+                ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -396,12 +478,17 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
               onPressed: () => _navigateToReleaseSong(song),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD700),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               child: const Text(
                 'Release',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12),
               ),
             )
           else
@@ -409,12 +496,17 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
               onPressed: () => _navigateToStudios(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B9D),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               child: const Text(
                 'Record',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12),
               ),
             ),
         ],
@@ -443,7 +535,77 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
         children: [
           Row(
             children: [
-              Text(song.genreEmoji, style: const TextStyle(fontSize: 32)),
+              // Cover Art - show cover art if available
+              song.coverArtUrl != null && song.coverArtUrl!.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: song.coverArtUrl!,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFFFFD700),
+                              ),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFFFD700).withOpacity(0.3),
+                                const Color(0xFF9B59B6).withOpacity(0.3),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              song.genreEmoji,
+                              style: const TextStyle(fontSize: 28),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFFFD700).withOpacity(0.3),
+                            const Color(0xFF9B59B6).withOpacity(0.3),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          song.genreEmoji,
+                          style: const TextStyle(fontSize: 28),
+                        ),
+                      ),
+                    ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -460,13 +622,15 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
                     const SizedBox(height: 4),
                     Text(
                       '${song.genre} • ${song.qualityRating}',
-                      style: const TextStyle(color: Colors.white60, fontSize: 12),
+                      style:
+                          const TextStyle(color: Colors.white60, fontSize: 12),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFD700).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -492,13 +656,16 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildSongStat(Icons.play_arrow, '${_formatNumber(song.streams)} streams'),
+              _buildSongStat(
+                  Icons.play_arrow, '${_formatNumber(song.streams)} streams'),
               const SizedBox(width: 16),
-              _buildSongStat(Icons.favorite, '${_formatNumber(song.likes)} likes'),
+              _buildSongStat(
+                  Icons.favorite, '${_formatNumber(song.likes)} likes'),
               const Spacer(),
               Text(
                 'Released ${_formatDate(song.releasedDate)}',
-                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10),
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.4), fontSize: 10),
               ),
             ],
           ),
@@ -543,15 +710,23 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: _buildStatItem('Songs Written', '${_currentStats.songsWritten}')),
-              Expanded(child: _buildStatItem('Albums Released', '${_currentStats.albumsSold}')),
+              Expanded(
+                  child: _buildStatItem(
+                      'Songs Written', '${_currentStats.songsWritten}')),
+              Expanded(
+                  child: _buildStatItem(
+                      'Albums Released', '${_currentStats.albumsSold}')),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildStatItem('Songwriting', '${_currentStats.songwritingSkill}')),
-              Expanded(child: _buildStatItem('Lyrics', '${_currentStats.lyricsSkill}')),
+              Expanded(
+                  child: _buildStatItem(
+                      'Songwriting', '${_currentStats.songwritingSkill}')),
+              Expanded(
+                  child:
+                      _buildStatItem('Lyrics', '${_currentStats.lyricsSkill}')),
             ],
           ),
         ],
@@ -595,7 +770,7 @@ class _MusicHubScreenState extends State<MusicHubScreen> with SingleTickerProvid
     if (date == null) return 'Unknown';
     final now = DateTime.now();
     final diff = now.difference(date);
-    
+
     if (diff.inDays == 0) return 'today';
     if (diff.inDays == 1) return 'yesterday';
     if (diff.inDays < 7) return '${diff.inDays} days ago';

@@ -716,11 +716,12 @@ function applyEventBonuses(baseStreams, song, playerData, event) {
 
 async function createSongLeaderboardSnapshot(weekId, timestamp) {
   try {
-    // Get top 100 songs by last7DaysStreams
-    const songsSnapshot = await db.collection('players').get();
+    // Get top 100 songs by last7DaysStreams from BOTH players and NPCs
+    const playersSnapshot = await db.collection('players').get();
     const allSongs = [];
     
-    songsSnapshot.forEach(playerDoc => {
+    // Add player songs
+    playersSnapshot.forEach(playerDoc => {
       const playerData = playerDoc.data();
       const songs = playerData.songs || [];
       
@@ -731,6 +732,27 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
             artistId: playerDoc.id,
             artistName: playerData.artistName || 'Unknown',
             last7DaysStreams: song.last7DaysStreams || 0,
+            isNPC: false,
+          });
+        }
+      });
+    });
+
+    // ALSO add NPC songs to charts
+    const npcsSnapshot = await db.collection('npcs').get();
+    
+    npcsSnapshot.forEach(npcDoc => {
+      const npcData = npcDoc.data();
+      const songs = npcData.songs || [];
+      
+      songs.forEach(song => {
+        if (song.state === 'released') {
+          allSongs.push({
+            ...song,
+            artistId: npcDoc.id,
+            artistName: npcData.name || 'Unknown NPC',
+            last7DaysStreams: song.last7DaysStreams || 0,
+            isNPC: true,
           });
         }
       });
@@ -753,6 +775,7 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
         streams: song.last7DaysStreams,
         totalStreams: song.streams,
         genre: song.genre,
+        isNPC: song.isNPC || false,
       })),
     });
     
@@ -768,6 +791,7 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
     const playersSnapshot = await db.collection('players').get();
     const artists = [];
     
+    // Add player artists
     playersSnapshot.forEach(playerDoc => {
       const playerData = playerDoc.data();
       const songs = playerData.songs || [];
@@ -783,6 +807,30 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
           weeklyStreams: totalWeeklyStreams,
           totalStreams: playerData.totalStreams || 0,
           fanbase: playerData.level || 0,
+          isNPC: false,
+        });
+      }
+    });
+
+    // ALSO add NPC artists to leaderboard
+    const npcsSnapshot = await db.collection('npcs').get();
+    
+    npcsSnapshot.forEach(npcDoc => {
+      const npcData = npcDoc.data();
+      const songs = npcData.songs || [];
+      
+      const totalWeeklyStreams = songs
+        .filter(s => s.state === 'released')
+        .reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
+      
+      if (totalWeeklyStreams > 0) {
+        artists.push({
+          artistId: npcDoc.id,
+          artistName: npcData.name || 'Unknown NPC',
+          weeklyStreams: totalWeeklyStreams,
+          totalStreams: npcData.totalStreams || 0,
+          fanbase: npcData.fanbase || 0,
+          isNPC: true,
         });
       }
     });
@@ -803,6 +851,7 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
         weeklyStreams: artist.weeklyStreams,
         totalStreams: artist.totalStreams,
         fanbase: artist.fanbase,
+        isNPC: artist.isNPC || false,
       })),
     });
     
@@ -1829,13 +1878,13 @@ exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
     switch (giftType) {
       case 'money':
         const moneyAmount = amount || 1000;
-        updates.money = (recipientData.money || 0) + moneyAmount;
+        updates.currentMoney = (recipientData.currentMoney || 0) + moneyAmount;
         giftDescription = `$${moneyAmount.toLocaleString()}`;
         break;
 
       case 'fame':
         const fameAmount = amount || 10;
-        updates.fame = (recipientData.fame || 0) + fameAmount;
+        updates.currentFame = (recipientData.currentFame || 0) + fameAmount;
         giftDescription = `${fameAmount} Fame Points`;
         break;
 
@@ -1859,8 +1908,8 @@ exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
 
       case 'starter_pack':
         // Give a nice starter pack
-        updates.money = (recipientData.money || 0) + 5000;
-        updates.fame = (recipientData.fame || 0) + 25;
+        updates.currentMoney = (recipientData.currentMoney || 0) + 5000;
+        updates.currentFame = (recipientData.currentFame || 0) + 25;
         updates.energy = 100;
         updates.fanbase = (recipientData.fanbase || 0) + 500;
         giftDescription = 'Starter Pack ($5,000, 25 Fame, 100 Energy, 500 Fans)';
@@ -1868,8 +1917,8 @@ exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
 
       case 'boost_pack':
         // Give a boost pack
-        updates.money = (recipientData.money || 0) + 15000;
-        updates.fame = (recipientData.fame || 0) + 50;
+        updates.currentMoney = (recipientData.currentMoney || 0) + 15000;
+        updates.currentFame = (recipientData.currentFame || 0) + 50;
         updates.fanbase = (recipientData.fanbase || 0) + 2000;
         updates.totalStreams = (recipientData.totalStreams || 0) + 50000;
         giftDescription = 'Boost Pack ($15,000, 50 Fame, 2,000 Fans, 50,000 Streams)';
@@ -1877,8 +1926,8 @@ exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
 
       case 'premium_pack':
         // Give a premium pack
-        updates.money = (recipientData.money || 0) + 50000;
-        updates.fame = (recipientData.fame || 0) + 100;
+        updates.currentMoney = (recipientData.currentMoney || 0) + 50000;
+        updates.currentFame = (recipientData.currentFame || 0) + 100;
         updates.fanbase = (recipientData.fanbase || 0) + 10000;
         updates.totalStreams = (recipientData.totalStreams || 0) + 250000;
         giftDescription = 'Premium Pack ($50,000, 100 Fame, 10,000 Fans, 250,000 Streams)';

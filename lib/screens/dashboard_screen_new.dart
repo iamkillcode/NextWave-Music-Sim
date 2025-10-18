@@ -37,6 +37,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _countdownTimer; // Timer for next day countdown
   Timer? _saveDebounceTimer; // Timer for debouncing saves
   Timer? _multiplayerStatsTimer; // Timer for multiplayer stats updates
+  StreamSubscription<DocumentSnapshot>?
+      _playerDataSubscription; // Real-time player data listener
+  StreamSubscription<QuerySnapshot>?
+      _notificationsSubscription; // Real-time notifications listener
   DateTime?
       currentGameDate; // Will be set from Firebase, starts as null to show loading
   DateTime? _lastSyncTime; // Track when we last synced with Firebase
@@ -87,7 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    // Load user profile from Firestore
+    // Load user profile from Firestore (will set up listeners after loading)
     _loadUserProfile();
 
     // Check for Firebase notifications (gifts from admin, etc.)
@@ -179,6 +183,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _countdownTimer?.cancel();
     _saveDebounceTimer?.cancel();
     _multiplayerStatsTimer?.cancel();
+
+    // Cancel real-time listeners
+    _playerDataSubscription?.cancel();
+    _notificationsSubscription?.cancel();
 
     // Save any pending changes before disposing
     if (_hasPendingSave) {
@@ -323,6 +331,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Check if player missed days while offline
         await _checkForMissedDays(data);
+
+        // Set up real-time listeners AFTER profile is loaded
+        _setupRealtimeListeners();
       } else {
         print('⚠️ Profile not found in Firestore, using demo stats');
       }
@@ -331,6 +342,281 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('💡 Using demo stats instead');
       // Keep the default stats if loading fails
     }
+  }
+
+  /// Set up real-time Firestore listeners for instant updates (gifts, stats changes, etc.)
+  void _setupRealtimeListeners() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('⚠️ No user signed in, skipping real-time listeners');
+      return;
+    }
+
+    print('🔔 Setting up real-time listeners for: ${user.uid}');
+
+    // Listen to player document changes (stats updates from admin gifts, etc.)
+    _playerDataSubscription = FirebaseFirestore.instance
+        .collection('players')
+        .doc(user.uid)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (!snapshot.exists || !mounted) return;
+
+        final data = snapshot.data()!;
+        print('📡 Real-time update received for player stats');
+        print('💰 Money from Firestore: ${data['currentMoney']}');
+
+        // Temporarily disable auto-save to prevent overwriting the update
+        final hadPendingSave = _hasPendingSave;
+        _hasPendingSave = false;
+
+        // Load songs from the update
+        List<Song> loadedSongs = [];
+        if (data['songs'] != null) {
+          try {
+            final songsList = data['songs'] as List<dynamic>;
+            loadedSongs = songsList
+                .map((songData) =>
+                    Song.fromJson(Map<String, dynamic>.from(songData)))
+                .toList();
+          } catch (e) {
+            print('⚠️ Error loading songs in real-time update: $e');
+          }
+        }
+
+        // Load regional fanbase
+        Map<String, int> loadedRegionalFanbase = {};
+        if (data['regionalFanbase'] != null) {
+          try {
+            final regionalData =
+                data['regionalFanbase'] as Map<dynamic, dynamic>;
+            loadedRegionalFanbase = regionalData.map(
+              (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+            );
+          } catch (e) {
+            print('⚠️ Error loading regional fanbase in real-time: $e');
+          }
+        }
+
+        // Load active side hustle
+        SideHustle? loadedSideHustle;
+        if (data['activeSideHustle'] != null) {
+          try {
+            loadedSideHustle = SideHustle.fromJson(
+              Map<String, dynamic>.from(data['activeSideHustle']),
+            );
+          } catch (e) {
+            print('⚠️ Error loading side hustle in real-time: $e');
+          }
+        }
+
+        // Load genre data
+        final String primaryGenre = data['primaryGenre'] ?? 'Hip Hop';
+        Map<String, int> loadedGenreMastery = {};
+        if (data['genreMastery'] != null) {
+          final masteryData = data['genreMastery'] as Map<dynamic, dynamic>;
+          loadedGenreMastery = masteryData.map(
+            (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+          );
+        }
+
+        List<String> loadedUnlockedGenres = [];
+        if (data['unlockedGenres'] != null) {
+          loadedUnlockedGenres = List<String>.from(data['unlockedGenres']);
+        } else {
+          loadedUnlockedGenres = [primaryGenre];
+          loadedGenreMastery[primaryGenre] = 0;
+        }
+
+        // Update UI with new data
+        setState(() {
+          artistStats = ArtistStats(
+            name: data['displayName'] ?? artistStats.name,
+            fame: (data['currentFame'] ?? artistStats.fame).toInt(),
+            money: (data['currentMoney'] ?? artistStats.money).toInt(),
+            energy: (data['energy'] ?? artistStats.energy).toInt(),
+            creativity:
+                (data['inspirationLevel'] ?? artistStats.creativity).toInt(),
+            fanbase: (data['fanbase'] ?? artistStats.fanbase).toInt(),
+            loyalFanbase:
+                (data['loyalFanbase'] ?? artistStats.loyalFanbase).toInt(),
+            albumsSold:
+                (data['albumsReleased'] ?? artistStats.albumsSold).toInt(),
+            songsWritten:
+                (data['songsPublished'] ?? artistStats.songsWritten).toInt(),
+            concertsPerformed:
+                (data['concertsPerformed'] ?? artistStats.concertsPerformed)
+                    .toInt(),
+            songwritingSkill:
+                (data['songwritingSkill'] ?? artistStats.songwritingSkill)
+                    .toInt(),
+            experience: (data['experience'] ?? artistStats.experience).toInt(),
+            lyricsSkill:
+                (data['lyricsSkill'] ?? artistStats.lyricsSkill).toInt(),
+            compositionSkill:
+                (data['compositionSkill'] ?? artistStats.compositionSkill)
+                    .toInt(),
+            inspirationLevel:
+                (data['inspirationLevel'] ?? artistStats.inspirationLevel)
+                    .toInt(),
+            songs: loadedSongs,
+            currentRegion: data['homeRegion'] ?? artistStats.currentRegion,
+            age: (data['age'] ?? artistStats.age).toInt(),
+            careerStartDate:
+                (data['careerStartDate'] as Timestamp?)?.toDate() ??
+                    artistStats.careerStartDate,
+            regionalFanbase: loadedRegionalFanbase,
+            avatarUrl: data['avatarUrl'] as String?,
+            activeSideHustle: loadedSideHustle,
+            primaryGenre: primaryGenre,
+            genreMastery: loadedGenreMastery,
+            unlockedGenres: loadedUnlockedGenres,
+          );
+        });
+
+        print('✅ Real-time stats updated successfully');
+        print('💵 Updated money to: ${artistStats.money}');
+
+        // Restore the pending save flag after a short delay
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && hadPendingSave) {
+            _hasPendingSave = true;
+          }
+        });
+      },
+      onError: (error) {
+        print('❌ Error in player data listener: $error');
+      },
+    );
+
+    // Listen to notifications collection for admin gifts, etc.
+    // Simplified query to avoid needing a composite index
+    _notificationsSubscription = FirebaseFirestore.instance
+        .collection('players')
+        .doc(user.uid)
+        .collection('notifications')
+        .where('read', isEqualTo: false)
+        .limit(10)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (!mounted) return;
+
+        for (var change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data()!;
+            print('🎁 New notification: ${data['title']}');
+
+            // Determine icon based on notification type
+            IconData icon;
+            switch (data['type']) {
+              case 'admin_gift':
+                icon = Icons.card_giftcard;
+                break;
+              case 'achievement':
+                icon = Icons.emoji_events;
+                break;
+              case 'warning':
+                icon = Icons.warning;
+                break;
+              default:
+                icon = Icons.notifications;
+            }
+
+            // Add to notification list
+            _addNotification(
+              data['title'] ?? 'Notification',
+              data['message'] ?? '',
+              icon: icon,
+            );
+
+            // Show notification snackbar
+            _showNotificationSnackBar(
+              data['title'] ?? 'Notification',
+              data['message'] ?? '',
+              data['type'] ?? 'info',
+            );
+
+            // Mark as read after showing
+            change.doc.reference.update({'read': true});
+          }
+        }
+      },
+      onError: (error) {
+        print('❌ Error in notifications listener: $error');
+      },
+    );
+
+    print('✅ Real-time listeners set up successfully');
+  }
+
+  /// Show a notification snackbar with custom styling based on type
+  void _showNotificationSnackBar(String title, String message, String type) {
+    if (!mounted) return;
+
+    Color backgroundColor;
+    IconData icon;
+
+    switch (type) {
+      case 'admin_gift':
+        backgroundColor = const Color(0xFFFFD700); // Gold
+        icon = Icons.card_giftcard;
+        break;
+      case 'achievement':
+        backgroundColor = const Color(0xFF32D74B); // Green
+        icon = Icons.emoji_events;
+        break;
+      case 'warning':
+        backgroundColor = const Color(0xFFFF9500); // Orange
+        icon = Icons.warning;
+        break;
+      default:
+        backgroundColor = const Color(0xFF00D9FF); // Cyan
+        icon = Icons.notifications;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   /// Check if player was offline and show welcome back message
@@ -797,7 +1083,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // More streams = more fans discovering your music + growing reputation
     int fanbaseGrowth = 0;
     int fameGrowth = 0;
+    int fameDecay = 0;
     int loyalFanGrowth = 0;
+
+    // ⚠️ FAME DECAY - Fame decreases based on artist idleness
+    if (artistStats.lastActivityDate != null) {
+      final daysSinceActivity =
+          currentGameDate.difference(artistStats.lastActivityDate!).inDays;
+
+      // After 7 days of inactivity, start losing 1% fame per day
+      if (daysSinceActivity > 7) {
+        final inactiveDays = daysSinceActivity - 7;
+        fameDecay = (artistStats.fame * 0.01 * inactiveDays).floor();
+        print(
+          '⚠️ Fame decay: ${daysSinceActivity} days inactive, -$fameDecay fame',
+        );
+      }
+    }
 
     if (totalNewStreams > 0) {
       // Every 1,000 streams converts 1 casual listener to a fan
@@ -863,6 +1165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (totalNewStreams > 0 ||
         fanbaseGrowth > 0 ||
         fameGrowth > 0 ||
+        fameDecay > 0 ||
         loyalFanGrowth > 0 ||
         sideHustlePay > 0 ||
         sideHustleEnergyCost > 0) {
@@ -874,7 +1177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ? (artistStats.energy - sideHustleEnergyCost).clamp(0, 100)
               : artistStats.energy,
           fanbase: artistStats.fanbase + fanbaseGrowth,
-          fame: artistStats.fame + fameGrowth,
+          fame: (artistStats.fame + fameGrowth - fameDecay).clamp(0, 999),
           loyalFanbase: artistStats.loyalFanbase + loyalFanGrowth,
           clearSideHustle: sideHustleExpired, // Clear if contract expired
         );
@@ -884,10 +1187,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         '💰 Total daily streaming income: \$$totalNewIncome from ${_streamGrowthService.formatStreams(totalNewStreams)} streams',
       );
 
-      if (fanbaseGrowth > 0 || fameGrowth > 0 || loyalFanGrowth > 0) {
-        print(
-          '📈 Artist growth: +$fanbaseGrowth fans (+$loyalFanGrowth loyal), +$fameGrowth fame (from streaming success)',
-        );
+      if (fanbaseGrowth > 0 ||
+          fameGrowth > 0 ||
+          fameDecay > 0 ||
+          loyalFanGrowth > 0) {
+        String growthMessage = '📈 Artist growth:';
+        if (fanbaseGrowth > 0) growthMessage += ' +$fanbaseGrowth fans';
+        if (loyalFanGrowth > 0) growthMessage += ' (+$loyalFanGrowth loyal)';
+        if (fameGrowth > 0) growthMessage += ' +$fameGrowth fame';
+        if (fameDecay > 0) growthMessage += ' -$fameDecay fame (inactivity)';
+        print(growthMessage);
       }
 
       if (sideHustleExpired) {
@@ -898,6 +1207,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Contract Ended',
           'Your ${artistStats.activeSideHustle!.type.displayName} contract has ended!',
           icon: Icons.work_off,
+        );
+      }
+
+      // Notify about fame decay if significant
+      if (fameDecay > 0) {
+        _addNotification(
+          'Fame Declining',
+          'You lost $fameDecay fame due to inactivity. Keep creating to maintain your status!',
+          icon: Icons.trending_down,
         );
       }
 
@@ -1189,44 +1507,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Money
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF32D74B).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFF32D74B),
-                      width: 1.5,
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF32D74B).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF32D74B),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.attach_money,
+                          color: Color(0xFF32D74B),
+                          size: 14,
+                        ),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            _formatMoney(artistStats.money.toDouble()),
+                            style: const TextStyle(
+                              color: Color(0xFF32D74B),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.attach_money,
-                        color: Color(0xFF32D74B),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatMoney(artistStats.money.toDouble()),
-                        style: const TextStyle(
-                          color: Color(0xFF32D74B),
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 // Energy
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
+                    horizontal: 8,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
@@ -1243,14 +1566,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const Icon(
                         Icons.bolt,
                         color: Color(0xFFFF6B9D),
-                        size: 16,
+                        size: 14,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 2),
                       Text(
                         '${artistStats.energy}',
                         style: const TextStyle(
                           color: Color(0xFFFF6B9D),
-                          fontSize: 14,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Fanbase
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D9FF).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF00D9FF),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.people_rounded,
+                        color: Color(0xFF00D9FF),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        _formatNumber(artistStats.fanbase),
+                        style: const TextStyle(
+                          color: Color(0xFF00D9FF),
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1339,6 +1697,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(2)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(2)}K';
+    } else {
+      return '$number';
+    }
+  }
+
   Widget _buildGameStatusRow() {
     // Calculate fame bonuses for tooltip
     final streamBonus = ((artistStats.fameStreamBonus - 1.0) * 100).round();
@@ -1387,12 +1755,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Expanded(
             child: _buildAdvancedStatusCard(
               'Level',
-              artistStats.fanbase,
-              50, // Max value for progress bar
+              (artistStats.experience / 100).floor() +
+                  1, // Experience-based level
+              100, // Max value for progress bar
               Icons.military_tech_rounded,
               const Color(0xFFF39C12), // Orange
               const Color(0xFF1A252F), // Dark navy
-              'Pro',
+              'Level ${(artistStats.experience / 100).floor() + 1}',
             ),
           ),
         ],
@@ -1601,8 +1970,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     Text(
                       currentGameDate != null
-                          ? '${artistStats.getCurrentAge(currentGameDate!)} years old • ${artistStats.careerLevel}'
-                          : '${artistStats.age} years old • ${artistStats.careerLevel}',
+                          ? '${artistStats.getCurrentAge(currentGameDate!)} years old • ${artistStats.fameTier}'
+                          : '${artistStats.age} years old • ${artistStats.fameTier}',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.8),
                         fontSize: 14,
@@ -1808,6 +2177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 setState(() {
                                   artistStats = updatedStats;
                                 });
+                                _debouncedSave(); // ✅ Save after recording songs
                               },
                             ),
                           ),
@@ -1830,6 +2200,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 setState(() {
                                   artistStats = updatedStats;
                                 });
+                                _debouncedSave(); // ✅ Save after releasing songs
                               },
                             ),
                           ),
@@ -2463,6 +2834,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     });
 
+    _debouncedSave(); // ✅ Save after writing song
+
     // Show success message with song details and skill gains
     _showMessage(
       '🎵 Created "$songName" ($genre)!\n+${songType['creativity']} Hype, +${songType['fame']} Fame\n📈 +${skillGains['experience']} XP, Skills improved!',
@@ -3075,7 +3448,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // Update genre mastery
         genreMastery: updatedMastery,
       );
-    }); // Publish song to Firebase if online
+    });
+
+    _debouncedSave(); // ✅ Save after creating custom song
+
+    // Publish song to Firebase if online
     if (_isOnlineMode) {
       _publishSongOnline(title, genre, songQuality.round());
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 
@@ -45,8 +46,8 @@ class _TunifyScreenState extends State<TunifyScreen>
       0,
       (sum, song) => sum + song.streams,
     );
-    final monthlyListeners = (totalStreams * 0.3)
-        .round(); // Estimate monthly listeners
+    final monthlyListeners =
+        (totalStreams * 0.3).round(); // Estimate monthly listeners
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -430,9 +431,8 @@ class _TunifyScreenState extends State<TunifyScreen>
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    backgroundColor: _isFollowing
-                        ? Colors.transparent
-                        : Colors.transparent,
+                    backgroundColor:
+                        _isFollowing ? Colors.transparent : Colors.transparent,
                     side: BorderSide(
                       color: _isFollowing
                           ? const Color(0xFF1DB954)
@@ -734,46 +734,93 @@ class _TunifyScreenState extends State<TunifyScreen>
                     '$rank',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isTopTrack
-                          ? const Color(0xFF1DB954)
-                          : Colors.white,
+                      color:
+                          isTopTrack ? const Color(0xFF1DB954) : Colors.white,
                       fontSize: isTopTrack ? 18 : 16,
-                      fontWeight: isTopTrack
-                          ? FontWeight.bold
-                          : FontWeight.w500,
+                      fontWeight:
+                          isTopTrack ? FontWeight.bold : FontWeight.w500,
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Album Art with gradient
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        _getArtistColor().withOpacity(0.8),
-                        _getArtistColor().withOpacity(0.5),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+                // Album Art - show cover art if available
+                song.coverArtUrl != null && song.coverArtUrl!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: CachedNetworkImage(
+                          imageUrl: song.coverArtUrl!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[800],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF1DB954),
+                                ),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  _getArtistColor().withOpacity(0.8),
+                                  _getArtistColor().withOpacity(0.5),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Center(
+                              child: Text(
+                                song.genreEmoji,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _getArtistColor().withOpacity(0.8),
+                              _getArtistColor().withOpacity(0.5),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            song.genreEmoji,
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      song.genreEmoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
-                ),
                 const SizedBox(width: 16),
                 // Song Info
                 Expanded(
@@ -1054,7 +1101,7 @@ class _TunifyScreenState extends State<TunifyScreen>
     final avgQuality = releasedSongs.isEmpty
         ? 0
         : releasedSongs.fold<int>(0, (sum, song) => sum + song.finalQuality) ~/
-              releasedSongs.length;
+            releasedSongs.length;
 
     return Container(
       color: Colors.black,
@@ -1273,25 +1320,75 @@ class _TunifyScreenState extends State<TunifyScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _getArtistColor().withOpacity(0.8),
-                            _getArtistColor().withOpacity(0.5),
-                          ],
+                    // Cover art or genre emoji
+                    (() {
+                      final cover = song.coverArtUrl;
+                      if (cover != null && cover.isNotEmpty) {
+                        return Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: CachedNetworkImage(
+                              imageUrl: cover,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[800],
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF1DB954),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      _getArtistColor().withOpacity(0.8),
+                                      _getArtistColor().withOpacity(0.5),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    song.genreEmoji,
+                                    style: const TextStyle(fontSize: 28),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              _getArtistColor().withOpacity(0.8),
+                              _getArtistColor().withOpacity(0.5),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          song.genreEmoji,
-                          style: const TextStyle(fontSize: 28),
+                        child: Center(
+                          child: Text(
+                            song.genreEmoji,
+                            style: const TextStyle(fontSize: 28),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    }()),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -1411,9 +1508,9 @@ class _TunifyScreenState extends State<TunifyScreen>
   String _formatNumberDetailed(int number) {
     // Format like "968,661,097" with commas
     return number.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
 
   Widget _buildMyMusicTab() {
@@ -1475,7 +1572,7 @@ class _TunifyScreenState extends State<TunifyScreen>
     final totalEarnings = (totalStreams * 0.003).round();
     final avgQuality =
         releasedSongs.fold<int>(0, (sum, song) => sum + song.finalQuality) ~/
-        releasedSongs.length;
+            releasedSongs.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -1586,7 +1683,58 @@ class _TunifyScreenState extends State<TunifyScreen>
         children: [
           Row(
             children: [
-              Text(song.genreEmoji, style: const TextStyle(fontSize: 24)),
+              // Cover art or genre emoji
+              (() {
+                final cover = song.coverArtUrl;
+                if (cover != null && cover.isNotEmpty) {
+                  return Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: CachedNetworkImage(
+                        imageUrl: cover,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[800],
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF1DB954),
+                              ),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                _getArtistColor().withOpacity(0.8),
+                                _getArtistColor().withOpacity(0.5),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: Text(
+                              song.genreEmoji,
+                              style: const TextStyle(fontSize: 28),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return Text(song.genreEmoji,
+                    style: const TextStyle(fontSize: 24));
+              }()),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1850,9 +1998,8 @@ class _TunifyScreenState extends State<TunifyScreen>
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: rank <= 3
-                  ? const Color(0xFFFFD700)
-                  : const Color(0xFF30363D),
+              color:
+                  rank <= 3 ? const Color(0xFFFFD700) : const Color(0xFF30363D),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
