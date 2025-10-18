@@ -791,9 +791,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         final result =
                             await _adminService.forceNPCRelease(selectedNpcId!);
 
-                        // Close loading dialog if still mounted
-                        if (mounted && Navigator.canPop(context)) {
-                          Navigator.of(context, rootNavigator: true).pop();
+                        // Close loading dialog safely
+                        if (mounted) {
+                          try {
+                            Navigator.of(context, rootNavigator: true).pop();
+                          } catch (e) {
+                            // Context invalid, dialog already closed
+                          }
                         }
 
                         if (mounted) {
@@ -812,9 +816,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           }
                         }
                       } catch (e) {
-                        // Close loading dialog if still mounted
-                        if (mounted && Navigator.canPop(context)) {
-                          Navigator.of(context, rootNavigator: true).pop();
+                        // Close loading dialog safely
+                        if (mounted) {
+                          try {
+                            Navigator.of(context, rootNavigator: true).pop();
+                          } catch (navError) {
+                            // Context invalid, dialog already closed
+                          }
                         }
 
                         if (mounted) {
@@ -1438,9 +1446,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   : messageController.text.trim(),
                             );
 
-                            // Close loading dialog if still mounted
-                            if (mounted && Navigator.canPop(context)) {
-                              Navigator.of(context, rootNavigator: true).pop();
+                            // Close loading dialog safely
+                            if (mounted) {
+                              try {
+                                Navigator.of(context, rootNavigator: true)
+                                    .pop();
+                              } catch (e) {
+                                // Context invalid, dialog already closed
+                              }
                             }
 
                             if (mounted) {
@@ -1457,9 +1470,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               }
                             }
                           } catch (e) {
-                            // Close loading dialog if still mounted
-                            if (mounted && Navigator.canPop(context)) {
-                              Navigator.of(context, rootNavigator: true).pop();
+                            // Close loading dialog safely
+                            if (mounted) {
+                              try {
+                                Navigator.of(context, rootNavigator: true)
+                                    .pop();
+                              } catch (navError) {
+                                // Context invalid, dialog already closed
+                              }
                             }
 
                             if (mounted) {
