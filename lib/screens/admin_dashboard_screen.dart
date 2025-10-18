@@ -791,7 +791,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         final result =
                             await _adminService.forceNPCRelease(selectedNpcId!);
 
-                        // Close loading dialog safely
+                        // Close loading dialog safely FIRST
                         if (mounted) {
                           try {
                             Navigator.of(context, rootNavigator: true).pop();
@@ -799,6 +799,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             // Context invalid, dialog already closed
                           }
                         }
+
+                        // Small delay to ensure loading dialog closes
+                        await Future.delayed(const Duration(milliseconds: 100));
 
                         if (mounted) {
                           if (result['success'] == true) {
@@ -824,6 +827,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             // Context invalid, dialog already closed
                           }
                         }
+
+                        // Small delay to ensure loading dialog closes
+                        await Future.delayed(const Duration(milliseconds: 100));
 
                         if (mounted) {
                           _showError('Error', e.toString());
@@ -1446,7 +1452,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   : messageController.text.trim(),
                             );
 
-                            // Close loading dialog safely
+                            // Close loading dialog safely FIRST
                             if (mounted) {
                               try {
                                 Navigator.of(context, rootNavigator: true)
@@ -1455,6 +1461,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 // Context invalid, dialog already closed
                               }
                             }
+
+                            // Small delay to ensure loading dialog closes
+                            await Future.delayed(
+                                const Duration(milliseconds: 100));
 
                             if (mounted) {
                               if (result['success'] == true) {
@@ -1479,6 +1489,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 // Context invalid, dialog already closed
                               }
                             }
+
+                            // Small delay to ensure loading dialog closes
+                            await Future.delayed(
+                                const Duration(milliseconds: 100));
 
                             if (mounted) {
                               _showError('Error', e.toString());
