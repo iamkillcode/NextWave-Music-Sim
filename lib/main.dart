@@ -6,12 +6,19 @@ import 'screens/dashboard_screen_new.dart';
 import 'screens/auth_screen.dart';
 import 'firebase_options.dart';
 import 'utils/firebase_status.dart';
+import 'services/remote_config_service.dart';
+import 'widgets/remote_config_guard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase with error handling
   await _initializeFirebase();
+
+  // Initialize Remote Config
+  if (FirebaseStatus.isInitialized) {
+    await _initializeRemoteConfig();
+  }
 
   runApp(const MusicArtistApp());
 }
@@ -43,6 +50,16 @@ Future<void> _initializeFirebase() async {
       '💡 Tip: If running on Chrome/Web, try Windows instead: flutter run -d windows',
     );
     print('App will run in demo mode without Firebase features.');
+  }
+}
+
+Future<void> _initializeRemoteConfig() async {
+  try {
+    await RemoteConfigService().initialize();
+    print('✅ Remote Config loaded successfully');
+  } catch (e) {
+    print('❌ Remote Config initialization failed: $e');
+    print('App will use default configuration values.');
   }
 }
 
@@ -83,31 +100,32 @@ class MusicArtistApp extends StatelessWidget {
   }
 
   Widget _getInitialScreen() {
-    // Use StreamBuilder to listen for auth state changes
-    // This ensures the UI updates when auth state changes (login/logout)
-    // and persists across hot reloads
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        // Show loading screen while checking auth state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF0D1117),
-            body: Center(
-              child: CircularProgressIndicator(color: Color(0xFF00D9FF)),
-            ),
-          );
-        }
+    // Wrap with RemoteConfigGuard to check maintenance mode & updates
+    return RemoteConfigGuard(
+      currentVersion: '1.0.0', // TODO: Get from package_info_plus
+      child: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // Show loading screen while checking auth state
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              backgroundColor: Color(0xFF0D1117),
+              body: Center(
+                child: CircularProgressIndicator(color: Color(0xFF00D9FF)),
+              ),
+            );
+          }
 
-        // Check if user is authenticated
-        if (snapshot.hasData && snapshot.data != null) {
-          // User is signed in, go to dashboard
-          return DashboardScreen();
-        } else {
-          // User is not signed in, show auth screen
-          return const AuthScreen();
-        }
-      },
+          // Check if user is authenticated
+          if (snapshot.hasData && snapshot.data != null) {
+            // User is signed in, go to dashboard
+            return DashboardScreen();
+          } else {
+            // User is not signed in, show auth screen
+            return const AuthScreen();
+          }
+        },
+      ),
     );
   }
 }
