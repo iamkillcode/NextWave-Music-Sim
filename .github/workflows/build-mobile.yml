@@ -1,0 +1,155 @@
+name: Build Mobile Apps (Android APK & iOS IPA)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build iOS (No Codesign)
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Create iOS IPA
+        run: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload
+          zip -r ../../../app-release.ipa Payload
+          cd ../../..
+
+      - name: Upload iOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-ipa
+          path: app-release.ipa
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep "version:" pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release-apk
+          path: ./artifacts
+
+      - name: Download iOS IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-release-ipa
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: NextWave v${{ steps.version.outputs.version }}
+          body: |
+            ## 🎵 NextWave Music Sim - Release v${{ steps.version.outputs.version }}
+            
+            ### 📦 Downloads
+            - **Android APK**: For Android devices (Android 5.0+)
+            - **iOS IPA**: For iOS devices (requires sideloading, unsigned)
+            
+            ### ✨ Features
+            - Music streaming simulation game
+            - Build your music career
+            - Multiple streaming platforms
+            - Regional charts and analytics
+            
+            ### 📱 Installation
+            
+            **Android:**
+            1. Download the APK file
+            2. Enable "Install from Unknown Sources" in Settings
+            3. Install the APK
+            
+            **iOS:**
+            1. Download the IPA file
+            2. Use AltStore, Sideloadly, or similar tool to sideload
+            3. Note: Unsigned build, requires developer certificate or sideloading tool
+            
+            ### 🔗 Links
+            - [Play Web Version](https://iamkillcode.github.io/NextWave-Music-Sim/)
+            - [GitHub Repository](https://github.com/iamkillcode/NextWave-Music-Sim)
+            
+          files: |
+            ./artifacts/app-release.apk
+            ./artifacts/app-release.ipa
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
