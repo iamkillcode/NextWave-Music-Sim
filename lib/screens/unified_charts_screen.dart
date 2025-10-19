@@ -455,35 +455,69 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
         leading: (() {
           final coverUrl = entry['coverArtUrl'] as String?;
           if (coverUrl != null && coverUrl.isNotEmpty) {
-            return Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white24, width: 1),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: coverUrl,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[800],
-                    child: const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white30,
+            return Stack(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white24, width: 1),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: coverUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[800],
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white30,
+                            ),
+                          ),
                         ),
+                      ),
+                      errorWidget: (context, url, error) =>
+                          _buildPositionBadge(position),
+                    ),
+                  ),
+                ),
+                // Position badge overlay
+                Positioned(
+                  top: 2,
+                  left: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: position <= 3 
+                          ? (position == 1 ? Colors.amber : 
+                             position == 2 ? Colors.grey[300]! : 
+                             Colors.brown)
+                          : Colors.white24,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      position <= 3 
+                        ? (position == 1 ? '🥇' : position == 2 ? '🥈' : '🥉')
+                        : '#$position',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: position <= 3 ? 14 : 11,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) =>
-                      _buildPositionBadge(position),
                 ),
-              ),
+              ],
             );
           }
           return _buildPositionBadge(position);
@@ -557,34 +591,68 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
         leading: (() {
           final avatar = entry['avatarUrl'] as String?;
           if (avatar != null && avatar.isNotEmpty) {
-            return Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white24, width: 1),
-              ),
-              child: ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: avatar,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: Colors.grey[800],
-                    child: const Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white30,
+            return Stack(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white24, width: 1),
+                  ),
+                  child: ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: avatar,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[800],
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white30,
+                            ),
+                          ),
                         ),
+                      ),
+                      errorWidget: (context, url, error) =>
+                          _buildPositionBadge(position),
+                    ),
+                  ),
+                ),
+                // Position badge overlay
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: position <= 3 
+                          ? (position == 1 ? Colors.amber : 
+                             position == 2 ? Colors.grey[300]! : 
+                             Colors.brown)
+                          : Colors.white24,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      position <= 3 
+                        ? (position == 1 ? '🥇' : position == 2 ? '🥈' : '🥉')
+                        : '#$position',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: position <= 3 ? 12 : 10,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) =>
-                      _buildPositionBadge(position),
                 ),
-              ),
+              ],
             );
           }
           return _buildPositionBadge(position);
