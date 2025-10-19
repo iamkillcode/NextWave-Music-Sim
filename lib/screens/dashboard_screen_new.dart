@@ -196,6 +196,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  /// Pull-to-refresh handler
+  Future<void> _handleRefresh() async {
+    try {
+      print('🔄 Manual refresh triggered');
+
+      // Sync with Firebase to get latest game time
+      await _syncWithFirebase();
+
+      // Reload user profile from Firebase
+      await _loadUserProfile();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Refreshed!'),
+            backgroundColor: Color(0xFF32D74B),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Refresh error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Refresh failed. Please try again.'),
+            backgroundColor: Color(0xFFFF6B9D),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _loadUserProfile() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -995,20 +1030,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         continue;
       }
 
-      // ⏰ REALISTIC STREAM DELAYS: Check if enough time has passed since last update
-      // Songs on streaming platforms update every 12 hours (half in-game day)
-      final lastUpdate = song.lastStreamUpdateDate ?? song.releasedDate!;
-      final hoursSinceLastUpdate =
-          currentGameDate.difference(lastUpdate).inHours;
-
-      // Skip if less than 12 hours have passed (need half-day delay)
-      if (hoursSinceLastUpdate < 12) {
-        updatedSongs.add(song.copyWith(last7DaysStreams: decayedLast7Days));
-        print(
-          '⏸️ ${song.title}: Waiting for stream update (${hoursSinceLastUpdate}h/12h)',
-        );
-        continue;
-      }
+      // ✅ Stream updates are handled by Cloud Functions (every 1 hour = 1 game day)
+      // No need for client-side timing checks - server controls the schedule
 
       // Calculate stream growth for this song
       final newStreams = _streamGrowthService.calculateDailyStreamGrowth(
@@ -1421,20 +1444,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117), // GitHub dark background
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Status Bar
-            _buildTopStatusBar(),
-
-            // Game Status Row
-            _buildGameStatusRow(),
-
-            // Profile Section (simplified)
-            _buildProfileSection(),
-            // Action Panel - Core gameplay
-            Expanded(child: _buildActionPanel()),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: const Color(0xFF00D9FF),
+        backgroundColor: const Color(0xFF21262D),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                // Top Status Bar
+                _buildTopStatusBar(),
+                // Game Status Row
+                _buildGameStatusRow(),
+                // Profile Section (simplified)
+                _buildProfileSection(),
+                // Action Panel - Core gameplay (now scrollable)
+                _buildActionPanel(),
+              ],
+            ),
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -1573,41 +1602,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         '${artistStats.energy}',
                         style: const TextStyle(
                           color: Color(0xFFFF6B9D),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                // Fanbase
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00D9FF).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFF00D9FF),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.people_rounded,
-                        color: Color(0xFF00D9FF),
-                        size: 14,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        _formatNumber(artistStats.fanbase),
-                        style: const TextStyle(
-                          color: Color(0xFF00D9FF),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1754,14 +1748,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: _buildAdvancedStatusCard(
-              'Level',
-              (artistStats.experience / 100).floor() +
-                  1, // Experience-based level
-              100, // Max value for progress bar
-              Icons.military_tech_rounded,
-              const Color(0xFFF39C12), // Orange
+              'Fanbase',
+              artistStats.fanbase,
+              artistStats.fanbase + 1000, // Dynamic max value for progress
+              Icons.people_rounded,
+              const Color(0xFF00D9FF), // Cyan
               const Color(0xFF1A252F), // Dark navy
-              'Level ${(artistStats.experience / 100).floor() + 1}',
+              _formatNumber(artistStats.fanbase),
             ),
           ),
         ],
@@ -2097,6 +2090,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
@@ -2124,94 +2118,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Responsive grid columns based on width
-                int crossAxisCount = 2;
-                double childAspectRatio = 2.0;
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Responsive grid columns based on width
+              int crossAxisCount = 2;
+              double childAspectRatio = 2.0;
 
-                if (constraints.maxWidth < 400) {
-                  // Small mobile (less than 400px)
-                  crossAxisCount = 2;
-                  childAspectRatio = 1.8;
-                } else if (constraints.maxWidth >= 600 &&
-                    constraints.maxWidth < 1024) {
-                  // Tablet
-                  crossAxisCount = 3;
-                  childAspectRatio = 2.2;
-                } else if (constraints.maxWidth >= 1024) {
-                  // Desktop
-                  crossAxisCount = 4;
-                  childAspectRatio = 2.5;
-                }
+              if (constraints.maxWidth < 400) {
+                // Small mobile (less than 400px)
+                crossAxisCount = 2;
+                childAspectRatio = 1.8;
+              } else if (constraints.maxWidth >= 600 &&
+                  constraints.maxWidth < 1024) {
+                // Tablet
+                crossAxisCount = 3;
+                childAspectRatio = 2.2;
+              } else if (constraints.maxWidth >= 1024) {
+                // Desktop
+                crossAxisCount = 4;
+                childAspectRatio = 2.5;
+              }
 
-                return GridView.count(
-                  physics: const NeverScrollableScrollPhysics(),
-                  shrinkWrap: true,
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: childAspectRatio,
-                  children: [
-                    _buildActionCard(
-                      'Write Song',
-                      Icons.edit_rounded,
-                      const Color(0xFF00D9FF),
-                      energyCost: 15,
-                      onTap: () => _performAction('write_song'),
-                      customCostText: '15-40',
-                    ),
-                    _buildActionCard(
-                      'Studio',
-                      Icons.album_rounded,
-                      const Color(0xFF9B59B6),
-                      energyCost: -1,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => StudiosListScreen(
-                              artistStats: artistStats,
-                              onStatsUpdated: (updatedStats) {
-                                setState(() {
-                                  artistStats = updatedStats;
-                                });
-                                _debouncedSave(); // ✅ Save after recording songs
-                              },
-                            ),
+              return GridView.count(
+                physics: const AlwaysScrollableScrollPhysics(),
+                shrinkWrap: true,
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: childAspectRatio,
+                children: [
+                  _buildActionCard(
+                    'Write Song',
+                    Icons.edit_rounded,
+                    const Color(0xFF00D9FF),
+                    energyCost: 15,
+                    onTap: () => _performAction('write_song'),
+                    customCostText: '15-40',
+                  ),
+                  _buildActionCard(
+                    'Studio',
+                    Icons.album_rounded,
+                    const Color(0xFF9B59B6),
+                    energyCost: -1,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => StudiosListScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: (updatedStats) {
+                              setState(() {
+                                artistStats = updatedStats;
+                              });
+                              _debouncedSave(); // ✅ Save after recording songs
+                            },
                           ),
-                        );
-                      },
-                      customCostText: 'Record',
-                    ),
-                    _buildActionCard(
-                      'Releases',
-                      Icons.library_music_rounded,
-                      const Color(0xFFE94560),
-                      energyCost: -1,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ReleaseManagerScreen(
-                              artistStats: artistStats,
-                              onStatsUpdated: (updatedStats) {
-                                setState(() {
-                                  artistStats = updatedStats;
-                                });
-                                _debouncedSave(); // ✅ Save after releasing songs
-                              },
-                            ),
+                        ),
+                      );
+                    },
+                    customCostText: 'Record',
+                  ),
+                  _buildActionCard(
+                    'Releases',
+                    Icons.library_music_rounded,
+                    const Color(0xFFE94560),
+                    energyCost: -1,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ReleaseManagerScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: (updatedStats) {
+                              setState(() {
+                                artistStats = updatedStats;
+                              });
+                              _debouncedSave(); // ✅ Save after releasing songs
+                            },
                           ),
-                        );
-                      },
-                      customCostText: 'EPs/Albums',
-                    ),
-                  ],
-                );
-              },
-            ),
+                        ),
+                      );
+                    },
+                    customCostText: 'EPs/Albums',
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

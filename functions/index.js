@@ -296,7 +296,32 @@ exports.triggerSpecialEvent = functions.pubsub
 async function processDailyStreamsForPlayer(playerId, playerData, currentGameDate) {
   try {
     const songs = playerData.songs || [];
-    if (songs.length === 0) return null;
+    
+    // ✅ CHECK IF SIDE HUSTLE CONTRACT EXPIRED (even when player offline)
+    let sideHustleExpired = false;
+    if (playerData.currentSideHustle && playerData.currentSideHustle.startDate) {
+      const startDate = playerData.currentSideHustle.startDate.toDate();
+      const contractLength = playerData.currentSideHustle.contractLength || 7;
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + contractLength);
+      
+      if (currentGameDate >= endDate) {
+        console.log(`⏰ Side hustle "${playerData.currentSideHustle.name}" expired for ${playerData.displayName || playerId}`);
+        sideHustleExpired = true;
+      }
+    }
+    
+    if (songs.length === 0) {
+      // If no songs but side hustle expired, still return update
+      if (sideHustleExpired) {
+        return {
+          currentSideHustle: null,
+          sideHustlePaymentPerDay: 0,
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        };
+      }
+      return null;
+    }
     
     let totalNewStreams = 0;
     let totalNewIncome = 0;
@@ -391,7 +416,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       }
     }
     
-    if (totalNewStreams > 0 || famePenalty > 0) {
+    if (totalNewStreams > 0 || famePenalty > 0 || sideHustleExpired) {
       const updates = {
         songs: updatedSongs,
         currentMoney: (playerData.currentMoney || 0) + totalNewIncome,
@@ -403,6 +428,32 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       if (famePenalty > 0) {
         const currentFame = playerData.fame || 0;
         updates.fame = Math.max(0, currentFame - famePenalty);
+      }
+      
+      // ✅ Terminate side hustle contract if expired
+      if (sideHustleExpired) {
+        updates.currentSideHustle = null;
+        updates.sideHustlePaymentPerDay = 0;
+        console.log(`✅ Terminated expired side hustle for ${playerData.displayName || playerId}`);
+      }
+      
+      // ✅ CREATE NOTIFICATION for daily royalties (only if earning money)
+      if (totalNewIncome > 0) {
+        try {
+          await db.collection('notifications').add({
+            userId: playerId,
+            type: 'royalty_payment',
+            title: '💰 Daily Royalties',
+            message: `You earned $${totalNewIncome.toLocaleString()} from ${totalNewStreams.toLocaleString()} streams!`,
+            amount: totalNewIncome,
+            streams: totalNewStreams,
+            read: false,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          console.log(`📬 Created royalty notification for ${playerData.displayName || playerId}: $${totalNewIncome}`);
+        } catch (notifError) {
+          console.error(`Failed to create notification for ${playerId}:`, notifError);
+        }
       }
       
       return updates;

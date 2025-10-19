@@ -386,41 +386,6 @@ class AdminService {
     }
   }
 
-  /// Get list of all players (for gift recipient selection)
-  Future<List<Map<String, dynamic>>> getAllPlayers() async {
-    if (!await isAdmin()) {
-      throw Exception('Admin access required');
-    }
-
-    try {
-      final snapshot = await _firestore
-          .collection('players')
-          .limit(100) // Limit to prevent loading too many
-          .get();
-
-      final playersList = snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'name': data['displayName'] ?? data['name'] ?? 'Unknown Player',
-          'fame': data['fame'] ?? 0,
-          'money': data['money'] ?? 0,
-          'fanbase': data['fanbase'] ?? 0,
-        };
-      }).toList();
-
-      // Sort by name in Dart instead of Firestore
-      playersList
-          .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
-
-      print('✅ Loaded ${playersList.length} players');
-      return playersList;
-    } catch (e) {
-      print('❌ Error getting players: $e');
-      rethrow; // Throw the error so the UI can show the actual error message
-    }
-  }
-
   /// Gift type definitions
   static const List<Map<String, dynamic>> GIFT_TYPES = [
     {
@@ -480,4 +445,38 @@ class AdminService {
       'icon': '👑',
     },
   ];
+
+  /// Get all players (Admin Only)
+  Future<List<Map<String, dynamic>>> getAllPlayers() async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final playersSnapshot = await _firestore.collection('players').get();
+      final List<Map<String, dynamic>> players = [];
+
+      for (var doc in playersSnapshot.docs) {
+        final data = doc.data();
+        final songs = data['songs'] as List<dynamic>? ?? [];
+
+        players.add({
+          'id': doc.id,
+          'name': data['displayName'] ?? 'Unknown',
+          'fame': data['fame'] ?? 0,
+          'money': data['currentMoney'] ?? 0,
+          'fanbase': data['level'] ?? 0,
+          'songCount': songs.length,
+          'lastActivity': data['lastActivityDate'],
+        });
+      }
+
+      // Sort by fame (descending)
+      players.sort((a, b) => (b['fame'] as int).compareTo(a['fame'] as int));
+
+      return players;
+    } catch (e) {
+      throw Exception('Failed to get players: $e');
+    }
+  }
 }

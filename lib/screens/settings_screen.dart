@@ -614,9 +614,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'No email',
-                      style: TextStyle(color: Colors.white60, fontSize: 14),
+                    Text(
+                      _auth.currentUser?.email ?? 'No email',
+                      style:
+                          const TextStyle(color: Colors.white60, fontSize: 14),
                     ),
                   ],
                 ),

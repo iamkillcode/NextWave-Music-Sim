@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/admin_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -11,6 +13,8 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final AdminService _adminService = AdminService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = true;
   Map<String, dynamic>? _gameStats;
   List<Map<String, dynamic>> _admins = [];
@@ -293,6 +297,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             description: 'Gift money, fame, or items to testers',
             color: Colors.pink,
             onPressed: _showSendGiftDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.search,
+            label: 'Search & Manage Players',
+            description: 'View, edit, or delete player accounts',
+            color: Colors.blue,
+            onPressed: _showPlayerManagementDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.access_time,
+            label: 'Adjust Game Time',
+            description: 'Fast forward or rewind game date',
+            color: Colors.teal,
+            onPressed: _showGameTimeAdjustDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.bar_chart,
+            label: 'View Analytics Dashboard',
+            description: 'Detailed stats and player activity',
+            color: Colors.indigo,
+            onPressed: _showAnalyticsDashboard,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.cleaning_services,
+            label: 'Clear Old Notifications',
+            description: 'Delete notifications older than 30 days',
+            color: Colors.amber,
+            onPressed: _clearOldNotifications,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.bug_report,
+            label: 'Test Error System',
+            description: 'Trigger test error for monitoring',
+            color: Colors.deepOrange,
+            onPressed: _testErrorSystem,
           ),
         ],
       ),
@@ -1526,6 +1570,939 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
       _showError('Error Loading Players', e.toString());
     }
+  }
+
+  // ============================================================================
+  // NEW ADMIN FEATURES
+  // ============================================================================
+
+  void _showPlayerManagementDialog() async {
+    _showLoadingDialog('Loading players...');
+
+    try {
+      final players = await _adminService.getAllPlayers();
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+      }
+
+      if (players.isEmpty) {
+        _showError('No Players', 'No players found in the database');
+        return;
+      }
+
+      String? selectedPlayerId;
+      final searchController = TextEditingController();
+      List<Map<String, dynamic>> filteredPlayers = players;
+
+      showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              title: const Row(
+                children: [
+                  Icon(Icons.search, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Text(
+                    'Player Management',
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 500,
+                height: 600,
+                child: Column(
+                  children: [
+                    // Search bar
+                    TextField(
+                      controller: searchController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Search by name...',
+                        hintStyle: const TextStyle(color: Colors.white30),
+                        prefixIcon:
+                            const Icon(Icons.search, color: Colors.white60),
+                        filled: true,
+                        fillColor: Colors.black26,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          filteredPlayers = players
+                              .where((p) => p['name']
+                                  .toLowerCase()
+                                  .contains(value.toLowerCase()))
+                              .toList();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Player list
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredPlayers.length,
+                        itemBuilder: (context, index) {
+                          final player = filteredPlayers[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: selectedPlayerId == player['id']
+                                  ? Colors.blue.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: selectedPlayerId == player['id']
+                                    ? Colors.blue
+                                    : Colors.white10,
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.blue,
+                                child: Text(
+                                  player['name'][0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                player['name'],
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '⭐${player['fame']} | \$${player['money']} | 👥${player['fanbase']} | 🎵${player['songCount']}',
+                                style: const TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                icon: const Icon(
+                                  Icons.more_vert,
+                                  color: Colors.white60,
+                                ),
+                                color: const Color(0xFF1A1A1A),
+                                onSelected: (value) async {
+                                  Navigator.pop(context); // Close main dialog
+
+                                  switch (value) {
+                                    case 'edit':
+                                      _showEditPlayerDialog(player);
+                                      break;
+                                    case 'reset':
+                                      _showResetPlayerDialog(player);
+                                      break;
+                                    case 'delete':
+                                      _showDeletePlayerDialog(player);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit, color: Colors.blue),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Edit Stats',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'reset',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.refresh,
+                                            color: Colors.orange),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Reset Progress',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Delete Account',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  selectedPlayerId = player['id'];
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+      }
+      _showError('Error Loading Players', e.toString());
+    }
+  }
+
+  void _showEditPlayerDialog(Map<String, dynamic> player) {
+    final moneyController =
+        TextEditingController(text: player['money'].toString());
+    final fameController =
+        TextEditingController(text: player['fame'].toString());
+    final fanbaseController =
+        TextEditingController(text: player['fanbase'].toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: Text(
+          'Edit ${player['name']}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: moneyController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: '💰 Money',
+                labelStyle: TextStyle(color: Colors.white60),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: fameController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: '⭐ Fame',
+                labelStyle: TextStyle(color: Colors.white60),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: fanbaseController,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: '👥 Fanbase',
+                labelStyle: TextStyle(color: Colors.white60),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Updating player...');
+
+              try {
+                await _firestore
+                    .collection('players')
+                    .doc(player['id'])
+                    .update({
+                  'currentMoney': int.parse(moneyController.text),
+                  'fame': int.parse(fameController.text),
+                  'level': int.parse(fanbaseController.text),
+                });
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showSuccessDialog(
+                    'Updated!',
+                    'Player stats updated successfully.',
+                  );
+                  await _loadData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showError('Error', e.toString());
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetPlayerDialog(Map<String, dynamic> player) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Row(
+          children: [
+            Icon(Icons.refresh, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Reset Player?', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Text(
+          'Reset ${player['name']}\'s progress to starting values?\n\n'
+          'This will:\n'
+          '• Clear all songs\n'
+          '• Reset money to \$5,000\n'
+          '• Reset fame and fanbase to 0\n'
+          '• Keep their account active',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Resetting player...');
+
+              try {
+                await _firestore
+                    .collection('players')
+                    .doc(player['id'])
+                    .update({
+                  'currentMoney': 5000,
+                  'fame': 0,
+                  'level': 0,
+                  'loyalFanbase': 0,
+                  'songs': [],
+                });
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showSuccessDialog(
+                    'Reset Complete!',
+                    '${player['name']} has been reset to starting values.',
+                  );
+                  await _loadData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showError('Error', e.toString());
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('Reset Progress'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeletePlayerDialog(Map<String, dynamic> player) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Delete Player?', style: TextStyle(color: Colors.red)),
+          ],
+        ),
+        content: Text(
+          'Permanently delete ${player['name']}\'s account?\n\n'
+          'This action CANNOT be undone.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Deleting player...');
+
+              try {
+                await _firestore
+                    .collection('players')
+                    .doc(player['id'])
+                    .delete();
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showSuccessDialog(
+                    'Deleted!',
+                    '${player['name']}\'s account has been permanently deleted.',
+                  );
+                  await _loadData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showError('Error', e.toString());
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('DELETE ACCOUNT'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGameTimeAdjustDialog() async {
+    _showLoadingDialog('Loading game time...');
+
+    try {
+      final gameTimeDoc =
+          await _firestore.collection('game_state').doc('global_time').get();
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      if (!gameTimeDoc.exists) {
+        _showError('Error', 'Game time not initialized');
+        return;
+      }
+
+      final currentDate =
+          (gameTimeDoc.data()!['currentGameDate'] as Timestamp).toDate();
+      int daysToAdjust = 0;
+
+      showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Row(
+              children: [
+                Icon(Icons.access_time, color: Colors.teal),
+                SizedBox(width: 8),
+                Text(
+                  'Adjust Game Time',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Current Game Date:',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    color: Color(0xFF00D9FF),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          daysToAdjust -= 7;
+                        });
+                      },
+                      icon: const Icon(Icons.fast_rewind),
+                      color: Colors.red,
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          daysToAdjust--;
+                        });
+                      },
+                      icon: const Icon(Icons.remove),
+                      color: Colors.orange,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${daysToAdjust > 0 ? '+' : ''}$daysToAdjust days',
+                        style: TextStyle(
+                          color: daysToAdjust == 0
+                              ? Colors.white
+                              : (daysToAdjust > 0 ? Colors.green : Colors.red),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          daysToAdjust++;
+                        });
+                      },
+                      icon: const Icon(Icons.add),
+                      color: Colors.green,
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          daysToAdjust += 7;
+                        });
+                      },
+                      icon: const Icon(Icons.fast_forward),
+                      color: Colors.green,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'New Date: ${DateTime(currentDate.year, currentDate.month, currentDate.day + daysToAdjust).toString().split(' ')[0]}',
+                  style: const TextStyle(color: Colors.white60, fontSize: 14),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: daysToAdjust == 0
+                    ? null
+                    : () async {
+                        Navigator.pop(context);
+                        _showLoadingDialog('Adjusting game time...');
+
+                        try {
+                          final newDate = DateTime(
+                            currentDate.year,
+                            currentDate.month,
+                            currentDate.day + daysToAdjust,
+                          );
+
+                          await _firestore
+                              .collection('game_state')
+                              .doc('global_time')
+                              .update({
+                            'currentGameDate': Timestamp.fromDate(newDate),
+                          });
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            _showSuccessDialog(
+                              'Time Adjusted!',
+                              'Game date changed by $daysToAdjust days.\n\n'
+                                  'New date: ${newDate.toString().split(' ')[0]}',
+                            );
+                            await _loadData();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            Navigator.pop(context);
+                            _showError('Error', e.toString());
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  disabledBackgroundColor: Colors.grey,
+                ),
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      _showError('Error', e.toString());
+    }
+  }
+
+  void _showAnalyticsDashboard() async {
+    _showLoadingDialog('Loading analytics...');
+
+    try {
+      final playersSnapshot = await _firestore.collection('players').get();
+
+      int totalMoney = 0;
+      int totalStreams = 0;
+      int activePlayers = 0;
+      Map<String, int> genreDistribution = {};
+
+      for (var playerDoc in playersSnapshot.docs) {
+        final data = playerDoc.data();
+        totalMoney += (data['currentMoney'] as int? ?? 0);
+
+        // Count active players (played in last 7 days)
+        if (data['lastActivityDate'] != null) {
+          final lastActivity = (data['lastActivityDate'] as Timestamp).toDate();
+          if (DateTime.now().difference(lastActivity).inDays < 7) {
+            activePlayers++;
+          }
+        }
+
+        // Count songs and streams from player data
+        final songs = data['songs'] as List<dynamic>? ?? [];
+        for (var song in songs) {
+          totalStreams += (song['streams'] as int? ?? 0);
+
+          final genre = song['genre'] as String? ?? 'Unknown';
+          genreDistribution[genre] = (genreDistribution[genre] ?? 0) + 1;
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // Sort genres by popularity
+      final sortedGenres = genreDistribution.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Row(
+            children: [
+              Icon(Icons.bar_chart, color: Colors.indigo),
+              SizedBox(width: 8),
+              Text(
+                'Analytics Dashboard',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildAnalyticCard(
+                    'Total Players',
+                    playersSnapshot.size.toString(),
+                    Icons.people,
+                    Colors.blue,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildAnalyticCard(
+                    'Active (7 days)',
+                    activePlayers.toString(),
+                    Icons.check_circle,
+                    Colors.green,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildAnalyticCard(
+                    'Total Songs',
+                    _gameStats?['totalSongs'].toString() ?? '0',
+                    Icons.music_note,
+                    Colors.purple,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildAnalyticCard(
+                    'Total Streams',
+                    totalStreams.toString(),
+                    Icons.play_arrow,
+                    Colors.red,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildAnalyticCard(
+                    'Total Money',
+                    '\$${totalMoney}',
+                    Icons.attach_money,
+                    Colors.green,
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Genre Distribution (Top 5):',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...sortedGenres.take(5).map((entry) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              entry.key,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              '${entry.value} songs',
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+      _showError('Error', e.toString());
+    }
+  }
+
+  Widget _buildAnalyticCard(
+      String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearOldNotifications() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Row(
+          children: [
+            Icon(Icons.cleaning_services, color: Colors.amber),
+            SizedBox(width: 8),
+            Text('Clear Old Notifications?',
+                style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'Delete all notifications older than 30 days?\n\n'
+          'This will free up database space.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Clearing old notifications...');
+
+              try {
+                final thirtyDaysAgo =
+                    DateTime.now().subtract(const Duration(days: 30));
+                final notificationsSnapshot = await _firestore
+                    .collection('notifications')
+                    .where('timestamp',
+                        isLessThan: Timestamp.fromDate(thirtyDaysAgo))
+                    .get();
+
+                final batch = _firestore.batch();
+                for (var doc in notificationsSnapshot.docs) {
+                  batch.delete(doc.reference);
+                }
+                await batch.commit();
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showSuccessDialog(
+                    'Cleared!',
+                    'Deleted ${notificationsSnapshot.size} old notifications.',
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showError('Error', e.toString());
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.amber,
+            ),
+            child: const Text('Clear Old Notifications'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _testErrorSystem() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Row(
+          children: [
+            Icon(Icons.bug_report, color: Colors.deepOrange),
+            SizedBox(width: 8),
+            Text('Test Error System?', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'This will create a test error in the error log.\n\n'
+          'Useful for testing error monitoring and alerting.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Creating test error...');
+
+              try {
+                await _firestore.collection('error_logs').add({
+                  'error': 'TEST ERROR - This is a test error for monitoring',
+                  'playerId': _auth.currentUser?.uid ?? 'admin',
+                  'timestamp': FieldValue.serverTimestamp(),
+                  'severity': 'test',
+                  'context': 'Admin Dashboard Test',
+                });
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showSuccessDialog(
+                    'Test Error Created!',
+                    'Check the error logs section to verify.',
+                  );
+                  await _loadData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  _showError('Error', e.toString());
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+            ),
+            child: const Text('Create Test Error'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSnackBar(String message) {
