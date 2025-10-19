@@ -57,8 +57,6 @@ class LeaderboardSnapshotService {
 
       // Query for the most recent snapshot for this region
       // Document naming: songs_global_YYYYWW or songs_usa_YYYYWW
-      final prefix = region == 'global' ? 'songs_global_' : 'songs_${region}_';
-
       final snapshot = await _firestore
           .collection('leaderboard_history')
           .where('type', isEqualTo: 'songs')

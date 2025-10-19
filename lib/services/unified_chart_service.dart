@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'leaderboard_snapshot_service.dart';
 
 /// Unified Chart Service - Handles ALL chart types
@@ -300,28 +299,31 @@ class UnifiedChartService {
 
       // For WEEKLY artist charts sorted by streams, use snapshot service
       if (period == 'weekly' && sortBy == 'streams') {
-        print('✅ Using snapshot-based weekly artist chart for accurate regional rankings');
+        print(
+            '✅ Using snapshot-based weekly artist chart for accurate regional rankings');
         final chartData = await _snapshotService.getLatestArtistChart(
           region: region,
           limit: limit,
         );
-        
+
         // Transform to match expected format
-        return chartData.map((entry) => {
-          'artistName': entry['artistName'],
-          'artistId': entry['artistId'],
-          'isNPC': entry['isNPC'] ?? false,
-          'periodStreams': entry['streams'], // Regional total streams
-          'fanbase': 0, // Not stored in snapshots
-          'fame': 0, // Not stored in snapshots
-          'releasedSongs': entry['songCount'],
-          'chartingSongs': entry['songCount'],
-          'avatarUrl': null,
-          'position': entry['position'],
-          'movement': entry['movement'],
-          'lastWeekPosition': entry['lastWeekPosition'],
-          'weeksOnChart': entry['weeksOnChart'],
-        }).toList();
+        return chartData
+            .map((entry) => {
+                  'artistName': entry['artistName'],
+                  'artistId': entry['artistId'],
+                  'isNPC': entry['isNPC'] ?? false,
+                  'periodStreams': entry['streams'], // Regional total streams
+                  'fanbase': 0, // Not stored in snapshots
+                  'fame': 0, // Not stored in snapshots
+                  'releasedSongs': entry['songCount'],
+                  'chartingSongs': entry['songCount'],
+                  'avatarUrl': null,
+                  'position': entry['position'],
+                  'movement': entry['movement'],
+                  'lastWeekPosition': entry['lastWeekPosition'],
+                  'weeksOnChart': entry['weeksOnChart'],
+                })
+            .toList();
       }
 
       // For DAILY charts or other sort options, fall back to real-time queries
