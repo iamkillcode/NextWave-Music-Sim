@@ -1553,12 +1553,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
-                          Icons.attach_money,
-                          color: Color(0xFF32D74B),
-                          size: 14,
-                        ),
-                        const SizedBox(width: 2),
                         Flexible(
                           child: Text(
                             _formatMoney(artistStats.money.toDouble()),

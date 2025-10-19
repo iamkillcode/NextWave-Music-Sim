@@ -4,6 +4,7 @@ class MultiplayerPlayer {
   final String id;
   final String displayName;
   final String email;
+  final String? gender; // 'male', 'female', 'other', or null
   final int totalStreams;
   final int totalLikes;
   final int songsPublished;
@@ -19,6 +20,7 @@ class MultiplayerPlayer {
     required this.id,
     required this.displayName,
     required this.email,
+    this.gender,
     this.totalStreams = 0,
     this.totalLikes = 0,
     this.songsPublished = 0,
@@ -38,6 +40,7 @@ class MultiplayerPlayer {
       id: doc.id,
       displayName: data['displayName'] ?? '',
       email: data['email'] ?? '',
+      gender: data['gender'] as String?,
       totalStreams: data['totalStreams'] ?? 0,
       totalLikes: data['totalLikes'] ?? 0,
       songsPublished: data['songsPublished'] ?? 0,
@@ -56,6 +59,7 @@ class MultiplayerPlayer {
     return {
       'displayName': displayName,
       'email': email,
+      'gender': gender,
       'totalStreams': totalStreams,
       'totalLikes': totalLikes,
       'songsPublished': songsPublished,
@@ -73,6 +77,7 @@ class MultiplayerPlayer {
     String? id,
     String? displayName,
     String? email,
+    String? gender,
     int? totalStreams,
     int? totalLikes,
     int? songsPublished,
@@ -88,6 +93,7 @@ class MultiplayerPlayer {
       id: id ?? this.id,
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
+      gender: gender ?? this.gender,
       totalStreams: totalStreams ?? this.totalStreams,
       totalLikes: totalLikes ?? this.totalLikes,
       songsPublished: songsPublished ?? this.songsPublished,

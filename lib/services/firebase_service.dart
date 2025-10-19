@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/published_song.dart';
 import '../models/multiplayer_player.dart';
 import '../models/artist_stats.dart';
@@ -11,11 +12,14 @@ class FirebaseService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Collections
   CollectionReference get _songsCollection => _firestore.collection('songs');
-  CollectionReference get _playersCollection => _firestore.collection('players');
-  CollectionReference get _leaderboardsCollection => _firestore.collection('leaderboards');
+  CollectionReference get _playersCollection =>
+      _firestore.collection('players');
+  CollectionReference get _leaderboardsCollection =>
+      _firestore.collection('leaderboards');
 
   // Current user
   User? get currentUser => _auth.currentUser;
@@ -35,7 +39,44 @@ class FirebaseService {
     }
   }
 
+  /// Sign in with Google account
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      // Trigger the Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        print('Google sign-in cancelled by user');
+        return null;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credential
+      final userCredential = await _auth.signInWithCredential(credential);
+
+      if (userCredential.user != null) {
+        await _createOrUpdatePlayer(userCredential.user!);
+      }
+
+      return userCredential;
+    } catch (e) {
+      print('Error signing in with Google: $e');
+      return null;
+    }
+  }
+
   Future<void> signOut() async {
+    await _googleSignIn.signOut();
     await _auth.signOut();
   }
 
@@ -107,7 +148,7 @@ class FirebaseService {
       );
 
       final docRef = await _songsCollection.add(song.toFirestore());
-      
+
       // Update player song count
       await _playersCollection.doc(currentUser!.uid).update({
         'songsPublished': FieldValue.increment(1),
@@ -154,7 +195,8 @@ class FirebaseService {
     }
   }
 
-  Future<List<PublishedSong>> getSongsByGenre(String genre, {int limit = 10}) async {
+  Future<List<PublishedSong>> getSongsByGenre(String genre,
+      {int limit = 10}) async {
     try {
       final snapshot = await _songsCollection
           .where('genre', isEqualTo: genre)
@@ -185,7 +227,8 @@ class FirebaseService {
   }
 
   // Leaderboard Methods
-  Future<List<MultiplayerPlayer>> getTopPlayersByNetWorth({int limit = 10}) async {
+  Future<List<MultiplayerPlayer>> getTopPlayersByNetWorth(
+      {int limit = 10}) async {
     try {
       final snapshot = await _playersCollection
           .orderBy('currentMoney', descending: true)
@@ -217,7 +260,8 @@ class FirebaseService {
     }
   }
 
-  Future<List<MultiplayerPlayer>> getTopPlayersByStreams({int limit = 10}) async {
+  Future<List<MultiplayerPlayer>> getTopPlayersByStreams(
+      {int limit = 10}) async {
     try {
       final snapshot = await _playersCollection
           .orderBy('totalStreams', descending: true)
@@ -259,20 +303,23 @@ class FirebaseService {
   Future<void> simulateSongPerformance() async {
     try {
       final recentSongs = await getRecentSongs(limit: 50);
-      
+
       for (final song in recentSongs) {
         // Simple performance simulation based on quality and age
         final ageInHours = DateTime.now().difference(song.releaseDate).inHours;
         final qualityFactor = song.quality / 100.0;
-        final randomFactor = (DateTime.now().millisecondsSinceEpoch % 100) / 100.0;
-        
-        final newStreams = ((qualityFactor * randomFactor * 10) * (ageInHours < 24 ? 2 : 1)).round();
-        
+        final randomFactor =
+            (DateTime.now().millisecondsSinceEpoch % 100) / 100.0;
+
+        final newStreams =
+            ((qualityFactor * randomFactor * 10) * (ageInHours < 24 ? 2 : 1))
+                .round();
+
         if (newStreams > 0) {
           await _songsCollection.doc(song.id).update({
             'streams': FieldValue.increment(newStreams),
           });
-          
+
           // Update player total streams
           await _playersCollection.doc(song.playerId).update({
             'totalStreams': FieldValue.increment(newStreams),

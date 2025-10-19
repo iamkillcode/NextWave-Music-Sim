@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firebase_status.dart';
+import '../services/firebase_service.dart';
 import 'onboarding_screen.dart';
 import 'dashboard_screen_new.dart';
 
@@ -52,11 +53,11 @@ class _AuthScreenState extends State<AuthScreen>
 
     try {
       // Create user with email and password
-      final credential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
-          );
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
       if (mounted && credential.user != null) {
         // Navigate to onboarding
@@ -244,6 +245,62 @@ class _AuthScreenState extends State<AuthScreen>
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final firebaseService = FirebaseService();
+      final userCredential = await firebaseService.signInWithGoogle();
+
+      if (userCredential == null) {
+        // User cancelled sign-in
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
+      if (mounted && userCredential.user != null) {
+        // Check if this is a new user by querying Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('players')
+            .doc(userCredential.user!.uid)
+            .get();
+
+        if (!userDoc.exists ||
+            userDoc.data()?['displayName'] == null ||
+            userDoc.data()!['displayName'].toString().startsWith('Artist ')) {
+          // New user or incomplete profile - go to onboarding
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) =>
+                  OnboardingScreen(user: userCredential.user!),
+            ),
+          );
+        } else {
+          // Existing user - go to dashboard
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => DashboardScreen()),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Google sign-in failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -359,6 +416,98 @@ class _AuthScreenState extends State<AuthScreen>
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Google Sign-In Button
+                  if (FirebaseStatus.isInitialized)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Column(
+                        children: [
+                          // Divider with "OR"
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.white30,
+                                  thickness: 1,
+                                ),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'OR',
+                                  style: TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.white30,
+                                  thickness: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Google Sign-In Button
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _handleGoogleSignIn,
+                            icon: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white70,
+                                      ),
+                                    ),
+                                  )
+                                : Image.asset(
+                                    'assets/icon/google_logo.png',
+                                    height: 24,
+                                    width: 24,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.login,
+                                        color: Colors.white,
+                                      );
+                                    },
+                                  ),
+                            label: Text(
+                              _isLoading
+                                  ? 'SIGNING IN...'
+                                  : 'SIGN IN WITH GOOGLE',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4285F4),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   const SizedBox(height: 24),
 

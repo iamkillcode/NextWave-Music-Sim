@@ -22,6 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _selectedGenre = 'Hip Hop';
   String _selectedRegion = 'usa';
   String _artistBio = '';
+  String? _selectedGender; // 'male', 'female', 'other', or null
   int _selectedAge = 18;
   bool _isLoading = false;
 
@@ -55,7 +56,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextPage() {
-    if (_currentPage < 4) {
+    if (_currentPage < 5) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -98,6 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'id': widget.user.uid,
         'displayName': _artistName.trim(),
         'email': widget.user.email ?? '',
+        'gender': _selectedGender,
         'primaryGenre': _selectedGenre,
         'homeRegion': _selectedRegion,
         'bio': _artistBio.trim(),
@@ -318,6 +320,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _buildWelcomePage(),
                     _buildArtistNamePage(),
                     _buildAgeSelectionPage(),
+                    _buildGenderSelectionPage(),
                     _buildGenreSelectionPage(),
                     _buildRegionSelectionPage(),
                   ],
@@ -352,7 +355,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           )
                         : Text(
-                            _currentPage == 3
+                            _currentPage == 5
                                 ? 'START YOUR JOURNEY'
                                 : 'CONTINUE',
                             style: const TextStyle(
@@ -704,6 +707,159 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGenderSelectionPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          const Icon(Icons.person, size: 80, color: Color(0xFF00D9FF)),
+          const SizedBox(height: 32),
+          const Text(
+            'Choose Your Gender',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Optional - This helps personalize your experience',
+            style: TextStyle(fontSize: 16, color: Colors.white60),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 48),
+
+          // Male Option
+          _buildGenderOption(
+            gender: 'male',
+            icon: Icons.male,
+            label: 'Male',
+            color: const Color(0xFF00D9FF),
+          ),
+          const SizedBox(height: 16),
+
+          // Female Option
+          _buildGenderOption(
+            gender: 'female',
+            icon: Icons.female,
+            label: 'Female',
+            color: const Color(0xFFFF6B9D),
+          ),
+          const SizedBox(height: 16),
+
+          // Other Option
+          _buildGenderOption(
+            gender: 'other',
+            icon: Icons.person_outline,
+            label: 'Other',
+            color: const Color(0xFF9D4EDD),
+          ),
+          const SizedBox(height: 16),
+
+          // Prefer not to say
+          _buildGenderOption(
+            gender: null,
+            icon: Icons.lock_outline,
+            label: 'Prefer not to say',
+            color: Colors.white60,
+          ),
+
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00D9FF).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFF00D9FF),
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'You can change this later in settings (one time only)',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderOption({
+    required String? gender,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    final isSelected = _selectedGender == gender;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedGender = gender;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.2) : const Color(0xFF21262D),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? color : color.withOpacity(0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(isSelected ? 0.3 : 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            const Spacer(),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: color,
+                size: 28,
+              ),
+          ],
+        ),
       ),
     );
   }

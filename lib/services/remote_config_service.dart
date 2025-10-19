@@ -140,12 +140,15 @@ class RemoteConfigService {
   // APP VERSION & MAINTENANCE
   // =============================================================================
 
-  String get minRequiredVersion => _getString('min_required_version', defaultValue: '1.0.0');
-  String get recommendedVersion => _getString('recommended_version', defaultValue: '1.0.0');
+  String get minRequiredVersion =>
+      _getString('min_required_version', defaultValue: '1.0.0');
+  String get recommendedVersion =>
+      _getString('recommended_version', defaultValue: '1.0.0');
   bool get forceUpdate => _getBool('force_update');
   bool get isMaintenanceMode => _getBool('maintenance_mode');
   String get maintenanceMessage => _getString('maintenance_message',
-      defaultValue: 'NextWave is currently under maintenance. Please check back soon!');
+      defaultValue:
+          'NextWave is currently under maintenance. Please check back soon!');
 
   // =============================================================================
   // FEATURE FLAGS
@@ -163,26 +166,32 @@ class RemoteConfigService {
 
   int get minSongCost => _getInt('min_song_cost', defaultValue: 50);
   int get maxSongCost => _getInt('max_song_cost', defaultValue: 500);
-  int get dailyStartingMoney => _getInt('daily_starting_money', defaultValue: 100);
+  int get dailyStartingMoney =>
+      _getInt('daily_starting_money', defaultValue: 100);
   int get dailyEnergy => _getInt('daily_energy', defaultValue: 100);
   int get energyPerSong => _getInt('energy_per_song', defaultValue: 10);
-  double get baseStreamingRate => _getDouble('base_streaming_rate', defaultValue: 0.005);
+  double get baseStreamingRate =>
+      _getDouble('base_streaming_rate', defaultValue: 0.005);
 
   // =============================================================================
   // GAME BALANCE - FAME & GROWTH
   // =============================================================================
 
-  int get fameUnlockThreshold => _getInt('fame_unlock_threshold', defaultValue: 50);
+  int get fameUnlockThreshold =>
+      _getInt('fame_unlock_threshold', defaultValue: 50);
   int get baseDailyStreams => _getInt('base_daily_streams', defaultValue: 100);
   int get viralThreshold => _getInt('viral_threshold', defaultValue: 10000);
-  double get chartPositionMultiplier => _getDouble('chart_position_multiplier', defaultValue: 1.5);
+  double get chartPositionMultiplier =>
+      _getDouble('chart_position_multiplier', defaultValue: 1.5);
 
   // =============================================================================
   // PLATFORM SETTINGS
   // =============================================================================
 
-  double get tunifyRoyaltyRate => _getDouble('tunify_royalty_rate', defaultValue: 0.004);
-  double get mapleRoyaltyRate => _getDouble('maple_royalty_rate', defaultValue: 0.006);
+  double get tunifyRoyaltyRate =>
+      _getDouble('tunify_royalty_rate', defaultValue: 0.004);
+  double get mapleRoyaltyRate =>
+      _getDouble('maple_royalty_rate', defaultValue: 0.006);
   int get tunifyUnlockFame => _getInt('tunify_unlock_fame');
   int get mapleUnlockFame => _getInt('maple_unlock_fame', defaultValue: 50);
 
@@ -190,15 +199,19 @@ class RemoteConfigService {
   // CHART SETTINGS
   // =============================================================================
 
-  int get dailyChartUpdateHours => _getInt('daily_chart_update_hours', defaultValue: 24);
-  int get weeklyChartUpdateHours => _getInt('weekly_chart_update_hours', defaultValue: 168);
+  int get dailyChartUpdateHours =>
+      _getInt('daily_chart_update_hours', defaultValue: 24);
+  int get weeklyChartUpdateHours =>
+      _getInt('weekly_chart_update_hours', defaultValue: 168);
 
   // =============================================================================
   // NPC DIFFICULTY
   // =============================================================================
 
-  double get npcCompetitionMultiplier => _getDouble('npc_competition_multiplier', defaultValue: 1.0);
-  int get npcMaxDailyReleases => _getInt('npc_max_daily_releases', defaultValue: 3);
+  double get npcCompetitionMultiplier =>
+      _getDouble('npc_competition_multiplier', defaultValue: 1.0);
+  int get npcMaxDailyReleases =>
+      _getInt('npc_max_daily_releases', defaultValue: 3);
 
   // =============================================================================
   // DEBUG & TESTING

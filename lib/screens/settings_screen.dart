@@ -32,6 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _vibrationEnabled = true;
   bool _showOnlineStatus = true;
   bool _isAdmin = false;
+  String? _currentGender;
+  bool _hasSetGender = false;
 
   final TextEditingController _artistNameController = TextEditingController();
   bool _isCheckingName = false;
@@ -68,11 +70,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _vibrationEnabled = data['vibrationEnabled'] ?? true;
             _showOnlineStatus = data['showOnlineStatus'] ?? true;
             _avatarUrl = data['avatarUrl'];
+            _currentGender = data['gender'] as String?;
+            _hasSetGender = data['gender'] != null;
           });
         }
       }
     } catch (e) {
       print('Error loading settings: $e');
+    }
+  }
+
+  Future<void> _setGender(String? gender) async {
+    if (_hasSetGender) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ You can only set your gender once'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId != null) {
+        await _firestore.collection('players').doc(userId).update({
+          'gender': gender,
+        });
+
+        setState(() {
+          _currentGender = gender;
+          _hasSetGender = true;
+        });
+
+        final displayGender = gender == null
+            ? 'Prefer not to say'
+            : gender[0].toUpperCase() + gender.substring(1);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Gender set to: $displayGender'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error setting gender: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Failed to set gender: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -496,6 +548,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildAccountCard(),
           const SizedBox(height: 24),
 
+          // Gender Section (show if not set yet)
+          if (!_hasSetGender) ...[
+            _buildSectionHeader('Gender (One-Time Setting)'),
+            _buildGenderCard(),
+            const SizedBox(height: 24),
+          ],
+
           // Artist Name Section
           _buildSectionHeader('Artist Identity'),
           _buildArtistNameCard(),
@@ -625,6 +684,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGenderCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person, color: Color(0xFF00D9FF), size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Choose Your Gender',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFB800).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    color: Color(0xFFFFB800), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You can only set this once. Choose carefully!',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Gender options
+          _buildGenderButton(
+              'male', 'Male', Icons.male, const Color(0xFF00D9FF)),
+          const SizedBox(height: 8),
+          _buildGenderButton(
+              'female', 'Female', Icons.female, const Color(0xFFFF6B9D)),
+          const SizedBox(height: 8),
+          _buildGenderButton(
+              'other', 'Other', Icons.person_outline, const Color(0xFF9D4EDD)),
+          const SizedBox(height: 8),
+          _buildGenderButton(
+              null, 'Prefer not to say', Icons.lock_outline, Colors.white60),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderButton(
+      String? gender, String label, IconData icon, Color color) {
+    return InkWell(
+      onTap: () => _setGender(gender),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1117),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
