@@ -108,7 +108,17 @@ class LeaderboardSnapshotService {
           '✅ Loaded ${chartData.length} songs from $region snapshot (week ${data['weekId']})');
       return chartData;
     } catch (e) {
-      print('❌ Error fetching song chart snapshot: $e');
+      // Check if error is due to missing index (indexes are building)
+      if (e.toString().contains('failed-precondition') ||
+          e.toString().contains('requires an index')) {
+        print(
+            '⚠️ Firestore index is still building. Charts will be available once index is ready.');
+        print('   This usually takes 5-10 minutes after deployment.');
+        print(
+            '   Chart will fall back to daily/real-time data in the meantime.');
+      } else {
+        print('❌ Error fetching song chart snapshot: $e');
+      }
       return [];
     }
   }
@@ -174,7 +184,17 @@ class LeaderboardSnapshotService {
           '✅ Loaded ${chartData.length} artists from $region snapshot (week ${data['weekId']})');
       return chartData;
     } catch (e) {
-      print('❌ Error fetching artist chart snapshot: $e');
+      // Check if error is due to missing index (indexes are building)
+      if (e.toString().contains('failed-precondition') ||
+          e.toString().contains('requires an index')) {
+        print(
+            '⚠️ Firestore index is still building. Charts will be available once index is ready.');
+        print('   This usually takes 5-10 minutes after deployment.');
+        print(
+            '   Chart will fall back to daily/real-time data in the meantime.');
+      } else {
+        print('❌ Error fetching artist chart snapshot: $e');
+      }
       return [];
     }
   }

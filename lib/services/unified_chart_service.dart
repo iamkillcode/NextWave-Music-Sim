@@ -79,29 +79,36 @@ class UnifiedChartService {
           limit: limit,
         );
 
-        // Transform to match expected format
-        return chartData
-            .map((entry) => {
-                  'title': entry['title'],
-                  'artist': entry['artist'],
-                  'artistId': entry['artistId'],
-                  'isNPC': entry['isNPC'] ?? false,
-                  'genre': entry['genre'],
-                  'quality': 75, // Default quality
-                  'periodStreams':
-                      entry['streams'], // Regional streams for this region
-                  'totalStreams': entry['totalStreams'],
-                  'likes': 0,
-                  'releaseDate': null,
-                  'state': 'released',
-                  'isAlbum': false,
-                  'coverArtUrl': null,
-                  'position': entry['position'],
-                  'movement': entry['movement'],
-                  'lastWeekPosition': entry['lastWeekPosition'],
-                  'weeksOnChart': entry['weeksOnChart'],
-                })
-            .toList();
+        // If snapshots are available, use them
+        if (chartData.isNotEmpty) {
+          // Transform to match expected format
+          return chartData
+              .map((entry) => {
+                    'title': entry['title'],
+                    'artist': entry['artist'],
+                    'artistId': entry['artistId'],
+                    'isNPC': entry['isNPC'] ?? false,
+                    'genre': entry['genre'],
+                    'quality': 75, // Default quality
+                    'periodStreams':
+                        entry['streams'], // Regional streams for this region
+                    'totalStreams': entry['totalStreams'],
+                    'likes': 0,
+                    'releaseDate': null,
+                    'state': 'released',
+                    'isAlbum': false,
+                    'coverArtUrl': null,
+                    'position': entry['position'],
+                    'movement': entry['movement'],
+                    'lastWeekPosition': entry['lastWeekPosition'],
+                    'weeksOnChart': entry['weeksOnChart'],
+                  })
+              .toList();
+        } else {
+          print(
+              '⚠️ No snapshot data available, falling back to real-time query');
+          // Fall through to real-time query below
+        }
       }
 
       // For DAILY charts and ALBUMS, fall back to real-time queries
@@ -306,24 +313,31 @@ class UnifiedChartService {
           limit: limit,
         );
 
-        // Transform to match expected format
-        return chartData
-            .map((entry) => {
-                  'artistName': entry['artistName'],
-                  'artistId': entry['artistId'],
-                  'isNPC': entry['isNPC'] ?? false,
-                  'periodStreams': entry['streams'], // Regional total streams
-                  'fanbase': 0, // Not stored in snapshots
-                  'fame': 0, // Not stored in snapshots
-                  'releasedSongs': entry['songCount'],
-                  'chartingSongs': entry['songCount'],
-                  'avatarUrl': null,
-                  'position': entry['position'],
-                  'movement': entry['movement'],
-                  'lastWeekPosition': entry['lastWeekPosition'],
-                  'weeksOnChart': entry['weeksOnChart'],
-                })
-            .toList();
+        // If snapshots are available, use them
+        if (chartData.isNotEmpty) {
+          // Transform to match expected format
+          return chartData
+              .map((entry) => {
+                    'artistName': entry['artistName'],
+                    'artistId': entry['artistId'],
+                    'isNPC': entry['isNPC'] ?? false,
+                    'periodStreams': entry['streams'], // Regional total streams
+                    'fanbase': 0, // Not stored in snapshots
+                    'fame': 0, // Not stored in snapshots
+                    'releasedSongs': entry['songCount'],
+                    'chartingSongs': entry['songCount'],
+                    'avatarUrl': null,
+                    'position': entry['position'],
+                    'movement': entry['movement'],
+                    'lastWeekPosition': entry['lastWeekPosition'],
+                    'weeksOnChart': entry['weeksOnChart'],
+                  })
+              .toList();
+        } else {
+          print(
+              '⚠️ No snapshot data available, falling back to real-time query');
+          // Fall through to real-time query below
+        }
       }
 
       // For DAILY charts or other sort options, fall back to real-time queries
