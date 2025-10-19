@@ -21,7 +21,7 @@ class AdminService {
   /// You can find your user ID in Firebase Console > Authentication
   static const List<String> ADMIN_USER_IDS = [
     // Add your Firebase User IDs here
-    'DQZOCI1WUxYNxX3QBm36qUDcYvj2',
+    'xjJFuMCEKMZwkI8uIP34Jl2bfQA3',
     // Example: 'abc123xyz456',
   ];
 
@@ -490,7 +490,7 @@ class AdminService {
           'name': data['displayName'] ?? 'Unknown',
           'fame': data['fame'] ?? 0,
           'money': data['currentMoney'] ?? 0,
-          'fanbase': data['level'] ?? 0,
+          'fanbase': data['fanbase'] ?? 0, // Fixed: was 'level', now 'fanbase'
           'songCount': songs.length,
           'lastActivity': data['lastActivityDate'],
         });
@@ -502,6 +502,35 @@ class AdminService {
       return players;
     } catch (e) {
       throw Exception('Failed to get players: $e');
+    }
+  }
+
+  /// Format number with K/M suffix (45K, 1.23M, etc.)
+  static String formatNumber(num value) {
+    if (value >= 1000000) {
+      // Format millions with 2 decimal places
+      return '${(value / 1000000).toStringAsFixed(2)}M';
+    } else if (value >= 1000) {
+      // Format thousands - no decimals if >= 10K, 1 decimal if < 10K
+      final thousands = value / 1000;
+      if (thousands >= 10) {
+        return '${thousands.toStringAsFixed(0)}K';
+      } else {
+        return '${thousands.toStringAsFixed(1)}K';
+      }
+    } else {
+      return value.toStringAsFixed(0);
+    }
+  }
+
+  /// Format money (single dollar sign)
+  static String formatMoney(num value) {
+    if (value >= 1000000) {
+      return '\$${(value / 1000000).toStringAsFixed(2)}M';
+    } else if (value >= 1000) {
+      return '\$${(value / 1000).toStringAsFixed(0)}K';
+    } else {
+      return '\$${value.toStringAsFixed(0)}';
     }
   }
 }

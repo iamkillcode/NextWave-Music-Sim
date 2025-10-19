@@ -39,7 +39,7 @@ static const List<String> ADMIN_USER_IDS = [
 **Example:**
 ```dart
 static const List<String> ADMIN_USER_IDS = [
-  'K8pQ3mR2xYNf4hT9vLpW1sZcX7jN',  // Manuel's account
+  'xjJFuMCEKMZwkI8uIP34Jl2bfQA3',  // Manuel's account
 ];
 ```
 

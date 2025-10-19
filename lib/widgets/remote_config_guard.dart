@@ -21,6 +21,7 @@ class RemoteConfigGuard extends StatefulWidget {
 class _RemoteConfigGuardState extends State<RemoteConfigGuard> {
   final _remoteConfig = RemoteConfigService();
   bool _hasShownUpdateDialog = false;
+  bool _configError = false;
 
   @override
   void initState() {
@@ -34,16 +35,21 @@ class _RemoteConfigGuardState extends State<RemoteConfigGuard> {
 
     if (!mounted) return;
 
-    // Check for force update
-    if (_remoteConfig.forceUpdate &&
-        !_remoteConfig.isVersionSupported(widget.currentVersion)) {
-      _showForceUpdateDialog();
-    }
-    // Check for recommended update
-    else if (!_hasShownUpdateDialog &&
-        _remoteConfig.isUpdateRecommended(widget.currentVersion)) {
-      _hasShownUpdateDialog = true;
-      _showRecommendedUpdateDialog();
+    try {
+      // Check for force update
+      if (_remoteConfig.forceUpdate &&
+          !_remoteConfig.isVersionSupported(widget.currentVersion)) {
+        _showForceUpdateDialog();
+      }
+      // Check for recommended update
+      else if (!_hasShownUpdateDialog &&
+          _remoteConfig.isUpdateRecommended(widget.currentVersion)) {
+        _hasShownUpdateDialog = true;
+        _showRecommendedUpdateDialog();
+      }
+    } catch (e) {
+      print('Remote Config check error: $e');
+      setState(() => _configError = true);
     }
   }
 
@@ -159,11 +165,21 @@ class _RemoteConfigGuardState extends State<RemoteConfigGuard> {
 
   @override
   Widget build(BuildContext context) {
-    // Check for maintenance mode
-    if (_remoteConfig.isMaintenanceMode) {
-      return MaintenanceModeScreen(
-        message: _remoteConfig.maintenanceMessage,
-      );
+    // If config error, just show the child app normally
+    if (_configError) {
+      return widget.child;
+    }
+
+    try {
+      // Check for maintenance mode
+      if (_remoteConfig.isMaintenanceMode) {
+        return MaintenanceModeScreen(
+          message: _remoteConfig.maintenanceMessage,
+        );
+      }
+    } catch (e) {
+      print('Maintenance mode check error: $e');
+      // Fall through to show normal app
     }
 
     // Show normal app

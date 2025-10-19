@@ -97,88 +97,116 @@ class RemoteConfigService {
   }
 
   // =============================================================================
+  // SAFE GETTERS (with fallbacks)
+  // =============================================================================
+
+  /// Safe get boolean with fallback
+  bool _getBool(String key, {bool defaultValue = false}) {
+    try {
+      return _remoteConfig.getBool(key);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+
+  /// Safe get int with fallback
+  int _getInt(String key, {int defaultValue = 0}) {
+    try {
+      return _remoteConfig.getInt(key);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+
+  /// Safe get double with fallback
+  double _getDouble(String key, {double defaultValue = 0.0}) {
+    try {
+      return _remoteConfig.getDouble(key);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+
+  /// Safe get string with fallback
+  String _getString(String key, {String defaultValue = ''}) {
+    try {
+      return _remoteConfig.getString(key);
+    } catch (e) {
+      return defaultValue;
+    }
+  }
+
+  // =============================================================================
   // APP VERSION & MAINTENANCE
   // =============================================================================
 
-  String get minRequiredVersion =>
-      _remoteConfig.getString('min_required_version');
-  String get recommendedVersion =>
-      _remoteConfig.getString('recommended_version');
-  bool get forceUpdate => _remoteConfig.getBool('force_update');
-  bool get isMaintenanceMode => _remoteConfig.getBool('maintenance_mode');
-  String get maintenanceMessage =>
-      _remoteConfig.getString('maintenance_message');
+  String get minRequiredVersion => _getString('min_required_version', defaultValue: '1.0.0');
+  String get recommendedVersion => _getString('recommended_version', defaultValue: '1.0.0');
+  bool get forceUpdate => _getBool('force_update');
+  bool get isMaintenanceMode => _getBool('maintenance_mode');
+  String get maintenanceMessage => _getString('maintenance_message',
+      defaultValue: 'NextWave is currently under maintenance. Please check back soon!');
 
   // =============================================================================
   // FEATURE FLAGS
   // =============================================================================
 
-  bool get isCollaborationEnabled =>
-      _remoteConfig.getBool('feature_collaboration_enabled');
-  bool get isProducersEnabled =>
-      _remoteConfig.getBool('feature_producers_enabled');
-  bool get isLabelsEnabled => _remoteConfig.getBool('feature_labels_enabled');
-  bool get isConcertsEnabled =>
-      _remoteConfig.getBool('feature_concerts_enabled');
-  bool get isMerchandiseEnabled =>
-      _remoteConfig.getBool('feature_merchandise_enabled');
+  bool get isCollaborationEnabled => _getBool('feature_collaboration_enabled');
+  bool get isProducersEnabled => _getBool('feature_producers_enabled');
+  bool get isLabelsEnabled => _getBool('feature_labels_enabled');
+  bool get isConcertsEnabled => _getBool('feature_concerts_enabled');
+  bool get isMerchandiseEnabled => _getBool('feature_merchandise_enabled');
 
   // =============================================================================
   // GAME BALANCE - ECONOMY
   // =============================================================================
 
-  int get minSongCost => _remoteConfig.getInt('min_song_cost');
-  int get maxSongCost => _remoteConfig.getInt('max_song_cost');
-  int get dailyStartingMoney => _remoteConfig.getInt('daily_starting_money');
-  int get dailyEnergy => _remoteConfig.getInt('daily_energy');
-  int get energyPerSong => _remoteConfig.getInt('energy_per_song');
-  double get baseStreamingRate =>
-      _remoteConfig.getDouble('base_streaming_rate');
+  int get minSongCost => _getInt('min_song_cost', defaultValue: 50);
+  int get maxSongCost => _getInt('max_song_cost', defaultValue: 500);
+  int get dailyStartingMoney => _getInt('daily_starting_money', defaultValue: 100);
+  int get dailyEnergy => _getInt('daily_energy', defaultValue: 100);
+  int get energyPerSong => _getInt('energy_per_song', defaultValue: 10);
+  double get baseStreamingRate => _getDouble('base_streaming_rate', defaultValue: 0.005);
 
   // =============================================================================
   // GAME BALANCE - FAME & GROWTH
   // =============================================================================
 
-  int get fameUnlockThreshold => _remoteConfig.getInt('fame_unlock_threshold');
-  int get baseDailyStreams => _remoteConfig.getInt('base_daily_streams');
-  int get viralThreshold => _remoteConfig.getInt('viral_threshold');
-  double get chartPositionMultiplier =>
-      _remoteConfig.getDouble('chart_position_multiplier');
+  int get fameUnlockThreshold => _getInt('fame_unlock_threshold', defaultValue: 50);
+  int get baseDailyStreams => _getInt('base_daily_streams', defaultValue: 100);
+  int get viralThreshold => _getInt('viral_threshold', defaultValue: 10000);
+  double get chartPositionMultiplier => _getDouble('chart_position_multiplier', defaultValue: 1.5);
 
   // =============================================================================
   // PLATFORM SETTINGS
   // =============================================================================
 
-  double get tunifyRoyaltyRate =>
-      _remoteConfig.getDouble('tunify_royalty_rate');
-  double get mapleRoyaltyRate => _remoteConfig.getDouble('maple_royalty_rate');
-  int get tunifyUnlockFame => _remoteConfig.getInt('tunify_unlock_fame');
-  int get mapleUnlockFame => _remoteConfig.getInt('maple_unlock_fame');
+  double get tunifyRoyaltyRate => _getDouble('tunify_royalty_rate', defaultValue: 0.004);
+  double get mapleRoyaltyRate => _getDouble('maple_royalty_rate', defaultValue: 0.006);
+  int get tunifyUnlockFame => _getInt('tunify_unlock_fame');
+  int get mapleUnlockFame => _getInt('maple_unlock_fame', defaultValue: 50);
 
   // =============================================================================
   // CHART SETTINGS
   // =============================================================================
 
-  int get dailyChartUpdateHours =>
-      _remoteConfig.getInt('daily_chart_update_hours');
-  int get weeklyChartUpdateHours =>
-      _remoteConfig.getInt('weekly_chart_update_hours');
+  int get dailyChartUpdateHours => _getInt('daily_chart_update_hours', defaultValue: 24);
+  int get weeklyChartUpdateHours => _getInt('weekly_chart_update_hours', defaultValue: 168);
 
   // =============================================================================
   // NPC DIFFICULTY
   // =============================================================================
 
-  double get npcCompetitionMultiplier =>
-      _remoteConfig.getDouble('npc_competition_multiplier');
-  int get npcMaxDailyReleases => _remoteConfig.getInt('npc_max_daily_releases');
+  double get npcCompetitionMultiplier => _getDouble('npc_competition_multiplier', defaultValue: 1.0);
+  int get npcMaxDailyReleases => _getInt('npc_max_daily_releases', defaultValue: 3);
 
   // =============================================================================
   // DEBUG & TESTING
   // =============================================================================
 
-  bool get enableDebugMode => _remoteConfig.getBool('enable_debug_mode');
-  bool get enableAnalytics => _remoteConfig.getBool('enable_analytics');
-  bool get showBetaFeatures => _remoteConfig.getBool('show_beta_features');
+  bool get enableDebugMode => _getBool('enable_debug_mode');
+  bool get enableAnalytics => _getBool('enable_analytics', defaultValue: true);
+  bool get showBetaFeatures => _getBool('show_beta_features');
 
   // =============================================================================
   // HELPER METHODS
