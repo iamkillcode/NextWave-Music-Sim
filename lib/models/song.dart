@@ -44,6 +44,9 @@ class Song {
       albumId; // ID of the album/EP this song belongs to (null if standalone single)
   final String? releaseType; // 'single', 'ep', or 'album'
 
+  final int? promoBuffer; // Daily bonus streams from promo
+  final DateTime? promoEndDate; // When the promo ends
+
   const Song({
     required this.id,
     required this.title,
@@ -71,6 +74,8 @@ class Song {
     this.lastStreamUpdateDate,
     this.albumId,
     this.releaseType = 'single',
+    this.promoBuffer,
+    this.promoEndDate,
   });
 
   Song copyWith({
@@ -100,6 +105,8 @@ class Song {
     DateTime? lastStreamUpdateDate,
     String? albumId,
     String? releaseType,
+    int? promoBuffer,
+    DateTime? promoEndDate,
   }) {
     return Song(
       id: id ?? this.id,
@@ -128,6 +135,8 @@ class Song {
       lastStreamUpdateDate: lastStreamUpdateDate ?? this.lastStreamUpdateDate,
       albumId: albumId ?? this.albumId,
       releaseType: releaseType ?? this.releaseType,
+      promoBuffer: promoBuffer ?? this.promoBuffer,
+      promoEndDate: promoEndDate ?? this.promoEndDate,
     );
   }
 
@@ -158,6 +167,8 @@ class Song {
       'lastStreamUpdateDate': lastStreamUpdateDate?.toIso8601String(),
       'albumId': albumId,
       'releaseType': releaseType,
+      'promoBuffer': promoBuffer,
+      'promoEndDate': promoEndDate?.toIso8601String(),
     };
   }
 
@@ -199,6 +210,10 @@ class Song {
           : null,
       albumId: json['albumId'] as String?,
       releaseType: json['releaseType'] as String? ?? 'single',
+      promoBuffer: json['promoBuffer'] as int?,
+      promoEndDate: json['promoEndDate'] != null
+          ? DateTime.parse(json['promoEndDate'] as String)
+          : null,
     );
   }
 

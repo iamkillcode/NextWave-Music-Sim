@@ -174,6 +174,31 @@ class AdminService {
     }
   }
 
+  /// Trigger manual weekly leaderboard update (Admin Only)
+  ///
+  /// This will regenerate weekly chart snapshots for the specified number of weeks.
+  /// Useful after backend fixes to refresh chart data.
+  ///
+  /// [weeksAhead] - Number of weeks to generate snapshots for (default: 1)
+  Future<Map<String, dynamic>> triggerWeeklyLeaderboardUpdate({
+    int weeksAhead = 1,
+  }) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final callable =
+          _functions.httpsCallable('triggerWeeklyLeaderboardUpdate');
+      final result = await callable.call({
+        'weeksAhead': weeksAhead,
+      });
+      return result.data as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to trigger weekly leaderboard update: $e');
+    }
+  }
+
   /// Get game statistics (Admin Only)
   Future<Map<String, dynamic>> getGameStats() async {
     if (!await isAdmin()) {

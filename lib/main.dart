@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/dashboard_screen_new.dart';
 import 'screens/auth_screen.dart';
 import 'firebase_options.dart';
@@ -55,7 +56,13 @@ class MusicArtistApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
-        fontFamily: 'Roboto',
+        // Use Google Fonts with proper emoji fallback
+        textTheme: GoogleFonts.robotoTextTheme(
+          Theme.of(context).textTheme,
+        ).apply(
+          bodyColor: Colors.white,
+          displayColor: Colors.white,
+        ),
         scaffoldBackgroundColor: const Color(
           0xFF0D1117,
         ), // GitHub dark background

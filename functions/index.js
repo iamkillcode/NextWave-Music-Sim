@@ -385,7 +385,15 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       
       // Calculate base streams
       let dailyStreams = calculateDailyStreamGrowth({ ...song, releasedDate: effectiveReleaseDate }, playerData, currentGameDate);
-      
+
+      // --- ViralWave Promo Buffer ---
+      if (song.promoBuffer && song.promoEndDate) {
+        const promoEnd = toDateSafe(song.promoEndDate);
+        if (promoEnd && promoEnd >= currentGameDate) {
+          dailyStreams += song.promoBuffer;
+        }
+      }
+
       // Apply event bonuses
       dailyStreams = applyEventBonuses(dailyStreams, song, playerData, activeEvent);
       
@@ -478,8 +486,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       // ✅ CREATE NOTIFICATION for daily royalties (only if earning money)
       if (totalNewIncome > 0) {
         try {
-          await db.collection('notifications').add({
-            userId: playerId,
+          await db.collection('players').doc(playerId).collection('notifications').add({
             type: 'royalty_payment',
             title: '💰 Daily Royalties',
             message: `You earned $${totalNewIncome.toLocaleString()} from ${totalNewStreams.toLocaleString()} streams!`,
@@ -820,7 +827,7 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
           allSongs.push({
             ...song,
             artistId: playerDoc.id,
-            artistName: playerData.artistName || 'Unknown',
+            artistName: playerData.displayName || 'Unknown',
             last7DaysStreams: song.last7DaysStreams || 0,
             regionalStreams: song.regionalStreams || {},
             isNPC: false,
@@ -862,9 +869,12 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
       type: 'songs',
       region: 'global',
       rankings: globalTop100.map((song, index) => ({
+        position: index + 1,
         rank: index + 1,
+        songId: song.id || '',
         title: song.title,
         artistId: song.artistId,
+        artist: song.artistName,
         artistName: song.artistName,
         streams: song.last7DaysStreams,
         totalStreams: song.streams,
@@ -895,9 +905,12 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
         type: 'songs',
         region,
         rankings: regionalTop100.map((song, index) => ({
+          position: index + 1,
           rank: index + 1,
+          songId: song.id || '',
           title: song.title,
           artistId: song.artistId,
+          artist: song.artistName,
           artistName: song.artistName,
           streams: song.regionStreams, // Region-specific streams
           totalStreams: song.streams, // Global total
@@ -924,28 +937,29 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
     playersSnapshot.forEach(playerDoc => {
       const playerData = playerDoc.data();
       const songs = playerData.songs || [];
+      const releasedSongs = songs.filter(s => s.state === 'released');
       
-      const totalWeeklyStreams = songs
-        .filter(s => s.state === 'released')
-        .reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
+      const totalWeeklyStreams = releasedSongs.reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
       
       // Calculate regional streams for this artist
       const regionalStreams = {};
       const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
       regions.forEach(region => {
-        regionalStreams[region] = songs
-          .filter(s => s.state === 'released')
-          .reduce((sum, s) => sum + (s.regionalStreams?.[region] || 0), 0);
+        regionalStreams[region] = releasedSongs.reduce((sum, s) => sum + (s.regionalStreams?.[region] || 0), 0);
       });
       
-      if (totalWeeklyStreams > 0) {
+      // Use displayName (which is what frontend uses)
+      const artistName = playerData.displayName && playerData.displayName.trim() !== '' ? playerData.displayName : 'Unknown';
+      
+      if (totalWeeklyStreams > 0 && releasedSongs.length > 0) {
         allArtists.push({
           artistId: playerDoc.id,
-          artistName: playerData.artistName || 'Unknown',
+          artistName: artistName,
+          songCount: releasedSongs.length,
           weeklyStreams: totalWeeklyStreams,
           regionalStreams,
           totalStreams: playerData.totalStreams || 0,
-          fanbase: playerData.level || 0,
+          fanbase: playerData.fanbase || 0,
           isNPC: false,
         });
       }
@@ -957,24 +971,25 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
     npcsSnapshot.forEach(npcDoc => {
       const npcData = npcDoc.data();
       const songs = npcData.songs || [];
+      const releasedSongs = songs.filter(s => s.state === 'released');
       
-      const totalWeeklyStreams = songs
-        .filter(s => s.state === 'released')
-        .reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
+      const totalWeeklyStreams = releasedSongs.reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
       
       // Calculate regional streams for this NPC artist
       const regionalStreams = {};
       const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
       regions.forEach(region => {
-        regionalStreams[region] = songs
-          .filter(s => s.state === 'released')
-          .reduce((sum, s) => sum + (s.regionalStreams?.[region] || 0), 0);
+        regionalStreams[region] = releasedSongs.reduce((sum, s) => sum + (s.regionalStreams?.[region] || 0), 0);
       });
       
-      if (totalWeeklyStreams > 0) {
+      // Use correct fanbase field and ensure name is set
+      const artistName = npcData.name && npcData.name.trim() !== '' ? npcData.name : 'Unknown NPC';
+      
+      if (totalWeeklyStreams > 0 && releasedSongs.length > 0) {
         allArtists.push({
           artistId: npcDoc.id,
-          artistName: npcData.name || 'Unknown NPC',
+          artistName: artistName,
+          songCount: releasedSongs.length,
           weeklyStreams: totalWeeklyStreams,
           regionalStreams,
           totalStreams: npcData.totalStreams || 0,
@@ -996,9 +1011,12 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
       type: 'artists',
       region: 'global',
       rankings: globalTop50.map((artist, index) => ({
+        position: index + 1,
         rank: index + 1,
         artistId: artist.artistId,
         artistName: artist.artistName,
+        songCount: artist.songCount,
+        streams: artist.weeklyStreams,
         weeklyStreams: artist.weeklyStreams,
         totalStreams: artist.totalStreams,
         fanbase: artist.fanbase,
@@ -1028,9 +1046,12 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
         type: 'artists',
         region,
         rankings: regionalTop50.map((artist, index) => ({
+          position: index + 1,
           rank: index + 1,
           artistId: artist.artistId,
           artistName: artist.artistName,
+          songCount: artist.songCount,
+          streams: artist.regionWeeklyStreams, // Region-specific streams
           weeklyStreams: artist.regionWeeklyStreams, // Region-specific streams
           totalStreams: artist.totalStreams, // Global total
           fanbase: artist.fanbase,
@@ -1963,7 +1984,34 @@ exports.forceNPCRelease = functions.https.onCall(async (data, context) => {
         songs: [],
         totalStreams: 0,
         fanbase: Math.floor(npc.baseStreams * 0.1), // 10% of weekly streams
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        loyalFanbase: Math.floor(npc.baseStreams * 0.05), // 5% loyal fans
+        regionalFanbase: {
+          usa: Math.floor(npc.baseStreams * 0.03),
+          europe: Math.floor(npc.baseStreams * 0.02),
+          uk: Math.floor(npc.baseStreams * 0.02),
+          asia: Math.floor(npc.baseStreams * 0.01),
+          africa: Math.floor(npc.baseStreams * 0.01),
+          latin_america: Math.floor(npc.baseStreams * 0.01),
+          oceania: Math.floor(npc.baseStreams * 0.01)
+        },
+        fame: npc.tier === 'legend' ? 200 : npc.tier === 'star' ? 100 : 50,
+        albumsSold: 0,
+        songsWritten: 0,
+        concertsPerformed: 0,
+        songwritingSkill: 50,
+        experience: 100,
+        lyricsSkill: 50,
+        compositionSkill: 50,
+        inspirationLevel: 10,
+        currentRegion: npc.region,
+        age: 25,
+        careerStartDate: admin.firestore.Timestamp.now(),
+        avatarUrl: npc.avatar,
+        lastActivityDate: admin.firestore.Timestamp.now(),
+        primaryGenre: npc.primaryGenre,
+        genreMastery: {[npc.primaryGenre]: 80, [npc.secondaryGenre]: 60},
+        unlockedGenres: [npc.primaryGenre, npc.secondaryGenre],
+        activeSideHustle: null,
       };
       await npcRef.set(npcData);
     } else {
@@ -2179,6 +2227,56 @@ exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
 
   } catch (error) {
     console.error('❌ Error sending gift:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// =============================================================================
+// ADMIN: Manually Trigger Weekly Leaderboard Update
+// =============================================================================
+exports.triggerWeeklyLeaderboardUpdate = functions.https.onCall(async (data, context) => {
+  // Verify admin authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const { weeksAhead = 1 } = data;
+
+  console.log(`🔄 Admin triggering weekly leaderboard update for ${weeksAhead} week(s)...`);
+
+  try {
+    const results = [];
+    const now = new Date();
+
+    for (let i = 0; i < weeksAhead; i++) {
+      // Advance the date by i weeks
+      const futureDate = new Date(now.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+      const weekId = getWeekId(futureDate);
+      
+      console.log(`➡️ Creating snapshots for week ${weekId} (${futureDate.toISOString().slice(0,10)})`);
+      
+      // Create snapshots
+      await createSongLeaderboardSnapshot(weekId, futureDate);
+      await createArtistLeaderboardSnapshot(weekId, futureDate);
+      await updateChartStatistics(weekId);
+      
+      results.push({
+        weekId,
+        date: futureDate.toISOString().slice(0,10),
+        success: true,
+      });
+    }
+
+    console.log(`✅ Successfully created ${results.length} weekly snapshots`);
+
+    return {
+      success: true,
+      message: `Created weekly leaderboard snapshots for ${results.length} week(s)`,
+      results,
+    };
+
+  } catch (error) {
+    console.error('❌ Error triggering weekly update:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
 });

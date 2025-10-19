@@ -51,6 +51,9 @@ dependencies:
   
   # Cached network images for better performance
   cached_network_image: ^3.3.1
+  
+  # Google Fonts for better emoji and character support
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:

@@ -321,10 +321,14 @@ class UnifiedChartService {
                     'artistName': entry['artistName'],
                     'artistId': entry['artistId'],
                     'isNPC': entry['isNPC'] ?? false,
-                    'periodStreams': entry['streams'], // Regional total streams
-                    'fanbase': 0, // Not stored in snapshots
+                    'streams':
+                        entry['streams'], // Use streams directly from snapshot
+                    'periodStreams': entry['streams'], // Backward compatibility
+                    'fanbase': entry['fanbase'] ?? 0, // Now stored in snapshots
                     'fame': 0, // Not stored in snapshots
-                    'releasedSongs': entry['songCount'],
+                    'songCount': entry['songCount'],
+                    'releasedSongs':
+                        entry['songCount'], // Backward compatibility
                     'chartingSongs': entry['songCount'],
                     'avatarUrl': null,
                     'position': entry['position'],

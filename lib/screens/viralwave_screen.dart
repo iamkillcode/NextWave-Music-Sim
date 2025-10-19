@@ -811,26 +811,36 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     // Update songs
     List<Song> updatedSongs = List.from(widget.artistStats.songs);
 
+    final promoDurationDays = 5; // e.g., 5 in-game days
+    final promoEndDate =
+        widget.currentGameDate.add(Duration(days: promoDurationDays));
+    final dailyBuffer = (streamsGained / promoDurationDays).round();
+
     if (_selectedPromotionType == 'song' && _selectedSong != null) {
-      // Promote single song
+      // Promote single song with buffer
       final songIndex = updatedSongs.indexWhere(
         (s) => s.id == _selectedSong!.id,
       );
       if (songIndex != -1) {
         updatedSongs[songIndex] = updatedSongs[songIndex].copyWith(
-          streams: updatedSongs[songIndex].streams + streamsGained,
+          promoBuffer: dailyBuffer,
+          promoEndDate: promoEndDate,
         );
       }
     } else {
-      // Promote all released songs
+      // Promote all released songs with buffer
+      final releasedCount =
+          updatedSongs.where((s) => s.state == SongState.released).length;
+      final songBuffer = (streamsGained /
+              promoDurationDays /
+              (releasedCount > 0 ? releasedCount : 1))
+          .round();
       updatedSongs = updatedSongs.map((song) {
         if (song.state == SongState.released) {
-          final songBoost = (streamsGained /
-                  updatedSongs
-                      .where((s) => s.state == SongState.released)
-                      .length)
-              .round();
-          return song.copyWith(streams: song.streams + songBoost);
+          return song.copyWith(
+            promoBuffer: songBuffer,
+            promoEndDate: promoEndDate,
+          );
         }
         return song;
       }).toList();

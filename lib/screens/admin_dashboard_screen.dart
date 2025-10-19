@@ -296,6 +296,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 12),
           _buildActionButton(
+            icon: Icons.leaderboard,
+            label: 'Trigger Weekly Charts Update',
+            description: 'Regenerate weekly leaderboard snapshots',
+            color: Colors.cyan,
+            onPressed: _showTriggerWeeklyChartsDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
             icon: Icons.notification_important,
             label: 'Send Global Notification',
             description: 'Broadcast message to all players',
@@ -719,6 +727,137 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           'Update Complete!',
           'Daily update completed successfully.\n\n'
               'Players updated: ${result['playersUpdated'] ?? 0}',
+        );
+        await _loadData();
+      }
+    } catch (e) {
+      _safePopNavigator();
+      if (mounted) {
+        _showError('Error', e.toString());
+      }
+    }
+  }
+
+  void _showTriggerWeeklyChartsDialog() {
+    int weeksAhead = 2;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Row(
+            children: [
+              Icon(Icons.leaderboard, color: Colors.cyan),
+              SizedBox(width: 8),
+              Text(
+                'Trigger Weekly Charts Update',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This will regenerate weekly leaderboard snapshots for multiple weeks.',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Number of weeks to generate:',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove, color: Colors.white),
+                    onPressed: () {
+                      if (weeksAhead > 1) {
+                        setState(() => weeksAhead--);
+                      }
+                    },
+                  ),
+                  Container(
+                    width: 60,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2D2D2D),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.cyan),
+                    ),
+                    child: Text(
+                      '$weeksAhead',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: () {
+                      if (weeksAhead < 10) {
+                        setState(() => weeksAhead++);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Will generate snapshots for weeks ${DateTime.now().year}W${((DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays + DateTime(DateTime.now().year, 1, 1).weekday) / 7).ceil()} to ${DateTime.now().year}W${((DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays + DateTime(DateTime.now().year, 1, 1).weekday) / 7).ceil() + weeksAhead - 1}',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.cyan,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _triggerWeeklyChartsUpdate(weeksAhead);
+              },
+              child: const Text('Generate Snapshots'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _triggerWeeklyChartsUpdate(int weeksAhead) async {
+    _showLoadingDialog(
+        'Generating weekly chart snapshots for $weeksAhead week(s)...');
+
+    try {
+      final result = await _adminService.triggerWeeklyLeaderboardUpdate(
+        weeksAhead: weeksAhead,
+      );
+
+      _safePopNavigator();
+
+      if (mounted) {
+        final results = result['results'] as List<dynamic>? ?? [];
+        final weeksList =
+            results.map((r) => '${r['weekId']} (${r['date']})').join('\n');
+
+        _showSuccessDialog(
+          'Weekly Charts Updated!',
+          'Successfully generated ${results.length} weekly snapshots:\n\n'
+              '$weeksList\n\n'
+              'Check the Weekly Charts tab to see updated data.',
         );
         await _loadData();
       }

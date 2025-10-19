@@ -492,23 +492,30 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   top: 2,
                   left: 2,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.75),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: position <= 3 
-                          ? (position == 1 ? Colors.amber : 
-                             position == 2 ? Colors.grey[300]! : 
-                             Colors.brown)
-                          : Colors.white24,
+                        color: position <= 3
+                            ? (position == 1
+                                ? Colors.amber
+                                : position == 2
+                                    ? Colors.grey[300]!
+                                    : Colors.brown)
+                            : Colors.white24,
                         width: 1,
                       ),
                     ),
                     child: Text(
-                      position <= 3 
-                        ? (position == 1 ? '🥇' : position == 2 ? '🥈' : '🥉')
-                        : '#$position',
+                      position <= 3
+                          ? (position == 1
+                              ? '🥇'
+                              : position == 2
+                                  ? '🥈'
+                                  : '🥉')
+                          : '#$position',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: position <= 3 ? 14 : 11,
@@ -627,23 +634,30 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   bottom: 0,
                   right: 0,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.75),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                        color: position <= 3 
-                          ? (position == 1 ? Colors.amber : 
-                             position == 2 ? Colors.grey[300]! : 
-                             Colors.brown)
-                          : Colors.white24,
+                        color: position <= 3
+                            ? (position == 1
+                                ? Colors.amber
+                                : position == 2
+                                    ? Colors.grey[300]!
+                                    : Colors.brown)
+                            : Colors.white24,
                         width: 1,
                       ),
                     ),
                     child: Text(
-                      position <= 3 
-                        ? (position == 1 ? '🥇' : position == 2 ? '🥈' : '🥉')
-                        : '#$position',
+                      position <= 3
+                          ? (position == 1
+                              ? '🥇'
+                              : position == 2
+                                  ? '🥈'
+                                  : '🥉')
+                          : '#$position',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: position <= 3 ? 12 : 10,
@@ -678,12 +692,12 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${entry['releasedSongs'] ?? 0} songs • ${_chartService.formatStreams(entry['fanbase'] ?? 0)} fans',
+              '${entry['songCount'] ?? entry['releasedSongs'] ?? 0} songs • ${_chartService.formatStreams(entry['fanbase'] ?? 0)} fans',
               style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 4),
             Text(
-              '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams ($_selectedPeriod)',
+              '${_chartService.formatStreams(entry['streams'] ?? entry['periodStreams'] ?? 0)} streams ($_selectedPeriod)',
               style: TextStyle(
                 color: _getStreamColor(),
                 fontWeight: FontWeight.bold,
