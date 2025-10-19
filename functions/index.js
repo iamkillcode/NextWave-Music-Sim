@@ -7,6 +7,18 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+// Utility: normalize various date shapes (Firestore Timestamp, JS Date, string, epoch)
+function toDateSafe(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+
 // ============================================================================
 // 1. DAILY UPDATE - Main game progression (EVERY HOUR)
 // In-game: 1 day = 1 real-world hour
@@ -19,25 +31,49 @@ exports.dailyGameUpdate = functions.pubsub
     console.log('🌅 Starting daily game update for all players...');
     
     try {
-      // 1. Update global game date
-      const gameTimeRef = db.collection('game_state').doc('global_time');
-      const gameTimeDoc = await gameTimeRef.get();
+      // 1. Calculate current game date from game settings
+      const gameSettingsRef = db.collection('gameSettings').doc('globalTime');
+      const gameSettingsDoc = await gameSettingsRef.get();
       
-      if (!gameTimeDoc.exists) {
-        console.error('❌ Global game time not initialized');
-        return null;
+      if (!gameSettingsDoc.exists) {
+        console.error('❌ Game time not initialized in gameSettings/globalTime');
+        // Try to initialize it
+        const realWorldStartDate = new Date(2025, 9, 1, 0, 0); // Oct 1, 2025
+        const gameWorldStartDate = new Date(2020, 0, 1); // Jan 1, 2020
+        
+        await gameSettingsRef.set({
+          realWorldStartDate: admin.firestore.Timestamp.fromDate(realWorldStartDate),
+          gameWorldStartDate: admin.firestore.Timestamp.fromDate(gameWorldStartDate),
+          hoursPerDay: 1,
+          description: '1 real world hour equals 1 in-game day',
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        console.log('✅ Initialized game time system');
       }
       
-      const currentGameDate = gameTimeDoc.data().currentGameDate.toDate();
-      const newGameDate = new Date(currentGameDate);
-      newGameDate.setDate(newGameDate.getDate() + 1);
+      // Calculate current game date
+      const data = gameSettingsDoc.exists ? gameSettingsDoc.data() : {
+        realWorldStartDate: admin.firestore.Timestamp.fromDate(new Date(2025, 9, 1, 0, 0)),
+        gameWorldStartDate: admin.firestore.Timestamp.fromDate(new Date(2020, 0, 1)),
+      };
       
-      await gameTimeRef.update({
-        currentGameDate: admin.firestore.Timestamp.fromDate(newGameDate),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      const realWorldStartDate = toDateSafe(data.realWorldStartDate);
+      const gameWorldStartDate = toDateSafe(data.gameWorldStartDate);
+      const now = new Date();
       
-      console.log(`📅 Game date: ${currentGameDate.toISOString()} → ${newGameDate.toISOString()}`);
+      const realHoursElapsed = Math.floor((now - realWorldStartDate) / (1000 * 60 * 60));
+      const gameDaysElapsed = realHoursElapsed; // 1 hour = 1 day
+      
+      const calculatedDate = new Date(gameWorldStartDate);
+      calculatedDate.setDate(calculatedDate.getDate() + gameDaysElapsed);
+      const currentGameDate = new Date(
+        calculatedDate.getFullYear(),
+        calculatedDate.getMonth(),
+        calculatedDate.getDate()
+      );
+      
+      console.log(`📅 Current game date: ${currentGameDate.toISOString().split('T')[0]}`);
       
       // 2. Get ALL players
       const playersSnapshot = await db.collection('players').get();
@@ -60,7 +96,7 @@ exports.dailyGameUpdate = functions.pubsub
           const updates = await processDailyStreamsForPlayer(
             playerId,
             playerData,
-            newGameDate
+            currentGameDate
           );
           
           if (updates) {
@@ -300,7 +336,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
     // ✅ CHECK IF SIDE HUSTLE CONTRACT EXPIRED (even when player offline)
     let sideHustleExpired = false;
     if (playerData.currentSideHustle && playerData.currentSideHustle.startDate) {
-      const startDate = playerData.currentSideHustle.startDate.toDate();
+      const startDate = toDateSafe(playerData.currentSideHustle.startDate);
       const contractLength = playerData.currentSideHustle.contractLength || 7;
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + contractLength);
@@ -337,14 +373,18 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         continue;
       }
       
-      const releaseDate = song.releasedDate.toDate();
-      if (releaseDate > currentGameDate) {
-        updatedSongs.push(song);
-        continue;
-      }
+        // Normalize release date regardless of type (Timestamp/Date/string/epoch)
+        const releaseDate = toDateSafe(song.releasedDate);
+        if (!releaseDate) {
+          console.warn(`⚠️ Invalid releasedDate for song ${song.id || song.title || '(unknown)'}, skipping`);
+          updatedSongs.push(song);
+          continue;
+        }
+      // Clamp release date to not exceed current game date to ensure streaming starts on release day
+      const effectiveReleaseDate = releaseDate > currentGameDate ? currentGameDate : releaseDate;
       
       // Calculate base streams
-      let dailyStreams = calculateDailyStreamGrowth(song, playerData, currentGameDate);
+      let dailyStreams = calculateDailyStreamGrowth({ ...song, releasedDate: effectiveReleaseDate }, playerData, currentGameDate);
       
       // Apply event bonuses
       dailyStreams = applyEventBonuses(dailyStreams, song, playerData, activeEvent);
@@ -400,9 +440,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
     
     // ✅ FAME DECAY - Fame decreases based on artist idleness
     let famePenalty = 0;
-    const lastActivityDate = playerData.lastActivityDate 
-      ? new Date(playerData.lastActivityDate._seconds * 1000)
-      : null;
+    const lastActivityDate = toDateSafe(playerData.lastActivityDate) || null;
     
     if (lastActivityDate) {
       const daysSinceActivity = Math.floor((currentGameDate - lastActivityDate) / (1000 * 60 * 60 * 24));
@@ -467,7 +505,8 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
 }
 
 function calculateDailyStreamGrowth(song, playerData, currentGameDate) {
-  const releaseDate = song.releasedDate.toDate();
+  const releaseDate = toDateSafe(song.releasedDate);
+  if (!releaseDate) return 0;
   const daysSinceRelease = Math.floor((currentGameDate - releaseDate) / (1000 * 60 * 60 * 24));
   
   const loyalFanbase = playerData.loyalFanbase || 0;
@@ -715,7 +754,7 @@ async function getActiveEvent() {
     
     const event = eventDoc.data();
     const now = new Date();
-    const endDate = event.endDate.toDate();
+    const endDate = toDateSafe(event.endDate);
     
     if (now > endDate) {
       // Event expired

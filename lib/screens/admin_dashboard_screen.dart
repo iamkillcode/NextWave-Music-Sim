@@ -1203,9 +1203,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final players = await _adminService.getAllPlayers();
 
-      if (mounted) {
-        Navigator.pop(context); // Close loading
-      }
+      _safePopNavigator(); // Close loading
 
       if (players.isEmpty) {
         _showError('No Players', 'No players found in the database');
@@ -1575,10 +1573,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       );
     } catch (e) {
+      _safePopNavigator(); // Close loading dialog
+
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
+        _showError('Error Loading Players', e.toString());
       }
-      _showError('Error Loading Players', e.toString());
     }
   }
 
@@ -1592,9 +1591,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final players = await _adminService.getAllPlayers();
 
-      if (mounted) {
-        Navigator.pop(context); // Close loading
-      }
+      _safePopNavigator(); // Close loading
 
       if (players.isEmpty) {
         _showError('No Players', 'No players found in the database');
@@ -1786,10 +1783,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       );
     } catch (e) {
+      _safePopNavigator(); // Close loading dialog
+
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
+        _showError('Error Loading Players', e.toString());
       }
-      _showError('Error Loading Players', e.toString());
     }
   }
 
@@ -2018,20 +2016,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _showLoadingDialog('Loading game time...');
 
     try {
-      final gameTimeDoc =
-          await _firestore.collection('game_state').doc('global_time').get();
+      // Get the correct game settings document
+      final gameSettingsDoc =
+          await _firestore.collection('gameSettings').doc('globalTime').get();
 
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      _safePopNavigator();
 
-      if (!gameTimeDoc.exists) {
-        _showError('Error', 'Game time not initialized');
+      if (!gameSettingsDoc.exists) {
+        _showError('Error',
+            'Game time not initialized. Please restart the app to initialize.');
         return;
       }
 
-      final currentDate =
-          (gameTimeDoc.data()!['currentGameDate'] as Timestamp).toDate();
+      final data = gameSettingsDoc.data()!;
+      final realWorldStartDate =
+          (data['realWorldStartDate'] as Timestamp).toDate();
+      final gameWorldStartDate =
+          (data['gameWorldStartDate'] as Timestamp).toDate();
+
+      // Calculate current game date based on hours elapsed
+      final now = DateTime.now();
+      final realHoursElapsed = now.difference(realWorldStartDate).inHours;
+      final gameDaysElapsed = realHoursElapsed; // 1 hour = 1 day
+
+      final calculatedDate =
+          gameWorldStartDate.add(Duration(days: gameDaysElapsed));
+      final currentDate = DateTime(
+        calculatedDate.year,
+        calculatedDate.month,
+        calculatedDate.day,
+      );
+
       int daysToAdjust = 0;
 
       showDialog(
@@ -2147,31 +2162,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _showLoadingDialog('Adjusting game time...');
 
                         try {
+                          // Adjust the realWorldStartDate to simulate time travel
+                          // Moving days BACKWARD in real time = moving FORWARD in game time
+                          // Example: If we want to add 7 game days, we subtract 7 hours from realWorldStartDate
+                          final adjustedRealWorldStart =
+                              realWorldStartDate.subtract(
+                            Duration(
+                                hours: daysToAdjust), // 1 hour per game day
+                          );
+
+                          await _firestore
+                              .collection('gameSettings')
+                              .doc('globalTime')
+                              .update({
+                            'realWorldStartDate':
+                                Timestamp.fromDate(adjustedRealWorldStart),
+                            'lastUpdated': FieldValue.serverTimestamp(),
+                          });
+
                           final newDate = DateTime(
                             currentDate.year,
                             currentDate.month,
                             currentDate.day + daysToAdjust,
                           );
 
-                          await _firestore
-                              .collection('game_state')
-                              .doc('global_time')
-                              .update({
-                            'currentGameDate': Timestamp.fromDate(newDate),
-                          });
+                          _safePopNavigator(); // Close loading dialog
 
                           if (mounted) {
-                            Navigator.pop(context);
                             _showSuccessDialog(
                               'Time Adjusted!',
                               'Game date changed by $daysToAdjust days.\n\n'
-                                  'New date: ${newDate.toString().split(' ')[0]}',
+                                  'New date: ${newDate.toString().split(' ')[0]}\n\n'
+                                  'Note: All players will see this change immediately.',
                             );
                             await _loadData();
                           }
                         } catch (e) {
+                          _safePopNavigator(); // Close loading dialog
+
                           if (mounted) {
-                            Navigator.pop(context);
                             _showError('Error', e.toString());
                           }
                         }
@@ -2187,10 +2216,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       );
     } catch (e) {
+      _safePopNavigator(); // Close loading dialog safely
+
       if (mounted) {
-        Navigator.pop(context);
+        _showError('Error', e.toString());
       }
-      _showError('Error', e.toString());
     }
   }
 
@@ -2227,9 +2257,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         }
       }
 
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      _safePopNavigator(); // Close loading
 
       // Sort genres by popularity
       final sortedGenres = genreDistribution.entries.toList()
@@ -2340,10 +2368,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       );
     } catch (e) {
+      _safePopNavigator(); // Close loading dialog
+
       if (mounted) {
-        Navigator.pop(context);
+        _showError('Error', e.toString());
       }
-      _showError('Error', e.toString());
     }
   }
 

@@ -20,6 +20,14 @@
       "density": "SPARSE_ALL"
     },
     {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "side_hustle_contracts",
       "queryScope": "COLLECTION",
       "fields": [
