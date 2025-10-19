@@ -822,6 +822,7 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
             artistId: playerDoc.id,
             artistName: playerData.artistName || 'Unknown',
             last7DaysStreams: song.last7DaysStreams || 0,
+            regionalStreams: song.regionalStreams || {},
             isNPC: false,
           });
         }
@@ -842,22 +843,25 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
             artistId: npcDoc.id,
             artistName: npcData.name || 'Unknown NPC',
             last7DaysStreams: song.last7DaysStreams || 0,
+            regionalStreams: song.regionalStreams || {},
             isNPC: true,
           });
         }
       });
     });
     
-    // Sort by last7DaysStreams
-    allSongs.sort((a, b) => b.last7DaysStreams - a.last7DaysStreams);
-    const top100 = allSongs.slice(0, 100);
+    // === GLOBAL CHART (by total last7DaysStreams) ===
+    const globalSongs = [...allSongs];
+    globalSongs.sort((a, b) => b.last7DaysStreams - a.last7DaysStreams);
+    const globalTop100 = globalSongs.slice(0, 100);
     
-    // Create snapshot document
-    await db.collection('leaderboard_history').doc(`songs_${weekId}`).set({
+    // Create global snapshot document
+    await db.collection('leaderboard_history').doc(`songs_global_${weekId}`).set({
       weekId,
       timestamp: admin.firestore.Timestamp.fromDate(timestamp),
       type: 'songs',
-      rankings: top100.map((song, index) => ({
+      region: 'global',
+      rankings: globalTop100.map((song, index) => ({
         rank: index + 1,
         title: song.title,
         artistId: song.artistId,
@@ -869,7 +873,42 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
       })),
     });
     
-    console.log(`✅ Created song leaderboard snapshot for week ${weekId}`);
+    console.log(`✅ Created GLOBAL song leaderboard snapshot for week ${weekId}`);
+    
+    // === REGIONAL CHARTS (by region-specific streams) ===
+    const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
+    
+    for (const region of regions) {
+      const regionalSongs = allSongs.map(song => ({
+        ...song,
+        regionStreams: song.regionalStreams?.[region] || 0,
+      }));
+      
+      // Sort by region-specific streams
+      regionalSongs.sort((a, b) => b.regionStreams - a.regionStreams);
+      const regionalTop100 = regionalSongs.slice(0, 100);
+      
+      // Create regional snapshot
+      await db.collection('leaderboard_history').doc(`songs_${region}_${weekId}`).set({
+        weekId,
+        timestamp: admin.firestore.Timestamp.fromDate(timestamp),
+        type: 'songs',
+        region,
+        rankings: regionalTop100.map((song, index) => ({
+          rank: index + 1,
+          title: song.title,
+          artistId: song.artistId,
+          artistName: song.artistName,
+          streams: song.regionStreams, // Region-specific streams
+          totalStreams: song.streams, // Global total
+          genre: song.genre,
+          isNPC: song.isNPC || false,
+        })),
+      });
+      
+      console.log(`✅ Created ${region.toUpperCase()} song leaderboard snapshot for week ${weekId}`);
+    }
+    
   } catch (error) {
     console.error('❌ Error creating song snapshot:', error);
   }
@@ -879,7 +918,7 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
   try {
     // Get all players and calculate total last7DaysStreams
     const playersSnapshot = await db.collection('players').get();
-    const artists = [];
+    const allArtists = [];
     
     // Add player artists
     playersSnapshot.forEach(playerDoc => {
@@ -890,11 +929,21 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
         .filter(s => s.state === 'released')
         .reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
       
+      // Calculate regional streams for this artist
+      const regionalStreams = {};
+      const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
+      regions.forEach(region => {
+        regionalStreams[region] = songs
+          .filter(s => s.state === 'released')
+          .reduce((sum, s) => sum + (s.regionalStreams?.[region] || 0), 0);
+      });
+      
       if (totalWeeklyStreams > 0) {
-        artists.push({
+        allArtists.push({
           artistId: playerDoc.id,
           artistName: playerData.artistName || 'Unknown',
           weeklyStreams: totalWeeklyStreams,
+          regionalStreams,
           totalStreams: playerData.totalStreams || 0,
           fanbase: playerData.level || 0,
           isNPC: false,
@@ -913,11 +962,21 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
         .filter(s => s.state === 'released')
         .reduce((sum, s) => sum + (s.last7DaysStreams || 0), 0);
       
+      // Calculate regional streams for this NPC artist
+      const regionalStreams = {};
+      const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
+      regions.forEach(region => {
+        regionalStreams[region] = songs
+          .filter(s => s.state === 'released')
+          .reduce((sum, s) => sum + (s.regionalStreams?.[region] || 0), 0);
+      });
+      
       if (totalWeeklyStreams > 0) {
-        artists.push({
+        allArtists.push({
           artistId: npcDoc.id,
           artistName: npcData.name || 'Unknown NPC',
           weeklyStreams: totalWeeklyStreams,
+          regionalStreams,
           totalStreams: npcData.totalStreams || 0,
           fanbase: npcData.fanbase || 0,
           isNPC: true,
@@ -925,16 +984,18 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
       }
     });
     
-    // Sort by weekly streams
-    artists.sort((a, b) => b.weeklyStreams - a.weeklyStreams);
-    const top50 = artists.slice(0, 50);
+    // === GLOBAL CHART (by total weekly streams) ===
+    const globalArtists = [...allArtists];
+    globalArtists.sort((a, b) => b.weeklyStreams - a.weeklyStreams);
+    const globalTop50 = globalArtists.slice(0, 50);
     
-    // Create snapshot
-    await db.collection('leaderboard_history').doc(`artists_${weekId}`).set({
+    // Create global snapshot
+    await db.collection('leaderboard_history').doc(`artists_global_${weekId}`).set({
       weekId,
       timestamp: admin.firestore.Timestamp.fromDate(timestamp),
       type: 'artists',
-      rankings: top50.map((artist, index) => ({
+      region: 'global',
+      rankings: globalTop50.map((artist, index) => ({
         rank: index + 1,
         artistId: artist.artistId,
         artistName: artist.artistName,
@@ -945,7 +1006,41 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
       })),
     });
     
-    console.log(`✅ Created artist leaderboard snapshot for week ${weekId}`);
+    console.log(`✅ Created GLOBAL artist leaderboard snapshot for week ${weekId}`);
+    
+    // === REGIONAL CHARTS (by region-specific streams) ===
+    const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
+    
+    for (const region of regions) {
+      const regionalArtists = allArtists.map(artist => ({
+        ...artist,
+        regionWeeklyStreams: artist.regionalStreams?.[region] || 0,
+      }));
+      
+      // Sort by region-specific weekly streams
+      regionalArtists.sort((a, b) => b.regionWeeklyStreams - a.regionWeeklyStreams);
+      const regionalTop50 = regionalArtists.slice(0, 50);
+      
+      // Create regional snapshot
+      await db.collection('leaderboard_history').doc(`artists_${region}_${weekId}`).set({
+        weekId,
+        timestamp: admin.firestore.Timestamp.fromDate(timestamp),
+        type: 'artists',
+        region,
+        rankings: regionalTop50.map((artist, index) => ({
+          rank: index + 1,
+          artistId: artist.artistId,
+          artistName: artist.artistName,
+          weeklyStreams: artist.regionWeeklyStreams, // Region-specific streams
+          totalStreams: artist.totalStreams, // Global total
+          fanbase: artist.fanbase,
+          isNPC: artist.isNPC || false,
+        })),
+      });
+      
+      console.log(`✅ Created ${region.toUpperCase()} artist leaderboard snapshot for week ${weekId}`);
+    }
+    
   } catch (error) {
     console.error('❌ Error creating artist snapshot:', error);
   }
@@ -953,36 +1048,51 @@ async function createArtistLeaderboardSnapshot(weekId, timestamp) {
 
 async function updateChartStatistics(weekId) {
   try {
-    // Get this week's and last week's snapshots
-    const thisWeekSongs = await db.collection('leaderboard_history').doc(`songs_${weekId}`).get();
-    const lastWeekSongs = await db.collection('leaderboard_history').doc(`songs_${weekId - 1}`).get();
+    // Update statistics for GLOBAL and ALL REGIONAL charts
+    const chartTypes = [
+      'global',
+      'usa',
+      'europe',
+      'uk',
+      'asia',
+      'africa',
+      'latin_america',
+      'oceania'
+    ];
     
-    if (!thisWeekSongs.exists) return;
-    
-    const thisWeekData = thisWeekSongs.data().rankings;
-    const lastWeekData = lastWeekSongs.exists ? lastWeekSongs.data().rankings : [];
-    
-    // Calculate statistics for each song
-    const statistics = thisWeekData.map(song => {
-      const lastWeekRank = lastWeekData.findIndex(s => 
-        s.title === song.title && s.artistId === song.artistId
-      ) + 1;
+    for (const chartType of chartTypes) {
+      // Get this week's and last week's snapshots
+      const thisWeekSongs = await db.collection('leaderboard_history').doc(`songs_${chartType}_${weekId}`).get();
+      const lastWeekSongs = await db.collection('leaderboard_history').doc(`songs_${chartType}_${weekId - 1}`).get();
       
-      return {
-        ...song,
-        lastWeekRank: lastWeekRank || null,
-        movement: lastWeekRank ? lastWeekRank - song.rank : null,
-        isNew: !lastWeekRank,
-      };
-    });
+      if (!thisWeekSongs.exists) continue;
+      
+      const thisWeekData = thisWeekSongs.data().rankings;
+      const lastWeekData = lastWeekSongs.exists ? lastWeekSongs.data().rankings : [];
+      
+      // Calculate statistics for each song
+      const statistics = thisWeekData.map(song => {
+        const lastWeekRank = lastWeekData.findIndex(s => 
+          s.title === song.title && s.artistId === song.artistId
+        ) + 1;
+        
+        return {
+          ...song,
+          lastWeekRank: lastWeekRank || null,
+          movement: lastWeekRank ? lastWeekRank - song.rank : null,
+          isNew: !lastWeekRank,
+        };
+      });
+      
+      // Update snapshot with statistics
+      await db.collection('leaderboard_history').doc(`songs_${chartType}_${weekId}`).update({
+        rankingsWithStats: statistics,
+        statsCalculated: true,
+      });
+      
+      console.log(`✅ Updated ${chartType.toUpperCase()} chart statistics for week ${weekId}`);
+    }
     
-    // Update snapshot with statistics
-    await db.collection('leaderboard_history').doc(`songs_${weekId}`).update({
-      rankingsWithStats: statistics,
-      statsCalculated: true,
-    });
-    
-    console.log(`✅ Updated chart statistics for week ${weekId}`);
   } catch (error) {
     console.error('❌ Error updating chart statistics:', error);
   }
