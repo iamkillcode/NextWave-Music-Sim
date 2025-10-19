@@ -1,11 +1,11 @@
 {
-    "name": "mobile_game",
-    "short_name": "mobile_game",
+    "name": "NextWave Music Sim",
+    "short_name": "NextWave",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#1DB954",
-    "description": "A new Flutter project.",
+    "description": "Build Your Music Empire Here.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -29,6 +29,10 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Create google-services.json
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -57,6 +61,10 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Create GoogleService-Info.plist
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}' > ios/Runner/GoogleService-Info.plist
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -65,9 +73,15 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+
       - name: Build iOS (No Codesign)
         run: |
           flutter build ios --release --no-codesign
+        continue-on-error: false
 
       - name: Create iOS IPA
         run: |
