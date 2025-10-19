@@ -59,7 +59,8 @@ class _RemoteConfigDebugScreenState extends State<RemoteConfigDebugScreen> {
           _buildSection(
             '🔐 App Control',
             [
-              _buildConfigItem('Maintenance Mode', _remoteConfig.isMaintenanceMode),
+              _buildConfigItem(
+                  'Maintenance Mode', _remoteConfig.isMaintenanceMode),
               _buildConfigItem('Force Update', _remoteConfig.forceUpdate),
               _buildConfigItem(
                   'Min Required Version', _remoteConfig.minRequiredVersion),
@@ -76,15 +77,18 @@ class _RemoteConfigDebugScreenState extends State<RemoteConfigDebugScreen> {
               _buildConfigItem('Producers', _remoteConfig.isProducersEnabled),
               _buildConfigItem('Labels', _remoteConfig.isLabelsEnabled),
               _buildConfigItem('Concerts', _remoteConfig.isConcertsEnabled),
-              _buildConfigItem('Merchandise', _remoteConfig.isMerchandiseEnabled),
+              _buildConfigItem(
+                  'Merchandise', _remoteConfig.isMerchandiseEnabled),
             ],
           ),
           const SizedBox(height: 24),
           _buildSection(
             '💰 Economy',
             [
-              _buildConfigItem('Min Song Cost', '\$${_remoteConfig.minSongCost}'),
-              _buildConfigItem('Max Song Cost', '\$${_remoteConfig.maxSongCost}'),
+              _buildConfigItem(
+                  'Min Song Cost', '\$${_remoteConfig.minSongCost}'),
+              _buildConfigItem(
+                  'Max Song Cost', '\$${_remoteConfig.maxSongCost}'),
               _buildConfigItem(
                   'Starting Money', '\$${_remoteConfig.dailyStartingMoney}'),
               _buildConfigItem('Daily Energy', _remoteConfig.dailyEnergy),
@@ -99,7 +103,8 @@ class _RemoteConfigDebugScreenState extends State<RemoteConfigDebugScreen> {
             [
               _buildConfigItem(
                   'Fame Unlock Threshold', _remoteConfig.fameUnlockThreshold),
-              _buildConfigItem('Base Daily Streams', _remoteConfig.baseDailyStreams),
+              _buildConfigItem(
+                  'Base Daily Streams', _remoteConfig.baseDailyStreams),
               _buildConfigItem('Viral Threshold', _remoteConfig.viralThreshold),
               _buildConfigItem('Chart Position Multiplier',
                   '${_remoteConfig.chartPositionMultiplier}x'),
@@ -109,12 +114,14 @@ class _RemoteConfigDebugScreenState extends State<RemoteConfigDebugScreen> {
           _buildSection(
             '📱 Platforms',
             [
+              _buildConfigItem('Tunify Royalty',
+                  '\$${_remoteConfig.tunifyRoyaltyRate}/stream'),
+              _buildConfigItem('Maple Royalty',
+                  '\$${_remoteConfig.mapleRoyaltyRate}/stream'),
               _buildConfigItem(
-                  'Tunify Royalty', '\$${_remoteConfig.tunifyRoyaltyRate}/stream'),
+                  'Tunify Unlock Fame', _remoteConfig.tunifyUnlockFame),
               _buildConfigItem(
-                  'Maple Royalty', '\$${_remoteConfig.mapleRoyaltyRate}/stream'),
-              _buildConfigItem('Tunify Unlock Fame', _remoteConfig.tunifyUnlockFame),
-              _buildConfigItem('Maple Unlock Fame', _remoteConfig.mapleUnlockFame),
+                  'Maple Unlock Fame', _remoteConfig.mapleUnlockFame),
             ],
           ),
           const SizedBox(height: 24),

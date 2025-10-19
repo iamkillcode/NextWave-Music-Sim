@@ -5,7 +5,8 @@ class MaintenanceModeScreen extends StatelessWidget {
 
   const MaintenanceModeScreen({
     super.key,
-    this.message = 'NextWave is currently under maintenance. Please check back soon!',
+    this.message =
+        'NextWave is currently under maintenance. Please check back soon!',
   });
 
   @override

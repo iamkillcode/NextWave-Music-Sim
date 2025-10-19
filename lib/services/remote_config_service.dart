@@ -210,4 +210,6 @@ class RemoteConfigService {
   /// Get all config values as a map (for debug screen)
   Map<String, dynamic> getAllValues() {
     final keys = _remoteConfig.getAll().keys;
-    return {for (var key in keys)
+    return {for (var key in keys) key: _remoteConfig.getValue(key).asString()};
+  }
+}
