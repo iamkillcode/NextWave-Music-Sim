@@ -1,14 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/song.dart';
+import 'leaderboard_snapshot_service.dart';
 
 /// Service for managing regional music charts
-/// 
+///
 /// Provides functionality to:
 /// - Get top songs per region
 /// - Check chart positions
 /// - Track chart history
+///
+/// Now uses weekly snapshots from Cloud Function for accurate regional rankings
 class RegionalChartService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LeaderboardSnapshotService _snapshotService =
+      LeaderboardSnapshotService();
 
   /// All supported regions
   static const List<String> regions = [
@@ -44,81 +49,45 @@ class RegionalChartService {
   };
 
   /// Get top songs for a specific region
-  /// 
+  ///
   /// [region] - Region code (e.g., 'usa', 'africa')
   /// [limit] - Number of songs to return (default: 10)
-  /// 
+  ///
   /// Returns list of songs sorted by regional streams (descending)
+  /// NOW USES WEEKLY SNAPSHOTS for accurate regional rankings
   Future<List<Map<String, dynamic>>> getTopSongsByRegion(
     String region, {
     int limit = 10,
   }) async {
     try {
-      print('📊 Fetching top $limit songs for region: $region');
+      print('📊 Fetching top $limit songs for region: $region from snapshots');
 
-      // Query all players to get their songs
-      // Note: In production, you'd want a dedicated 'songs' collection
-      final playersSnapshot = await _firestore
-          .collection('players')
-          .get()
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception('Chart query timeout');
-            },
-          );
-
-      List<Map<String, dynamic>> allSongs = [];
-
-      // Extract all songs from all players
-      for (var doc in playersSnapshot.docs) {
-        final data = doc.data();
-        final artistName = data['displayName'] ?? 'Unknown Artist';
-        final songs = data['songs'] as List<dynamic>?;
-
-        if (songs != null) {
-          for (var songData in songs) {
-            final songMap = Map<String, dynamic>.from(songData);
-            
-            // Check if song has streams in this region
-            final regionalStreams = songMap['regionalStreams'] as Map<dynamic, dynamic>?;
-            final songState = songMap['state'] ?? 'unknown';
-            
-            // Only include released songs in charts
-            if (songState == 'released' && 
-                regionalStreams != null && 
-                regionalStreams.containsKey(region)) {
-              final streams = (regionalStreams[region] as num?)?.toInt() ?? 0;
-              
-              if (streams > 0) {
-                allSongs.add({
-                  'title': songMap['title'] ?? 'Untitled',
-                  'artist': artistName,
-                  'artistId': doc.id,
-                  'genre': songMap['genre'] ?? 'Unknown',
-                  'quality': songMap['quality'] ?? 0,
-                  'regionalStreams': streams,
-                  'totalStreams': songMap['totalStreams'] ?? 0,
-                  'likes': songMap['likes'] ?? 0,
-                  'releaseDate': songMap['releaseDate'],
-                  'state': songState,
-                });
-              }
-            }
-          }
-        }
-      }
-
-      // Sort by regional streams (descending)
-      allSongs.sort((a, b) => 
-        (b['regionalStreams'] as int).compareTo(a['regionalStreams'] as int)
+      // Use snapshot service to get pre-computed regional rankings
+      final chartData = await _snapshotService.getLatestSongChart(
+        region: region,
+        limit: limit,
       );
 
-      // Return top N songs
-      final topSongs = allSongs.take(limit).toList();
-      print('✅ Found ${topSongs.length} charting songs in $region');
-      
-      return topSongs;
+      // Transform to match expected format
+      return chartData
+          .map((entry) => {
+                'title': entry['title'],
+                'artist': entry['artist'],
+                'artistId': entry['artistId'],
+                'genre': entry['genre'],
+                'quality': 75, // Default quality (not stored in snapshots)
+                'regionalStreams':
+                    entry['streams'], // Regional-specific streams
+                'totalStreams': entry['totalStreams'],
+                'likes': 0, // Not stored in snapshots
+                'releaseDate': null, // Not stored in snapshots
+                'state': 'released',
+                'position': entry['position'],
+                'movement': entry['movement'],
+                'lastWeekPosition': entry['lastWeekPosition'],
+                'weeksOnChart': entry['weeksOnChart'],
+              })
+          .toList();
     } catch (e) {
       print('❌ Error fetching regional chart: $e');
       return [];
@@ -126,23 +95,27 @@ class RegionalChartService {
   }
 
   /// Get chart position for a specific song in a region
-  /// 
+  ///
   /// Returns the position (1-based) or null if not charting
+  /// NOW USES WEEKLY SNAPSHOTS for accurate positions
   Future<int?> getChartPosition(
     String songTitle,
     String artistId,
     String region,
   ) async {
     try {
-      final topSongs = await getTopSongsByRegion(region, limit: 100);
-      
-      for (int i = 0; i < topSongs.length; i++) {
-        if (topSongs[i]['title'] == songTitle && 
-            topSongs[i]['artistId'] == artistId) {
-          return i + 1; // 1-based position
+      // Use snapshot service for efficient position lookup
+      final chart = await _snapshotService.getLatestSongChart(
+        region: region,
+        limit: 100,
+      );
+
+      for (final entry in chart) {
+        if (entry['title'] == songTitle && entry['artistId'] == artistId) {
+          return entry['position'] as int;
         }
       }
-      
+
       return null; // Not charting
     } catch (e) {
       print('❌ Error getting chart position: $e');
@@ -200,7 +173,7 @@ class RegionalChartService {
   Future<Map<String, dynamic>> getArtistChartSummary(String artistId) async {
     try {
       final doc = await _firestore.collection('players').doc(artistId).get();
-      
+
       if (!doc.exists) {
         return {
           'topTenHits': 0,
@@ -230,18 +203,18 @@ class RegionalChartService {
       for (var songData in songs) {
         final songMap = Map<String, dynamic>.from(songData);
         final title = songMap['title'] ?? '';
-        
+
         for (var region in regions) {
           final position = await getChartPosition(title, artistId, region);
-          
+
           if (position != null) {
             chartingSongs++;
             chartingRegions.add(region);
-            
+
             if (position <= 10) {
               topTenHits++;
             }
-            
+
             if (highestPosition == null || position < highestPosition) {
               highestPosition = position;
             }
@@ -267,60 +240,36 @@ class RegionalChartService {
   }
 
   /// Get global chart (all regions combined)
+  /// NOW USES WEEKLY SNAPSHOTS for accurate global rankings
   Future<List<Map<String, dynamic>>> getGlobalChart({int limit = 100}) async {
     try {
-      print('🌍 Fetching global top $limit songs');
+      print('🌍 Fetching global top $limit songs from snapshots');
 
-      final playersSnapshot = await _firestore
-          .collection('players')
-          .get()
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception('Global chart query timeout');
-            },
-          );
-
-      List<Map<String, dynamic>> allSongs = [];
-
-      for (var doc in playersSnapshot.docs) {
-        final data = doc.data();
-        final artistName = data['displayName'] ?? 'Unknown Artist';
-        final songs = data['songs'] as List<dynamic>?;
-
-        if (songs != null) {
-          for (var songData in songs) {
-            final songMap = Map<String, dynamic>.from(songData);
-            final totalStreams = songMap['totalStreams'] ?? 0;
-            final songState = songMap['state'] ?? 'unknown';
-
-            // Only include released songs in charts
-            if (songState == 'released' && totalStreams > 0) {
-              allSongs.add({
-                'title': songMap['title'] ?? 'Untitled',
-                'artist': artistName,
-                'artistId': doc.id,
-                'genre': songMap['genre'] ?? 'Unknown',
-                'quality': songMap['quality'] ?? 0,
-                'totalStreams': totalStreams,
-                'likes': songMap['likes'] ?? 0,
-                'releaseDate': songMap['releaseDate'],
-                'state': songState,
-              });
-            }
-          }
-        }
-      }
-
-      // Sort by total streams
-      allSongs.sort((a, b) => 
-        (b['totalStreams'] as int).compareTo(a['totalStreams'] as int)
+      // Use snapshot service to get pre-computed global rankings
+      final chartData = await _snapshotService.getLatestSongChart(
+        region: 'global',
+        limit: limit,
       );
 
-      final topSongs = allSongs.take(limit).toList();
-      print('✅ Found ${topSongs.length} songs on global chart');
-      
-      return topSongs;
+      // Transform to match expected format
+      return chartData
+          .map((entry) => {
+                'title': entry['title'],
+                'artist': entry['artist'],
+                'artistId': entry['artistId'],
+                'genre': entry['genre'],
+                'quality': 75, // Default quality
+                'totalStreams':
+                    entry['streams'], // For global, streams = total streams
+                'likes': 0,
+                'releaseDate': null,
+                'state': 'released',
+                'position': entry['position'],
+                'movement': entry['movement'],
+                'lastWeekPosition': entry['lastWeekPosition'],
+                'weeksOnChart': entry['weeksOnChart'],
+              })
+          .toList();
     } catch (e) {
       print('❌ Error fetching global chart: $e');
       return [];

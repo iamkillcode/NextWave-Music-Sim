@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'leaderboard_snapshot_service.dart';
 
 /// Unified Chart Service - Handles ALL chart types
 ///
@@ -8,14 +10,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// - Scope: Global or Per-Region
 ///
 /// Chart Combinations:
-/// - Daily Singles (Global/Regional)
-/// - Daily Albums (Global/Regional)
-/// - Daily Artists (Global/Regional)
-/// - Weekly Singles (Global/Regional)
-/// - Weekly Albums (Global/Regional)
-/// - Weekly Artists (Global/Regional)
+/// - Daily Singles (Global/Regional) - Real-time queries
+/// - Daily Albums (Global/Regional) - Real-time queries
+/// - Daily Artists (Global/Regional) - Real-time queries
+/// - Weekly Singles (Global/Regional) - USES SNAPSHOTS for accurate regional rankings
+/// - Weekly Albums (Global/Regional) - Real-time queries (snapshots coming soon)
+/// - Weekly Artists (Global/Regional) - USES SNAPSHOTS for accurate regional rankings
 class UnifiedChartService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final LeaderboardSnapshotService _snapshotService =
+      LeaderboardSnapshotService();
 
   /// All supported regions
   static const List<String> regions = [
@@ -66,6 +70,43 @@ class UnifiedChartService {
   }) async {
     try {
       print('📊 Fetching $period $type chart for $region (limit: $limit)');
+
+      // For WEEKLY SINGLES, use snapshot service for accurate regional rankings
+      if (period == 'weekly' && type == 'singles') {
+        print(
+            '✅ Using snapshot-based weekly chart for accurate regional rankings');
+        final chartData = await _snapshotService.getLatestSongChart(
+          region: region,
+          limit: limit,
+        );
+
+        // Transform to match expected format
+        return chartData
+            .map((entry) => {
+                  'title': entry['title'],
+                  'artist': entry['artist'],
+                  'artistId': entry['artistId'],
+                  'isNPC': entry['isNPC'] ?? false,
+                  'genre': entry['genre'],
+                  'quality': 75, // Default quality
+                  'periodStreams':
+                      entry['streams'], // Regional streams for this region
+                  'totalStreams': entry['totalStreams'],
+                  'likes': 0,
+                  'releaseDate': null,
+                  'state': 'released',
+                  'isAlbum': false,
+                  'coverArtUrl': null,
+                  'position': entry['position'],
+                  'movement': entry['movement'],
+                  'lastWeekPosition': entry['lastWeekPosition'],
+                  'weeksOnChart': entry['weeksOnChart'],
+                })
+            .toList();
+      }
+
+      // For DAILY charts and ALBUMS, fall back to real-time queries
+      // (Album snapshots coming in future update)
 
       // Fetch both players AND NPCs
       final playersSnapshot =
@@ -256,6 +297,34 @@ class UnifiedChartService {
       print(
         '📊 Fetching $period artists chart for $region (sort: $sortBy, limit: $limit)',
       );
+
+      // For WEEKLY artist charts sorted by streams, use snapshot service
+      if (period == 'weekly' && sortBy == 'streams') {
+        print('✅ Using snapshot-based weekly artist chart for accurate regional rankings');
+        final chartData = await _snapshotService.getLatestArtistChart(
+          region: region,
+          limit: limit,
+        );
+        
+        // Transform to match expected format
+        return chartData.map((entry) => {
+          'artistName': entry['artistName'],
+          'artistId': entry['artistId'],
+          'isNPC': entry['isNPC'] ?? false,
+          'periodStreams': entry['streams'], // Regional total streams
+          'fanbase': 0, // Not stored in snapshots
+          'fame': 0, // Not stored in snapshots
+          'releasedSongs': entry['songCount'],
+          'chartingSongs': entry['songCount'],
+          'avatarUrl': null,
+          'position': entry['position'],
+          'movement': entry['movement'],
+          'lastWeekPosition': entry['lastWeekPosition'],
+          'weeksOnChart': entry['weeksOnChart'],
+        }).toList();
+      }
+
+      // For DAILY charts or other sort options, fall back to real-time queries
 
       // Fetch both players AND NPCs
       final playersSnapshot =
