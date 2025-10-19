@@ -138,18 +138,18 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
               Expanded(
                 child: SegmentedButton<String>(
                   style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.resolveWith<Color>((
-                      Set<MaterialState> states,
+                    backgroundColor: WidgetStateProperty.resolveWith<Color>((
+                      Set<WidgetState> states,
                     ) {
-                      if (states.contains(MaterialState.selected)) {
+                      if (states.contains(WidgetState.selected)) {
                         return _getThemeColor().withOpacity(0.3);
                       }
                       return Colors.grey[800]!;
                     }),
-                    foregroundColor: MaterialStateProperty.resolveWith<Color>((
-                      Set<MaterialState> states,
+                    foregroundColor: WidgetStateProperty.resolveWith<Color>((
+                      Set<WidgetState> states,
                     ) {
-                      if (states.contains(MaterialState.selected)) {
+                      if (states.contains(WidgetState.selected)) {
                         return _getThemeColor();
                       }
                       return Colors.white;
@@ -199,18 +199,18 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
               Expanded(
                 child: SegmentedButton<String>(
                   style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.resolveWith<Color>((
-                      Set<MaterialState> states,
+                    backgroundColor: WidgetStateProperty.resolveWith<Color>((
+                      Set<WidgetState> states,
                     ) {
-                      if (states.contains(MaterialState.selected)) {
+                      if (states.contains(WidgetState.selected)) {
                         return _getThemeColor().withOpacity(0.3);
                       }
                       return Colors.grey[800]!;
                     }),
-                    foregroundColor: MaterialStateProperty.resolveWith<Color>((
-                      Set<MaterialState> states,
+                    foregroundColor: WidgetStateProperty.resolveWith<Color>((
+                      Set<WidgetState> states,
                     ) {
-                      if (states.contains(MaterialState.selected)) {
+                      if (states.contains(WidgetState.selected)) {
                         return _getThemeColor();
                       }
                       return Colors.white;

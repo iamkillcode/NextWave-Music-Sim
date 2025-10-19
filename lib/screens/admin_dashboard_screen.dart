@@ -26,6 +26,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _checkAdminAndLoadData();
   }
 
+  // Safe navigation helper
+  void _safePopNavigator() {
+    if (mounted) {
+      try {
+        Navigator.of(context).pop();
+      } catch (e) {
+        // Silently catch navigation errors
+        print('Navigation error: $e');
+      }
+    }
+  }
+
   Future<void> _checkAdminAndLoadData() async {
     setState(() => _isLoading = true);
 
@@ -449,7 +461,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             )
           else
-            ..._admins.map((admin) => _buildAdminTile(admin)).toList(),
+            ..._admins.map((admin) => _buildAdminTile(admin)),
         ],
       ),
     );
@@ -532,10 +544,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             )
           else
-            ..._errorLogs
-                .take(5)
-                .map((log) => _buildErrorLogTile(log))
-                .toList(),
+            ..._errorLogs.take(5).map((log) => _buildErrorLogTile(log)),
           if (_errorLogs.length > 5)
             TextButton(
               onPressed: () {
@@ -672,9 +681,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final result = await _adminService.initializeNPCs();
 
-      if (mounted) {
-        Navigator.pop(context); // Close loading
+      _safePopNavigator(); // Close loading
 
+      if (mounted) {
         if (result['success'] == true) {
           _showSuccessDialog(
             'NPCs Initialized!',
@@ -690,8 +699,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         }
       }
     } catch (e) {
+      _safePopNavigator();
       if (mounted) {
-        Navigator.pop(context);
         _showError('Error', e.toString());
       }
     }
@@ -703,8 +712,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       final result = await _adminService.triggerDailyUpdate();
 
+      _safePopNavigator();
+
       if (mounted) {
-        Navigator.pop(context);
         _showSuccessDialog(
           'Update Complete!',
           'Daily update completed successfully.\n\n'
@@ -713,8 +723,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         await _loadData();
       }
     } catch (e) {
+      _safePopNavigator();
       if (mounted) {
-        Navigator.pop(context);
         _showError('Error', e.toString());
       }
     }
@@ -2276,7 +2286,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(height: 12),
                   _buildAnalyticCard(
                     'Total Money',
-                    '\$${totalMoney}',
+                    '\$$totalMoney',
                     Icons.attach_money,
                     Colors.green,
                   ),

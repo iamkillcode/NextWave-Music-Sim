@@ -583,7 +583,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -878,7 +878,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                 ],
               ),
             );
-          }).toList(),
+          }),
           if (!isReleased) ...[
             const SizedBox(height: 16),
             Row(

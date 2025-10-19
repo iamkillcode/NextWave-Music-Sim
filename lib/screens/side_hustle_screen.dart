@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
 import '../models/side_hustle.dart';
 import '../services/side_hustle_service.dart';
-import '../services/game_time_service.dart';
 
 class SideHustleScreen extends StatefulWidget {
   final ArtistStats artistStats;

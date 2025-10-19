@@ -1119,7 +1119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final inactiveDays = daysSinceActivity - 7;
         fameDecay = (artistStats.fame * 0.01 * inactiveDays).floor();
         print(
-          '⚠️ Fame decay: ${daysSinceActivity} days inactive, -$fameDecay fame',
+          '⚠️ Fame decay: $daysSinceActivity days inactive, -$fameDecay fame',
         );
       }
     }
