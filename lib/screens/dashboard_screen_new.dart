@@ -88,6 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         lyricsSkill: 10,
         compositionSkill: 10,
         inspirationLevel: 0, // No hype yet - you're just starting!
+        age: 18, // Will be updated from Firestore when profile loads
       );
     }
 
