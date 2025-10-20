@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
+import '../models/pending_practice.dart';
 import 'practice_screen.dart';
 import 'unified_charts_screen.dart';
 import 'side_hustle_screen.dart';
@@ -9,12 +10,16 @@ class ActivityHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
   final Function(ArtistStats) onStatsUpdated;
   final DateTime currentGameDate;
+  final List<PendingPractice> pendingPractices;
+  final Function(PendingPractice) onPracticeStarted;
 
   const ActivityHubScreen({
     super.key,
     required this.artistStats,
     required this.onStatsUpdated,
     required this.currentGameDate,
+    required this.pendingPractices,
+    required this.onPracticeStarted,
   });
 
   @override
@@ -155,6 +160,9 @@ class ActivityHubScreen extends StatelessWidget {
                         builder: (context) => PracticeScreen(
                           artistStats: artistStats,
                           onStatsUpdated: onStatsUpdated,
+                          pendingPractices: pendingPractices,
+                          onPracticeStarted: onPracticeStarted,
+                          currentDate: currentGameDate,
                         ),
                       ),
                     );
@@ -189,9 +197,8 @@ class ActivityHubScreen extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  badge: artistStats.activeSideHustle != null
-                      ? 'Active'
-                      : 'Jobs',
+                  badge:
+                      artistStats.activeSideHustle != null ? 'Active' : 'Jobs',
                   description: 'Earn extra money',
                   onTap: () {
                     Navigator.push(

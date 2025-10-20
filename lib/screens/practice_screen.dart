@@ -1,15 +1,22 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'dart:math';
 import '../models/artist_stats.dart';
+import '../models/pending_practice.dart';
 
 class PracticeScreen extends StatefulWidget {
   final ArtistStats artistStats;
   final Function(ArtistStats) onStatsUpdated;
+  final List<PendingPractice> pendingPractices;
+  final Function(PendingPractice) onPracticeStarted;
+  final DateTime currentDate;
 
   const PracticeScreen({
     super.key,
     required this.artistStats,
     required this.onStatsUpdated,
+    this.pendingPractices = const [],
+    required this.onPracticeStarted,
+    required this.currentDate,
   });
 
   @override
@@ -18,54 +25,68 @@ class PracticeScreen extends StatefulWidget {
 
 class _PracticeScreenState extends State<PracticeScreen> {
   String? _selectedPractice;
-  final int _energyCost = 15;
-  final int _moneyCost = 50; // Cost for practice materials/studio time
-  final int _timeHours = 3; // Practice takes 3 hours
 
+  // Training programs with energy costs as per updated specs
   final List<Map<String, dynamic>> _practiceOptions = [
     {
       'id': 'songwriting',
-      'name': 'Songwriting',
+      'name': 'Songwriting Workshop',
       'emoji': '🎼',
-      'description': 'Improve your songwriting skills',
+      'description': 'Intensive 3-day songwriting course',
       'color': const Color(0xFF00D9FF),
-      'xp': 8, // Reduced XP for gradual gains
-      'skillGain': 2, // Small skill gain per session
+      'xp': 25,
+      'skillGain': 4,
+      'moneyCost': 500,
+      'energyCost': 10,
+      'durationDays': 3,
     },
     {
       'id': 'lyrics',
-      'name': 'Lyrics',
+      'name': 'Lyrics Masterclass',
       'emoji': '📝',
-      'description': 'Work on your lyrical abilities',
+      'description': 'Week-long lyrical writing bootcamp',
       'color': const Color(0xFFFF6B9D),
-      'xp': 6,
-      'skillGain': 2,
+      'xp': 35,
+      'skillGain': 6,
+      'moneyCost': 800,
+      'energyCost': 15,
+      'durationDays': 7,
     },
     {
       'id': 'composition',
-      'name': 'Composition',
+      'name': 'Music Theory Course',
       'emoji': '🎹',
-      'description': 'Practice music composition',
+      'description': '5-day advanced composition training',
       'color': const Color(0xFF9B59B6),
-      'xp': 10,
-      'skillGain': 3,
+      'xp': 40,
+      'skillGain': 15,
+      'moneyCost': 1000,
+      'energyCost': 25,
+      'durationDays': 5,
     },
     {
       'id': 'inspiration',
-      'name': 'Inspiration',
+      'name': 'Creative Retreat',
       'emoji': '💡',
-      'description': 'Gain creative inspiration',
+      'description': 'Weekend getaway for creative renewal',
       'color': const Color(0xFFFFD60A),
-      'xp': 5,
-      'skillGain': 4, // Higher inspiration gain
+      'xp': 20,
+      'skillGain': 20,
+      'moneyCost': 600,
+      'energyCost': 20,
+      'durationDays': 2,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    final canPractice =
-        widget.artistStats.energy >= _energyCost &&
-        widget.artistStats.money >= _moneyCost;
+    final selectedOption = _selectedPractice != null
+        ? _practiceOptions.firstWhere((opt) => opt['id'] == _selectedPractice)
+        : null;
+    final canAfford = selectedOption != null
+        ? widget.artistStats.money >= (selectedOption['moneyCost'] as int) &&
+            widget.artistStats.energy >= (selectedOption['energyCost'] as int)
+        : false;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
@@ -77,7 +98,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          '🎸 Practice',
+          '🎓 Professional Training',
           style: TextStyle(
             color: Colors.white,
             fontSize: 22,
@@ -91,7 +112,99 @@ class _PracticeScreenState extends State<PracticeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Energy and stats card
+              // Show pending practices if any
+              if (widget.pendingPractices.isNotEmpty) ...[
+                const Text(
+                  'Training in Progress',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...widget.pendingPractices.map((practice) {
+                  final remaining =
+                      practice.getRemainingDays(widget.currentDate);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(int.parse('FF${practice.colorHex}', radix: 16))
+                              .withOpacity(0.3),
+                          Color(int.parse('FF${practice.colorHex}', radix: 16))
+                              .withOpacity(0.1),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Color(
+                                int.parse('FF${practice.colorHex}', radix: 16))
+                            .withOpacity(0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(practice.emoji,
+                            style: const TextStyle(fontSize: 32)),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                practice.displayName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                remaining > 0
+                                    ? '$remaining day${remaining == 1 ? '' : 's'} remaining'
+                                    : 'Complete! Check your skills',
+                                style: TextStyle(
+                                  color: remaining > 0
+                                      ? Colors.white70
+                                      : const Color(0xFF32D74B),
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: remaining > 0
+                                      ? 1 - (remaining / practice.durationDays)
+                                      : 1.0,
+                                  minHeight: 6,
+                                  backgroundColor:
+                                      Colors.white.withOpacity(0.1),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(int.parse('FF${practice.colorHex}',
+                                        radix: 16)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 24),
+                const Divider(color: Colors.white24),
+                const SizedBox(height: 24),
+              ],
+
+              // Stats card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -113,7 +226,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Your Skills',
+                      'Your Current Skills',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -161,127 +274,39 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Costs indicators
+                    // Resources display
                     Row(
                       children: [
-                        // Energy cost
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.bolt,
-                                color: Color(0xFFFF6B9D),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${widget.artistStats.energy}/100',
-                                style: TextStyle(
-                                  color:
-                                      widget.artistStats.energy >= _energyCost
-                                      ? Colors.white
-                                      : const Color(0xFFFF453A),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                        const Icon(
+                          Icons.account_balance_wallet,
+                          color: Color(0xFF32D74B),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '\$${widget.artistStats.money}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        // Money cost
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.attach_money,
-                                color: Color(0xFF32D74B),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '\$${widget.artistStats.money}',
-                                style: TextStyle(
-                                  color: widget.artistStats.money >= _moneyCost
-                                      ? Colors.white
-                                      : const Color(0xFFFF453A),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 20),
+                        const Icon(
+                          Icons.bolt,
+                          color: Color(0xFFFF6B9D),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${widget.artistStats.energy}/100',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Cost info
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF39C12).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFFF39C12).withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Practice Cost:',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$_energyCost ⚡',
-                            style: const TextStyle(
-                              color: Color(0xFFFF6B9D),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            '•',
-                            style: TextStyle(
-                              color: Colors.white30,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '\$$_moneyCost 💵',
-                            style: const TextStyle(
-                              color: Color(0xFF32D74B),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            '•',
-                            style: TextStyle(
-                              color: Colors.white30,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$_timeHours hrs ⏰',
-                            style: const TextStyle(
-                              color: Color(0xFF0A84FF),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
                 ),
@@ -289,9 +314,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
               const SizedBox(height: 24),
 
-              // Practice options title
+              // Training options title
               const Text(
-                'Choose What to Practice',
+                'Professional Training Programs',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -300,7 +325,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Practice consistently for gradual improvement. Small gains lead to mastery!',
+                'Invest in professional courses. Pay upfront, wait for completion, then reap the rewards!',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6),
                   fontSize: 14,
@@ -308,31 +333,34 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Practice options
+              // Training options
               ..._practiceOptions.map((option) {
                 final isSelected = _selectedPractice == option['id'];
+                final canAffordThis = widget.artistStats.money >=
+                        (option['moneyCost'] as int) &&
+                    widget.artistStats.energy >= (option['energyCost'] as int);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildPracticeOption(
                     option: option,
                     isSelected: isSelected,
-                    canSelect: canPractice,
+                    canAfford: canAffordThis,
                   ),
                 );
               }),
 
               const SizedBox(height: 24),
 
-              // Practice button
+              // Enroll button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: (_selectedPractice != null && canPractice)
-                      ? _practiceSkill
+                  onPressed: (_selectedPractice != null && canAfford)
+                      ? _enrollInTraining
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF39C12),
-                    disabledBackgroundColor: Colors.grey,
+                    disabledBackgroundColor: Colors.grey.withOpacity(0.3),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -340,12 +368,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   ),
                   child: Text(
                     _selectedPractice == null
-                        ? 'Select a Practice Option'
-                        : canPractice
-                        ? 'Start Practicing ($_timeHours hours)'
-                        : widget.artistStats.energy < _energyCost
-                        ? 'Not Enough Energy'
-                        : 'Not Enough Money',
+                        ? 'Select a Training Program'
+                        : canAfford
+                            ? 'Enroll Now (\$${selectedOption['moneyCost']}, -${selectedOption['energyCost']} ⚡)'
+                            : 'Cannot Afford',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -355,7 +381,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
                 ),
               ),
 
-              if (!canPractice) ...[
+              if (_selectedPractice != null &&
+                  !canAfford &&
+                  selectedOption != null) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -373,9 +401,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          widget.artistStats.energy < _energyCost
-                              ? 'You need at least $_energyCost energy to practice'
-                              : 'You need at least \$$_moneyCost to practice',
+                          widget.artistStats.money <
+                                  (selectedOption['moneyCost'] as int)
+                              ? 'Need \$${selectedOption['moneyCost']} to enroll'
+                              : 'Need ${selectedOption['energyCost']} energy to enroll',
                           style: const TextStyle(
                             color: Color(0xFFFF453A),
                             fontSize: 13,
@@ -434,16 +463,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
   Widget _buildPracticeOption({
     required Map<String, dynamic> option,
     required bool isSelected,
-    required bool canSelect,
+    required bool canAfford,
   }) {
     return GestureDetector(
-      onTap: canSelect
-          ? () {
-              setState(() {
-                _selectedPractice = option['id'];
-              });
-            }
-          : null,
+      onTap: () {
+        setState(() {
+          _selectedPractice = option['id'];
+        });
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -481,7 +508,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   Text(
                     option['name'],
                     style: TextStyle(
-                      color: canSelect
+                      color: canAfford
                           ? Colors.white
                           : Colors.white.withOpacity(0.5),
                       fontSize: 16,
@@ -492,19 +519,19 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   Text(
                     option['description'],
                     style: TextStyle(
-                      color: canSelect
+                      color: canAfford
                           ? Colors.white.withOpacity(0.6)
                           : Colors.white.withOpacity(0.3),
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(Icons.trending_up, color: option['color'], size: 14),
                       const SizedBox(width: 4),
                       Text(
-                        '+${option['skillGain']}-${option['skillGain'] + 2} skill',
+                        '+${option['skillGain']} skill',
                         style: TextStyle(
                           color: option['color'],
                           fontSize: 11,
@@ -528,6 +555,61 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.attach_money,
+                        color: canAfford
+                            ? const Color(0xFF32D74B)
+                            : const Color(0xFFFF453A),
+                        size: 14,
+                      ),
+                      Text(
+                        '\$${option['moneyCost']}',
+                        style: TextStyle(
+                          color: canAfford
+                              ? const Color(0xFF32D74B)
+                              : const Color(0xFFFF453A),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.bolt,
+                        color: canAfford
+                            ? const Color(0xFFFF6B9D)
+                            : const Color(0xFFFF453A),
+                        size: 14,
+                      ),
+                      Text(
+                        '${option['energyCost']} ⚡',
+                        style: TextStyle(
+                          color: canAfford
+                              ? const Color(0xFFFF6B9D)
+                              : const Color(0xFFFF453A),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.calendar_today,
+                        color: Color(0xFF0A84FF),
+                        size: 12,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${option['durationDays']} days',
+                        style: const TextStyle(
+                          color: Color(0xFF0A84FF),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -544,89 +626,48 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 
-  void _practiceSkill() {
-    if (_selectedPractice == null ||
-        widget.artistStats.energy < _energyCost ||
-        widget.artistStats.money < _moneyCost) {
-      return;
-    }
+  void _enrollInTraining() {
+    if (_selectedPractice == null) return;
 
     final option = _practiceOptions.firstWhere(
       (opt) => opt['id'] == _selectedPractice,
     );
 
-    final random = Random();
+    final moneyCost = option['moneyCost'] as int;
+    final energyCost = option['energyCost'] as int;
 
-    // Small, gradual skill gains (base from option, ±1 random)
-    int baseSkillGain = option['skillGain'] as int;
-    int skillGain = baseSkillGain + random.nextInt(3) - 1;
-    skillGain = skillGain.clamp(1, baseSkillGain + 2);
-
-    // Very small experience gains
-    int xpGain = option['xp'] as int;
-
-    // Tiny fame increase (1 in 3 chance to get +1 fame)
-    int fameGain = random.nextInt(3) == 0 ? 1 : 0;
-
-    Map<String, int> improvements = {};
-    String practiceMessage = '';
-
-    switch (_selectedPractice) {
-      case 'songwriting':
-        improvements['songwritingSkill'] = skillGain;
-        improvements['experience'] = xpGain;
-        practiceMessage =
-            'You refined your songwriting techniques through focused practice.';
-        break;
-      case 'lyrics':
-        improvements['lyricsSkill'] = skillGain;
-        improvements['experience'] = xpGain;
-        practiceMessage =
-            'You developed your lyrical abilities with dedicated effort.';
-        break;
-      case 'composition':
-        improvements['compositionSkill'] = skillGain;
-        improvements['experience'] = xpGain;
-        practiceMessage = 'You enhanced your musical composition skills.';
-        break;
-      case 'inspiration':
-        improvements['inspirationLevel'] = skillGain;
-        improvements['experience'] = xpGain;
-        practiceMessage = 'You found creative inspiration through exploration.';
-        break;
+    if (widget.artistStats.money < moneyCost ||
+        widget.artistStats.energy < energyCost) {
+      return;
     }
 
-    // Update stats with gradual gains and resource consumption
+    final random = Random();
+
+    // Small variance on gains (±20%)
+    int skillGain = option['skillGain'] as int;
+    int variance = (skillGain * 0.2).round();
+    skillGain = skillGain + random.nextInt(variance * 2 + 1) - variance;
+
+    // Create pending practice
+    final pendingPractice = PendingPractice(
+      practiceType: option['id'] as String,
+      startDate: widget.currentDate,
+      durationDays: option['durationDays'] as int,
+      skillGain: skillGain,
+      xpGain: option['xp'] as int,
+      moneyCost: moneyCost,
+    );
+
+    // Deduct money and energy immediately
     final updatedStats = widget.artistStats.copyWith(
-      energy: widget.artistStats.energy - _energyCost,
-      money: widget.artistStats.money - _moneyCost,
-      creativity: (widget.artistStats.creativity + 1).clamp(
-        0,
-        100,
-      ), // Tiny creativity boost
-      fanbase: widget.artistStats.fanbase + fameGain, // Sometimes gain a fan
-      songwritingSkill:
-          (widget.artistStats.songwritingSkill +
-                  (improvements['songwritingSkill'] ?? 0))
-              .clamp(0, 100),
-      lyricsSkill:
-          (widget.artistStats.lyricsSkill + (improvements['lyricsSkill'] ?? 0))
-              .clamp(0, 100),
-      compositionSkill:
-          (widget.artistStats.compositionSkill +
-                  (improvements['compositionSkill'] ?? 0))
-              .clamp(0, 100),
-      inspirationLevel:
-          (widget.artistStats.inspirationLevel +
-                  (improvements['inspirationLevel'] ?? 0))
-              .clamp(0, 100),
-      experience:
-          widget.artistStats.experience + (improvements['experience'] ?? 0),
+      money: widget.artistStats.money - moneyCost,
+      energy: widget.artistStats.energy - energyCost,
     );
 
     widget.onStatsUpdated(updatedStats);
+    widget.onPracticeStarted(pendingPractice);
 
-    // Show success dialog
+    // Show enrollment confirmation
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -638,7 +679,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
-                'Practice Complete!',
+                'Enrolled!',
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
             ),
@@ -649,65 +690,49 @@ class _PracticeScreenState extends State<PracticeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              practiceMessage,
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$_timeHours hours of practice completed',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+              'You\'ve enrolled in ${option['name']}!',
+              style: const TextStyle(color: Colors.white, fontSize: 14),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Gains:',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (option['color'] as Color).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: (option['color'] as Color).withOpacity(0.5),
+                ),
+              ),
+              child: Column(
+                children: [
+                  _buildResultRow(
+                    'Duration',
+                    '${option['durationDays']} in-game days',
+                    const Color(0xFF0A84FF),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildResultRow(
+                    'Completion',
+                    pendingPractice.completionDate.toString().split(' ')[0],
+                    const Color(0xFF32D74B),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildResultRow(
+                    'Expected Gains',
+                    '+$skillGain skill, +${option['xp']} XP',
+                    option['color'],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            _buildResultRow('Skill', '+$skillGain', option['color']),
-            _buildResultRow(
-              'Experience',
-              '+${improvements['experience']} XP',
-              const Color(0xFFFFD60A),
-            ),
-            _buildResultRow('Creativity', '+1', const Color(0xFF9B59B6)),
-            if (fameGain > 0)
-              _buildResultRow('Fame', '+$fameGain', const Color(0xFF32D74B)),
             const SizedBox(height: 12),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 8),
             const Text(
-              'Resources Used:',
+              '💰 Payment processed. Training will complete after the specified in-game days pass. Keep playing to advance time!',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+                color: Colors.white70,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
               ),
-            ),
-            const SizedBox(height: 8),
-            _buildResultRow(
-              'Energy',
-              '-$_energyCost ⚡',
-              const Color(0xFFFF6B9D),
-            ),
-            _buildResultRow(
-              'Money',
-              '-\$$_moneyCost 💵',
-              const Color(0xFFFF9500),
             ),
           ],
         ),
@@ -722,52 +747,31 @@ class _PracticeScreenState extends State<PracticeScreen> {
               style: TextStyle(color: Color(0xFF0A84FF)),
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _selectedPractice = null;
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF39C12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Practice Again',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildResultRow(String label, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
-            ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontSize: 13,
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

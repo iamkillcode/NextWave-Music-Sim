@@ -11,6 +11,7 @@ import '../services/game_time_service.dart';
 import '../services/stream_growth_service.dart';
 import '../services/side_hustle_service.dart';
 import '../services/song_name_generator.dart';
+import '../models/pending_practice.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
 import 'media_hub_screen.dart';
@@ -56,6 +57,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
   String _timeUntilNextDay = ''; // Formatted time until next day
   bool _hasPendingSave = false; // Track if we have pending changes to save
+  List<PendingPractice> pendingPractices =
+      []; // Track ongoing training programs
 
   @override
   void initState() {
@@ -367,6 +370,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Check if player missed days while offline
         await _checkForMissedDays(data);
+
+        // Load pending practices
+        await _loadPendingPractices();
+
+        // Check for completed practices
+        await _checkCompletedPractices();
 
         // Set up real-time listeners AFTER profile is loaded
         _setupRealtimeListeners();
@@ -801,6 +810,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ), // Track last activity
         'songs': artistStats.songs.map((song) => song.toJson()).toList(),
         'activeSideHustle': artistStats.activeSideHustle?.toJson(),
+        'pendingPractices': pendingPractices
+            .map((p) => p.toMap())
+            .toList(), // Save pending training programs
         if (artistStats.careerStartDate != null)
           'careerStartDate': Timestamp.fromDate(
             artistStats.careerStartDate!,
@@ -843,6 +855,128 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _saveDebounceTimer?.cancel();
     _hasPendingSave = false;
     _saveUserProfile();
+  }
+
+  // === PENDING PRACTICE MANAGEMENT ===
+
+  /// Load pending practices from Firestore
+  Future<void> _loadPendingPractices() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final doc = await FirebaseFirestore.instance
+          .collection('players')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists && doc.data()?['pendingPractices'] != null) {
+        final practicesList = doc.data()!['pendingPractices'] as List<dynamic>;
+        setState(() {
+          pendingPractices = practicesList
+              .map((data) =>
+                  PendingPractice.fromMap(Map<String, dynamic>.from(data)))
+              .toList();
+        });
+        print('✅ Loaded ${pendingPractices.length} pending practices');
+      }
+    } catch (e) {
+      print('❌ Error loading pending practices: $e');
+    }
+  }
+
+  /// Save pending practices to Firestore
+  Future<void> _savePendingPractices() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      await FirebaseFirestore.instance
+          .collection('players')
+          .doc(user.uid)
+          .update({
+        'pendingPractices': pendingPractices.map((p) => p.toMap()).toList(),
+      });
+
+      print('✅ Saved ${pendingPractices.length} pending practices');
+    } catch (e) {
+      print('❌ Error saving pending practices: $e');
+    }
+  }
+
+  /// Check for completed practices and apply their benefits
+  Future<void> _checkCompletedPractices() async {
+    if (currentGameDate == null) return;
+
+    final completedPractices = pendingPractices
+        .where((practice) => practice.isComplete(currentGameDate!))
+        .toList();
+
+    if (completedPractices.isEmpty) return;
+
+    print('🎓 Found ${completedPractices.length} completed practices!');
+
+    for (final practice in completedPractices) {
+      // Apply the skill gains based on practice type
+      setState(() {
+        switch (practice.practiceType) {
+          case 'songwriting':
+            artistStats = artistStats.copyWith(
+              songwritingSkill:
+                  artistStats.songwritingSkill + practice.skillGain,
+              experience: artistStats.experience + practice.xpGain,
+            );
+            break;
+          case 'lyrics':
+            artistStats = artistStats.copyWith(
+              lyricsSkill: artistStats.lyricsSkill + practice.skillGain,
+              experience: artistStats.experience + practice.xpGain,
+            );
+            break;
+          case 'composition':
+            artistStats = artistStats.copyWith(
+              compositionSkill:
+                  artistStats.compositionSkill + practice.skillGain,
+              experience: artistStats.experience + practice.xpGain,
+            );
+            break;
+          case 'inspiration':
+            artistStats = artistStats.copyWith(
+              inspirationLevel:
+                  artistStats.inspirationLevel + practice.skillGain,
+              experience: artistStats.experience + practice.xpGain,
+            );
+            break;
+        }
+      });
+
+      print(
+          '✅ Applied ${practice.displayName}: +${practice.skillGain} skill, +${practice.xpGain} XP');
+    }
+
+    // Remove completed practices
+    setState(() {
+      pendingPractices.removeWhere(
+        (practice) => practice.isComplete(currentGameDate!),
+      );
+    });
+
+    // Save the updated state
+    await _savePendingPractices();
+    _immediateSave(); // Save stats with new skills
+
+    // Show notification to user
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '🎓 Training complete! Gained skills from ${completedPractices.length} program(s)',
+          ),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _updateGameDate() async {
@@ -894,6 +1028,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           print(
             '✅ Energy restored to 100 - Game Date: ${_gameTimeService.formatGameDate(newGameDate)}',
           );
+
+          // Check for completed practice programs
+          await _checkCompletedPractices();
         }
       } else {
         // Same day, just update passive income
@@ -2377,72 +2514,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           }
           break;
-        case 'practice':
-          if (artistStats.energy >= 15) {
-            // Randomly choose which skills to improve
-            final practiceTypes = [
-              'songwriting',
-              'lyrics',
-              'composition',
-              'inspiration',
-            ];
-            final selectedPractice = (practiceTypes..shuffle()).first;
-
-            int skillGain = 2 +
-                (artistStats.energy > 50
-                    ? 1
-                    : 0); // Better results with more energy
-
-            Map<String, int> improvements = {};
-            String practiceMessage = '';
-
-            switch (selectedPractice) {
-              case 'songwriting':
-                improvements['songwritingSkill'] = skillGain;
-                improvements['experience'] = 15;
-                practiceMessage = '🎼 Practiced songwriting techniques!';
-                break;
-              case 'lyrics':
-                improvements['lyricsSkill'] = skillGain;
-                improvements['experience'] = 12;
-                practiceMessage = '📝 Worked on lyrical skills!';
-                break;
-              case 'composition':
-                improvements['compositionSkill'] = skillGain;
-                improvements['experience'] = 18;
-                practiceMessage = '🎹 Practiced music composition!';
-                break;
-              case 'inspiration':
-                improvements['inspirationLevel'] = skillGain * 2;
-                improvements['experience'] = 10;
-                practiceMessage = '💡 Gained creative inspiration!';
-                break;
-            }
-
-            artistStats = artistStats.copyWith(
-              energy: artistStats.energy - 15,
-              creativity: artistStats.creativity + 3,
-              fanbase: artistStats.fanbase + 1,
-              songwritingSkill: (artistStats.songwritingSkill +
-                      (improvements['songwritingSkill'] ?? 0))
-                  .clamp(0, 100),
-              lyricsSkill:
-                  (artistStats.lyricsSkill + (improvements['lyricsSkill'] ?? 0))
-                      .clamp(0, 100),
-              compositionSkill: (artistStats.compositionSkill +
-                      (improvements['compositionSkill'] ?? 0))
-                  .clamp(0, 100),
-              inspirationLevel: (artistStats.inspirationLevel +
-                      (improvements['inspirationLevel'] ?? 0))
-                  .clamp(0, 100),
-              experience:
-                  artistStats.experience + (improvements['experience'] ?? 0),
-            );
-            _showMessage(
-              '🎸 $practiceMessage\n+${improvements['experience']} XP, +${improvements.values.where((v) => v > 0 && improvements.keys.first != 'experience').first} ${selectedPractice[0].toUpperCase()}${selectedPractice.substring(1)} skill',
-            );
-          }
-          break;
+        // REMOVED: Quick practice from dashboard
+        // Players must use the dedicated Practice screen from Activity Hub
         case 'social_media':
           if (artistStats.energy >= 10) {
             artistStats = artistStats.copyWith(
@@ -3493,6 +3566,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _debouncedSave(); // Save stats to Firestore (debounced)
                 },
                 currentGameDate: currentGameDate ?? DateTime.now(),
+                pendingPractices: pendingPractices,
+                onPracticeStarted: (practice) {
+                  setState(() {
+                    pendingPractices.add(practice);
+                  });
+                  _savePendingPractices();
+                  _debouncedSave();
+                },
               ),
             ),
           );
