@@ -42,12 +42,14 @@ class _TunifyScreenState extends State<TunifyScreen>
 
   @override
   Widget build(BuildContext context) {
-    final totalStreams = releasedSongs.fold<int>(
+    // Calculate monthly listeners from last 7 days streams
+    // Monthly ≈ 4.3 weeks of activity (30 days / 7 days per week)
+    final last7DaysStreams = releasedSongs.fold<int>(
       0,
-      (sum, song) => sum + song.streams,
+      (sum, song) => sum + song.last7DaysStreams,
     );
     final monthlyListeners =
-        (totalStreams * 0.3).round(); // Estimate monthly listeners
+        (last7DaysStreams * 4.3).round(); // Based on recent weekly activity
 
     return Scaffold(
       backgroundColor: Colors.black,

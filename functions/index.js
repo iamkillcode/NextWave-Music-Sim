@@ -585,7 +585,7 @@ function calculateDailyStreamGrowth(song, playerData, currentGameDate) {
   const daysSinceRelease = Math.floor((currentGameDate - releaseDate) / (1000 * 60 * 60 * 24));
   
   const loyalFanbase = playerData.loyalFanbase || 0;
-  const totalFanbase = playerData.level || 1;
+  const totalFanbase = playerData.fanbase || 1; // FIX: Use fanbase instead of level
   const songQuality = song.quality || 50;
   const viralityScore = song.viralityScore || 0.5;
   const ageCategory = getAgeCategory(daysSinceRelease);
@@ -863,7 +863,8 @@ function applyEventBonuses(baseStreams, song, playerData, event) {
       }
       break;
     case 'new_artist_boost':
-      if ((playerData.level || 0) < 10000) {
+      // Boost for artists with small fanbase (under 10k fans)
+      if ((playerData.fanbase || 0) < 10000) {
         multiplier = event.effect.newArtistBonus;
       }
       break;
@@ -1632,8 +1633,16 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
             break;
             
           case 'currentFame':
-          case 'fanbase':
             if (!validateStatChange(oldValue, newValue, stat, 50)) {
+              throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
+            }
+            validatedUpdates[stat] = Math.max(0, newValue);
+            break;
+            
+          case 'fanbase':
+            // Fanbase can grow more rapidly from daily streams (multiple songs × conversion rates)
+            // Allow up to 2000 new fans per save (accounts for viral hits, multiple albums, campaigns)
+            if (!validateStatChange(oldValue, newValue, stat, 2000)) {
               throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
             }
             validatedUpdates[stat] = Math.max(0, newValue);

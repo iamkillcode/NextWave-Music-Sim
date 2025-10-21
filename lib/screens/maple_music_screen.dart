@@ -47,6 +47,16 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Calculate monthly listeners from last 7 days streams
+    // Monthly ≈ 4.3 weeks of activity (30 days / 7 days per week)
+    final last7DaysStreams = releasedSongs.fold<int>(
+      0,
+      (sum, song) => sum + song.last7DaysStreams,
+    );
+    final monthlyListeners =
+        (last7DaysStreams * 4.3).round(); // Based on recent weekly activity
+
+    // Followers is a separate metric (40% of fanbase on this platform)
     final followers =
         (_currentStats.fanbase * 0.4).round(); // 40% of fanbase on Maple Music
 
@@ -55,7 +65,8 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
       body: CustomScrollView(
         slivers: [
           // Apple Music-style Header
-          SliverToBoxAdapter(child: _buildArtistHeader(followers)),
+          SliverToBoxAdapter(
+              child: _buildArtistHeader(followers, monthlyListeners)),
           // Action Buttons & Navigation
           SliverToBoxAdapter(child: _buildActionButtonsAndNav()),
           // Content based on selected tab
@@ -66,7 +77,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
   }
 
   // Apple Music-style Artist Header
-  Widget _buildArtistHeader(int followers) {
+  Widget _buildArtistHeader(int followers, int monthlyListeners) {
     return Container(
       height: 420,
       decoration: BoxDecoration(
@@ -163,13 +174,35 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
+                // Monthly Listeners (consistent with Tunify)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.headphones_rounded,
+                      color: Colors.white.withOpacity(0.7),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_formatNumber(monthlyListeners)} monthly listeners',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 // Followers
                 Text(
                   '${_formatNumber(followers)} Followers',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -596,34 +629,148 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
     );
   }
 
-  // Albums Tab - Placeholder
+  // Albums Tab - Show released albums and singles
   Widget _buildAlbumsTab() {
+    if (releasedSongs.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            Icon(
+              Icons.album_outlined,
+              size: 80,
+              color: Colors.white.withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No albums yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Release songs on Maple Music to see them here',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(40),
+      color: const Color(0xFF000000),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.album_outlined,
-            size: 80,
-            color: Colors.white.withOpacity(0.3),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Album feature coming soon!',
-            textAlign: TextAlign.center,
+          // Singles & Albums Section
+          const Text(
+            'Singles & Albums',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Group your songs into albums for better organization',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.4),
-              fontSize: 14,
+          const SizedBox(height: 16),
+          // Grid of album covers
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.75,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: releasedSongs.length,
+            itemBuilder: (context, index) {
+              final song = releasedSongs[index];
+              return _buildAlbumCard(song);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumCard(Song song) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Album art
+          AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFFFC3C44).withOpacity(0.8),
+                    const Color(0xFFFC3C44).withOpacity(0.4),
+                  ],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  song.genreEmoji,
+                  style: const TextStyle(fontSize: 48),
+                ),
+              ),
+            ),
+          ),
+          // Song info
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    song.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Single • ${song.genre}',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

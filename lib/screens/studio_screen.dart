@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import 'release_manager_screen.dart';
 
 class StudioScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -76,6 +77,27 @@ class _StudioScreenState extends State<StudioScreen>
           _buildRecordedSongsTab(),
           _buildReleasedSongsTab(),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ReleaseManagerScreen(
+                artistStats: _currentStats,
+                onStatsUpdated: (updatedStats) {
+                  setState(() {
+                    _currentStats = updatedStats;
+                  });
+                  widget.onStatsUpdated(updatedStats);
+                },
+              ),
+            ),
+          );
+        },
+        backgroundColor: const Color(0xFFE94560),
+        icon: const Icon(Icons.library_music_rounded),
+        label: const Text('Releases (EPs/Albums)'),
       ),
     );
   }

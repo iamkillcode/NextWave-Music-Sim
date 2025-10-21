@@ -56,6 +56,9 @@ dependencies:
   
   # Google Fonts for better emoji and character support
   google_fonts: ^6.1.0
+  
+  # Audio player for tap sounds and rewards
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:

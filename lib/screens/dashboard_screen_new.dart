@@ -87,7 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             5000, // Starting money - enough to get started with side hustles!
         energy: 100,
         creativity: 0, // No hype yet - you're just starting!
-        fanbase: 1,
+        fanbase: 100, // Start with 100 fans minimum
         albumsSold: 0,
         songsWritten: 0,
         concertsPerformed: 0,
@@ -368,8 +368,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             money: (data['currentMoney'] ?? 5000).toInt(),
             energy: 100, // Always start with full energy
             creativity: (data['inspirationLevel'] ?? 0).toInt(),
-            fanbase: (data['fanbase'] ?? data['level'] ?? 1)
-                .toInt(), // Try fanbase first, fallback to level for old saves
+            fanbase: ((data['fanbase'] ?? data['level'] ?? 100).toInt())
+                .clamp(100, double.infinity.toInt()), // Minimum 100 fans
             loyalFanbase: (data['loyalFanbase'] ?? 0).toInt(),
             albumsSold: (data['albumsReleased'] ?? 0).toInt(),
             songsWritten: (data['songsPublished'] ?? 0).toInt(),
@@ -1995,7 +1995,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               setState(() {
                                 artistStats = updatedStats;
                               });
-                              _debouncedSave(); // ✅ Save after releasing songs
+                              _debouncedSave(); // ✅ Save after releasing albums
                             },
                           ),
                         ),

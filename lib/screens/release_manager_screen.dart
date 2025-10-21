@@ -31,11 +31,13 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   AlbumType _selectedType = AlbumType.ep;
   final List<String> _selectedSongIds = [];
   String? _uploadedCoverArtUrl; // Album/EP cover art URL
+  late ArtistStats _currentStats;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _currentStats = widget.artistStats;
   }
 
   @override
@@ -125,7 +127,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
 
   Widget _buildCreateTab() {
     // Get available songs (recorded or already released)
-    final availableSongs = widget.artistStats.songs.where((song) {
+    final availableSongs = _currentStats.songs.where((song) {
       // Can use recorded songs OR released singles
       if (song.state == SongState.recorded) return true;
       if (song.state == SongState.released && song.releaseType == 'single') {
@@ -680,7 +682,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   Widget _buildSelectedSongs() {
     if (_selectedSongIds.isEmpty) return const SizedBox.shrink();
 
-    final selectedSongs = widget.artistStats.songs
+    final selectedSongs = _currentStats.songs
         .where((song) => _selectedSongIds.contains(song.id))
         .toList();
 
@@ -828,7 +830,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     );
 
     // Update songs to mark them as part of this album
-    final updatedSongs = widget.artistStats.songs.map((song) {
+    final updatedSongs = _currentStats.songs.map((song) {
       if (_selectedSongIds.contains(song.id)) {
         return song.copyWith(
           albumId: newAlbum.id,
@@ -838,13 +840,15 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       return song;
     }).toList();
 
-    // Add album to artist stats
-    final updatedStats = widget.artistStats.copyWith(
-      albums: [...widget.artistStats.albums, newAlbum],
-      songs: updatedSongs,
-    );
+    // Add album to artist stats and update local state
+    setState(() {
+      _currentStats = _currentStats.copyWith(
+        albums: [..._currentStats.albums, newAlbum],
+        songs: updatedSongs,
+      );
+    });
 
-    widget.onStatsUpdated(updatedStats);
+    widget.onStatsUpdated(_currentStats);
 
     // Show success dialog
     showDialog(
@@ -889,7 +893,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   }
 
   Widget _buildScheduledTab() {
-    final scheduledAlbums = widget.artistStats.albums
+    final scheduledAlbums = _currentStats.albums
         .where((album) =>
             album.state == AlbumState.planned ||
             album.state == AlbumState.scheduled)
@@ -926,7 +930,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   }
 
   Widget _buildReleasedTab() {
-    final releasedAlbums = widget.artistStats.albums
+    final releasedAlbums = _currentStats.albums
         .where((album) => album.state == AlbumState.released)
         .toList();
 
@@ -956,7 +960,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   }
 
   Widget _buildAlbumCard(Album album, {bool isReleased = false}) {
-    final songs = widget.artistStats.songs
+    final songs = _currentStats.songs
         .where((song) => album.songIds.contains(song.id))
         .toList();
 
@@ -1074,13 +1078,13 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
 
   void _releaseAlbum(Album album) {
     // Get the songs in this album
-    final albumSongs = widget.artistStats.songs
+    final albumSongs = _currentStats.songs
         .where((song) => album.songIds.contains(song.id))
         .toList();
 
     // RULE: If a song was already released as a single with cover art, keep it
     // If a song has NO cover art, use the album's cover art
-    final updatedSongs = widget.artistStats.songs.map((song) {
+    final updatedSongs = _currentStats.songs.map((song) {
       if (album.songIds.contains(song.id)) {
         // This song is part of the album
         String? finalCoverArt = song.coverArtUrl; // Keep existing if it has one
@@ -1090,10 +1094,22 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           finalCoverArt = album.coverArtUrl;
         }
 
+        // CRITICAL: Only set releasedDate if song is NOT already released
+        // This prevents overwriting the original release date of singles
+        final DateTime releaseDate = song.state == SongState.released
+            ? song.releasedDate! // Keep existing release date
+            : DateTime.now();     // Set new release date
+
+        // Ensure songs have streaming platforms for Tunify and Maple Music
+        final platforms = song.streamingPlatforms.isEmpty
+            ? ['tunify', 'maple_music']
+            : song.streamingPlatforms;
+
         return song.copyWith(
           state: SongState.released,
-          releasedDate: DateTime.now(),
+          releasedDate: releaseDate,
           coverArtUrl: finalCoverArt,
+          streamingPlatforms: platforms,
           // Keep the albumId and releaseType already set
         );
       }
@@ -1107,7 +1123,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     );
 
     // Update albums list
-    final updatedAlbums = widget.artistStats.albums.map((a) {
+    final updatedAlbums = _currentStats.albums.map((a) {
       return a.id == album.id ? updatedAlbum : a;
     }).toList();
 
@@ -1120,14 +1136,17 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     final fameGain = 5 + (avgQuality ~/ 20); // 5-10 fame based on quality
     final fanbaseGain = 100 + (fameGain * 20); // Larger fanbase boost for albums
 
-    final updatedStats = widget.artistStats.copyWith(
-      songs: updatedSongs,
-      albums: updatedAlbums,
-      fame: widget.artistStats.fame + fameGain,
-      fanbase: widget.artistStats.fanbase + fanbaseGain,
-    );
+    // Update local state and notify parent
+    setState(() {
+      _currentStats = _currentStats.copyWith(
+        songs: updatedSongs,
+        albums: updatedAlbums,
+        fame: _currentStats.fame + fameGain,
+        fanbase: _currentStats.fanbase + fanbaseGain,
+      );
+    });
 
-    widget.onStatsUpdated(updatedStats);
+    widget.onStatsUpdated(_currentStats);
 
     // Show success dialog
     showDialog(
@@ -1199,7 +1218,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           TextButton(
             onPressed: () {
               // Remove album reference from songs
-              final updatedSongs = widget.artistStats.songs.map((song) {
+              final updatedSongs = _currentStats.songs.map((song) {
                 if (song.albumId == album.id) {
                   return song.copyWith(
                     albumId: null,
@@ -1210,14 +1229,18 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               }).toList();
 
               // Remove album
-              final updatedAlbums = widget.artistStats.albums
+              final updatedAlbums = _currentStats.albums
                   .where((a) => a.id != album.id)
                   .toList();
 
-              widget.onStatsUpdated(widget.artistStats.copyWith(
-                albums: updatedAlbums,
-                songs: updatedSongs,
-              ));
+              setState(() {
+                _currentStats = _currentStats.copyWith(
+                  albums: updatedAlbums,
+                  songs: updatedSongs,
+                );
+              });
+
+              widget.onStatsUpdated(_currentStats);
 
               Navigator.pop(context);
             },

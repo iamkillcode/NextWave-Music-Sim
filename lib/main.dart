@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'screens/dashboard_screen_new.dart';
 import 'screens/auth_screen.dart';
 import 'firebase_options.dart';
 import 'utils/firebase_status.dart';
 import 'services/remote_config_service.dart';
 import 'widgets/remote_config_guard.dart';
+import 'theme/nextwave_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,26 +70,7 @@ class MusicArtistApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'NextWave',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-        // Use Google Fonts with proper emoji fallback
-        textTheme: GoogleFonts.robotoTextTheme(
-          Theme.of(context).textTheme,
-        ).apply(
-          bodyColor: Colors.white,
-          displayColor: Colors.white,
-        ),
-        scaffoldBackgroundColor: const Color(
-          0xFF0D1117,
-        ), // GitHub dark background
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF21262D),
-          selectedItemColor: Color(0xFF00D9FF), // Cyan
-          unselectedItemColor: Colors.white54,
-          type: BottomNavigationBarType.fixed,
-        ),
-      ),
+      theme: NextWaveTheme.theme,
       home: _getInitialScreen(),
       routes: {
         '/auth': (context) => const AuthScreen(),
