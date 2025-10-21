@@ -47,8 +47,11 @@ All project documentation has been organized into the `/docs` directory:
 ## �🚀 Getting Started
 
 ### Prerequisites
-- Flutter SDK (3.8.1 or higher)
-- Dart SDK (3.8.1 or higher)
+- Flutter SDK (stable release; tested with 3.35.6)
+- Dart SDK (comes with Flutter)
+- Node.js (used for Cloud Functions and deploy tooling — Node 18 recommended)
+- nvm (optional, recommended to manage Node versions)
+- Google Chrome or Chromium (required for running web target with Flutter)
 - Firebase account
 - Git
 
@@ -56,8 +59,8 @@ All project documentation has been organized into the `/docs` directory:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/NextWave.git
-   cd NextWave/mobile_game
+   git clone https://github.com/iamkillcode/NextWave-Music-Sim.git
+   cd NextWave-Music-Sim
    ```
 
 2. **Install dependencies**
@@ -73,13 +76,30 @@ All project documentation has been organized into the `/docs` directory:
    ```
    
    Option B: Manual setup:
-   - See [docs/setup/FIREBASE_SETUP.md](docs/setup/) for detailed instructions
-   - Or run: `flutterfire configure`
+   - See [docs/setup/](docs/setup/) for detailed instructions
+   - Or run: `flutterfire configure` from the project root and follow the prompts
 
 4. **Run the app**
    ```bash
-   # Web
+   # Web (ensure Chrome/Chromium is installed)
    flutter run -d chrome
+### Deploying the Web Build (GitHub Pages)
+
+This repository includes a minimal `package.json` for deploying the built web app to GitHub Pages.
+
+1. Build the web app:
+
+```bash
+flutter build web
+```
+
+2. Deploy the `build/web` output to GitHub Pages (uses `gh-pages`):
+
+```bash
+npx gh-pages -d build/web
+```
+
+Tip: When developing or deploying Cloud Functions, use Node 18 (see `.nvmrc` in `functions/` and `nextwavecl/`).
    
    # Android
    flutter run -d android

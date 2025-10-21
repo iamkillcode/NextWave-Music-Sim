@@ -6,6 +6,7 @@ import 'write_song_screen.dart';
 import 'studios_list_screen.dart';
 import 'release_song_screen.dart';
 import 'record_album_screen.dart';
+import 'release_manager_screen.dart';
 
 class MusicHubScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -61,6 +62,13 @@ class _MusicHubScreenState extends State<MusicHubScreen>
         backgroundColor: const Color(0xFF21262D),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: () => _navigateToReleaseManager(),
+            icon: const Icon(Icons.library_music),
+            tooltip: 'Release Manager',
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFF00D9FF),
@@ -124,6 +132,15 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             color: const Color(0xFF9B59B6),
             energyCost: 40,
             onTap: () => _navigateToRecordAlbum(),
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            title: 'Manage Releases',
+            subtitle: 'Bundle songs into EPs and Albums',
+            icon: Icons.library_music, 
+            color: const Color(0xFFFFD700),
+            energyCost: 0,
+            onTap: () => _navigateToReleaseManager(),
           ),
           const SizedBox(height: 24),
           _buildStatsOverview(),
@@ -836,6 +853,28 @@ class _MusicHubScreenState extends State<MusicHubScreen>
       context,
       MaterialPageRoute(
         builder: (context) => RecordAlbumScreen(artistStats: _currentStats),
+      ),
+    );
+
+    if (result != null && result is ArtistStats) {
+      setState(() {
+        _currentStats = result;
+      });
+      widget.onStatsUpdated(_currentStats);
+    }
+  }
+
+  void _navigateToReleaseManager() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReleaseManagerScreen(
+          artistStats: _currentStats,
+          onStatsUpdated: (updatedStats) {
+            // Release Manager will notify parent via Navigator.pop
+            Navigator.pop(context, updatedStats);
+          },
+        ),
       ),
     );
 
