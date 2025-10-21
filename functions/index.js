@@ -123,6 +123,18 @@ exports.dailyGameUpdate = functions.pubsub
         console.log(`💾 Committed final batch of ${batchCount} players`);
       }
       
+      // ===================================================================
+      // DAILY SIDE HUSTLE CONTRACT GENERATION
+      // ===================================================================
+      console.log('📋 Generating new side hustle contracts...');
+      try {
+        await generateDailySideHustleContracts();
+        console.log('✅ Daily side hustle contracts generated');
+      } catch (contractError) {
+        console.error('❌ Error generating side hustle contracts:', contractError);
+        // Don't fail entire daily update if contract generation fails
+      }
+      
       console.log(`✅ Daily update complete!`);
       console.log(`   Processed: ${processedCount} / ${playersSnapshot.size} players`);
       console.log(`   Errors: ${errorCount}`);
@@ -463,6 +475,43 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
     }
     
     if (totalNewStreams > 0 || famePenalty > 0 || sideHustleExpired) {
+      
+      // 🎯 CALCULATE FANBASE GROWTH from streams
+      let fanbaseGrowth = 0;
+      let fameGrowth = 0;
+      let loyalFanGrowth = 0;
+      
+      if (totalNewStreams > 0) {
+        const currentFanbase = playerData.fanbase || 0;
+        const currentFame = playerData.fame || 0;
+        const currentLoyalFans = playerData.loyalFanbase || 0;
+        
+        // Every 1,000 streams converts 1 casual listener to a fan
+        // Apply diminishing returns for established artists
+        const baseFanGrowth = Math.floor(totalNewStreams / 1000);
+        const diminishingFactor = 1.0 / (1.0 + currentFanbase / 10000);
+        fanbaseGrowth = Math.round(baseFanGrowth * diminishingFactor);
+        fanbaseGrowth = Math.max(0, Math.min(50, fanbaseGrowth)); // Cap at 50 per day
+        
+        // Every 10,000 streams increases fame by 1 point
+        // Also has diminishing returns for mega-celebrities
+        const baseFameGrowth = Math.floor(totalNewStreams / 10000);
+        const fameDiminishing = 1.0 / (1.0 + currentFame / 500);
+        fameGrowth = Math.round(baseFameGrowth * fameDiminishing);
+        fameGrowth = Math.max(0, Math.min(10, fameGrowth)); // Cap at 10 per day
+        
+        // Convert casual fans to loyal fans based on consistent streaming
+        // Every 5,000 streams converts 1 casual fan to loyal
+        const casualFans = Math.max(0, currentFanbase - currentLoyalFans);
+        if (casualFans > 0) {
+          const baseLoyalGrowth = Math.floor(totalNewStreams / 5000);
+          const loyalDiminishing = 1.0 / (1.0 + currentLoyalFans / 5000);
+          const maxConvertible = Math.round(casualFans * 0.05); // Max 5% of casual fans per day
+          loyalFanGrowth = Math.round(baseLoyalGrowth * loyalDiminishing);
+          loyalFanGrowth = Math.max(0, Math.min(maxConvertible, loyalFanGrowth));
+        }
+      }
+      
       const updates = {
         songs: updatedSongs,
         currentMoney: (playerData.currentMoney || 0) + totalNewIncome,
@@ -470,10 +519,29 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
       };
       
-      // Apply fame decay if needed
-      if (famePenalty > 0) {
-        const currentFame = playerData.fame || 0;
-        updates.fame = Math.max(0, currentFame - famePenalty);
+      // Apply fanbase growth
+      if (fanbaseGrowth > 0) {
+        updates.fanbase = (playerData.fanbase || 0) + fanbaseGrowth;
+        console.log(`📈 ${playerData.displayName || playerId}: +${fanbaseGrowth} fans (total: ${updates.fanbase})`);
+      }
+      
+      // Apply loyal fanbase growth
+      if (loyalFanGrowth > 0) {
+        updates.loyalFanbase = (playerData.loyalFanbase || 0) + loyalFanGrowth;
+        console.log(`💎 ${playerData.displayName || playerId}: +${loyalFanGrowth} loyal fans (total: ${updates.loyalFanbase})`);
+      }
+      
+      // Apply fame growth and decay
+      const currentFame = playerData.fame || 0;
+      const netFameChange = fameGrowth - famePenalty;
+      if (netFameChange !== 0) {
+        updates.fame = Math.max(0, Math.min(999, currentFame + netFameChange));
+        if (fameGrowth > 0) {
+          console.log(`⭐ ${playerData.displayName || playerId}: +${fameGrowth} fame`);
+        }
+        if (famePenalty > 0) {
+          console.log(`⚠️ ${playerData.displayName || playerId}: -${famePenalty} fame (inactivity)`);
+        }
       }
       
       // ✅ Terminate side hustle contract if expired
@@ -1296,7 +1364,7 @@ function getRarity(value) {
 }
 
 // ============================================================================
-// ANTI-CHEAT VALIDATION FUNCTIONS
+// ANTI-CHEAT VALIDATION FUNCTIONS - ENHANCED SECURITY
 // ============================================================================
 
 function validateQuality(song, playerData) {
@@ -1309,6 +1377,433 @@ function validateQuality(song, playerData) {
   
   return song.quality <= maxQuality + 10; // Allow 10% margin
 }
+
+// Enhanced validation functions for anti-cheat
+function validateMoneyChange(oldMoney, newMoney, action, context = {}) {
+  const maxGains = {
+    'song_creation': 500,      // Max $500 per song
+    'side_hustle': 200,        // Max $200 per day
+    'stream_income': 10000,    // Max $10K per day from streams
+    'album_release': 50000,    // Max $50K per album
+    'admin_gift': 1000000,     // Admin gifts can be large
+    'admin_stat_update': 1000000,  // ✅ Admin manual stat adjustments can be large
+    'stat_update': 10000,      // ✅ Regular stat updates (for profile saves, etc.)
+  };
+  
+  const gain = newMoney - oldMoney;
+  const maxGain = maxGains[action] || 1000; // Default max $1K
+  
+  if (gain < 0) return true; // Spending money is always valid
+  if (gain > maxGain) {
+    console.warn(`🚨 Suspicious money gain: ${gain} for action ${action}, max allowed: ${maxGain}`);
+    return false;
+  }
+  return true;
+}
+
+function validateStatChange(oldValue, newValue, statName, maxGainPerAction = 10) {
+  const gain = newValue - oldValue;
+  if (gain < 0) return true; // Stats can decrease
+  if (gain > maxGainPerAction) {
+    console.warn(`🚨 Suspicious ${statName} gain: ${gain}, max allowed: ${maxGainPerAction}`);
+    return false;
+  }
+  return true;
+}
+
+function validateEnergyConsumption(energyUsed, action) {
+  const maxEnergyPerAction = {
+    'song_creation': 50,
+    'side_hustle': 30,
+    'practice': 20,
+    'viral_campaign': 40,
+  };
+  
+  const maxEnergy = maxEnergyPerAction[action] || 25;
+  return energyUsed <= maxEnergy;
+}
+
+function detectSuspiciousActivity(playerData, changes) {
+  const flags = [];
+  
+  // Check for impossible stat combinations
+  if (playerData.currentMoney > 10000000) flags.push('excessive_money');
+  if (playerData.currentFame > 1000) flags.push('excessive_fame');
+  
+  // Check for rapid progression
+  const totalSkills = (playerData.songwritingSkill || 0) + 
+                     (playerData.lyricsSkill || 0) + 
+                     (playerData.compositionSkill || 0);
+  if (totalSkills > 250) flags.push('suspicious_skill_total');
+  
+  // Check for negative values
+  if (playerData.currentMoney < 0) flags.push('negative_money');
+  if (playerData.energy < 0 || playerData.energy > 100) flags.push('invalid_energy');
+  
+  return flags;
+}
+
+async function logSuspiciousActivity(playerId, activity, flags, additionalData = {}) {
+  await db.collection('security_logs').add({
+    playerId,
+    activity,
+    flags,
+    additionalData,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    severity: flags.length > 2 ? 'high' : 'medium',
+  });
+  
+  console.warn(`🚨 Suspicious activity logged for player ${playerId}: ${flags.join(', ')}`);
+}
+
+// ============================================================================
+// SECURE GAME ACTIONS - Server-side validation for all critical operations
+// ============================================================================
+
+exports.secureSongCreation = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+  
+  const playerId = context.auth.uid;
+  const { title, genre, effort } = data;
+  
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const playerRef = db.collection('players').doc(playerId);
+      const playerDoc = await transaction.get(playerRef);
+      
+      if (!playerDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Player not found');
+      }
+      
+      const playerData = playerDoc.data();
+      
+      // Validate effort level
+      if (effort < 1 || effort > 4) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid effort level');
+      }
+      
+      // Calculate energy cost
+      const energyCosts = { 1: 15, 2: 25, 3: 35, 4: 45 };
+      const energyCost = energyCosts[effort];
+      
+      // Validate player has enough energy
+      if ((playerData.energy || 100) < energyCost) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient energy');
+      }
+      
+      // Calculate song quality server-side (prevents manipulation)
+      const songwritingSkill = playerData.songwritingSkill || 10;
+      const lyricsSkill = playerData.lyricsSkill || 10;
+      const compositionSkill = playerData.compositionSkill || 10;
+      
+      let baseQuality = (songwritingSkill + lyricsSkill + compositionSkill) / 3.0;
+      baseQuality *= (0.5 + (effort * 0.25)); // Effort multiplier
+      baseQuality *= (0.8 + ((playerData.inspirationLevel || 0) / 100.0 * 0.4)); // Inspiration
+      
+      const songQuality = Math.min(100, Math.max(1, Math.round(baseQuality)));
+      
+      // Calculate rewards (server-side to prevent manipulation)
+      const moneyGain = Math.round((songQuality / 100) * 100 * effort); // Max $400
+      const fameGain = Math.round((songQuality / 100) * 2 * effort); // Max 8 fame
+      const creativityGain = effort * 2;
+      
+      // Calculate skill gains
+      const baseGain = effort;
+      const bonusGain = songQuality > 70 ? 2 : songQuality > 50 ? 1 : 0;
+      
+      const skillGains = {
+        songwritingSkill: baseGain + bonusGain,
+        experience: (effort * 10) + Math.round(songQuality / 10),
+        lyricsSkill: genre === 'Hip Hop' ? baseGain + bonusGain + 2 : baseGain / 2,
+        compositionSkill: genre === 'Electronic' ? baseGain + bonusGain + 1 : baseGain / 2,
+      };
+      
+      // Validate money change
+      const oldMoney = playerData.currentMoney || 1000;
+      const newMoney = oldMoney + moneyGain;
+      if (!validateMoneyChange(oldMoney, newMoney, 'song_creation')) {
+        throw new functions.https.HttpsError('invalid-argument', 'Suspicious money gain detected');
+      }
+      
+      // Create song object
+      const songId = `song_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const newSong = {
+        id: songId,
+        title,
+        genre,
+        quality: songQuality,
+        createdDate: admin.firestore.FieldValue.serverTimestamp(),
+        state: 'written',
+      };
+      
+      // Update player stats
+      const updates = {
+        energy: Math.max(0, (playerData.energy || 100) - energyCost),
+        currentMoney: newMoney,
+        currentFame: (playerData.currentFame || 0) + fameGain,
+        inspirationLevel: Math.max(0, (playerData.inspirationLevel || 0) + creativityGain),
+        songwritingSkill: Math.min(100, (playerData.songwritingSkill || 10) + skillGains.songwritingSkill),
+        lyricsSkill: Math.min(100, (playerData.lyricsSkill || 10) + skillGains.lyricsSkill),
+        compositionSkill: Math.min(100, (playerData.compositionSkill || 10) + skillGains.compositionSkill),
+        experience: Math.min(10000, (playerData.experience || 0) + skillGains.experience),
+        songs: admin.firestore.FieldValue.arrayUnion(newSong),
+        lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      // Log suspicious activity if detected
+      const flags = detectSuspiciousActivity({ ...playerData, ...updates }, updates);
+      if (flags.length > 0) {
+        await logSuspiciousActivity(playerId, 'song_creation', flags, { 
+          songQuality, 
+          moneyGain, 
+          effort,
+          title 
+        });
+      }
+      
+      transaction.update(playerRef, updates);
+      
+      return {
+        success: true,
+        song: newSong,
+        gains: {
+          money: moneyGain,
+          fame: fameGain,
+          creativity: creativityGain,
+          skills: skillGains,
+        },
+        newStats: {
+          energy: updates.energy,
+          money: updates.currentMoney,
+          fame: updates.currentFame,
+        },
+      };
+    });
+  } catch (error) {
+    console.error('Error in secureSongCreation:', error);
+    throw error;
+  }
+});
+
+exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+  
+  const { updates, action, context: actionContext, playerId } = data;
+  
+  // Determine which player to update
+  let targetPlayerId = context.auth.uid; // Default: update self
+  
+  // Admin can update other players
+  if (playerId && playerId !== context.auth.uid) {
+    await validateAdminAccess(context); // Throws if not admin
+    targetPlayerId = playerId;
+  }
+  
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const playerRef = db.collection('players').doc(targetPlayerId);
+      const playerDoc = await transaction.get(playerRef);
+      
+      if (!playerDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Player not found');
+      }
+      
+      const playerData = playerDoc.data();
+      const validatedUpdates = {};
+      
+      // Validate each stat change
+      for (const [stat, newValue] of Object.entries(updates)) {
+        const oldValue = playerData[stat] || 0;
+        
+        switch (stat) {
+          case 'currentMoney':
+            if (!validateMoneyChange(oldValue, newValue, action, actionContext)) {
+              throw new functions.https.HttpsError('invalid-argument', `Invalid money change: ${oldValue} -> ${newValue}`);
+            }
+            validatedUpdates[stat] = Math.max(0, newValue); // No negative money
+            break;
+            
+          case 'energy':
+            validatedUpdates[stat] = Math.max(0, Math.min(100, newValue)); // 0-100 range
+            break;
+            
+          case 'currentFame':
+          case 'fanbase':
+            if (!validateStatChange(oldValue, newValue, stat, 50)) {
+              throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
+            }
+            validatedUpdates[stat] = Math.max(0, newValue);
+            break;
+            
+          case 'songwritingSkill':
+          case 'lyricsSkill':
+          case 'compositionSkill':
+            if (!validateStatChange(oldValue, newValue, stat, 10)) {
+              throw new functions.https.HttpsError('invalid-argument', `Invalid skill change`);
+            }
+            validatedUpdates[stat] = Math.max(0, Math.min(100, newValue));
+            break;
+          
+          case 'experience':
+            // XP can grow rapidly from writing songs, performing, etc.
+            if (!validateStatChange(oldValue, newValue, stat, 200)) {
+              throw new functions.https.HttpsError('invalid-argument', `Invalid experience change`);
+            }
+            validatedUpdates[stat] = Math.max(0, newValue); // No upper limit
+            break;
+          
+          case 'creativity':
+          case 'inspirationLevel':
+            // 🎨 Creativity (Hype) and Inspiration - can grow significantly from activities
+            if (!validateStatChange(oldValue, newValue, stat, 100)) {
+              throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
+            }
+            validatedUpdates[stat] = Math.max(0, newValue); // No upper limit
+            break;
+          
+          // ✅ CRITICAL FIX: Allow songs, albums, and fanbase arrays to be saved
+          case 'songs':
+          case 'albums':
+          case 'regionalFanbase':
+            // Accept arrays/objects without validation (structure validated client-side)
+            validatedUpdates[stat] = newValue;
+            break;
+          
+          case 'loyalFanbase':
+          case 'currentRegion':
+            // Accept simple values without strict validation
+            validatedUpdates[stat] = newValue;
+            break;
+            
+          default:
+            validatedUpdates[stat] = newValue;
+        }
+      }
+      
+      // Add timestamp
+      validatedUpdates.lastActivity = admin.firestore.FieldValue.serverTimestamp();
+      
+      // Check for suspicious activity (skip for admin actions)
+      let detectedFlags = [];
+      if (action !== 'admin_stat_update') {
+        detectedFlags = detectSuspiciousActivity({ ...playerData, ...validatedUpdates }, validatedUpdates);
+        if (detectedFlags.length > 0) {
+          await logSuspiciousActivity(targetPlayerId, action || 'stat_update', detectedFlags, { 
+            originalUpdates: updates,
+            validatedUpdates,
+            actionContext 
+          });
+          
+          // Block update if too many flags
+          if (detectedFlags.length > 3) {
+            throw new functions.https.HttpsError('permission-denied', 'Suspicious activity detected');
+          }
+        }
+      }
+      
+      transaction.update(playerRef, validatedUpdates);
+      
+      return {
+        success: true,
+        appliedUpdates: validatedUpdates,
+        flags: action !== 'admin_stat_update' ? (detectedFlags.length > 0 ? detectedFlags : undefined) : undefined,
+      };
+    });
+  } catch (error) {
+    console.error('Error in secureStatUpdate:', error);
+    throw error;
+  }
+});
+
+exports.secureSideHustleReward = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+  
+  const playerId = context.auth.uid;
+  const { sideHustleId, currentGameDate } = data;
+  
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const playerRef = db.collection('players').doc(playerId);
+      const playerDoc = await transaction.get(playerRef);
+      
+      if (!playerDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Player not found');
+      }
+      
+      const playerData = playerDoc.data();
+      const sideHustle = playerData.activeSideHustle;
+      
+      if (!sideHustle || sideHustle.id !== sideHustleId) {
+        throw new functions.https.HttpsError('not-found', 'No matching active side hustle');
+      }
+      
+      // Validate the side hustle hasn't been exploited
+      const lastRewardDate = sideHustle.lastRewardDate ? toDateSafe(sideHustle.lastRewardDate) : null;
+      const gameDate = toDateSafe(currentGameDate);
+      
+      if (lastRewardDate && gameDate && gameDate <= lastRewardDate) {
+        throw new functions.https.HttpsError('failed-precondition', 'Side hustle already rewarded for this date');
+      }
+      
+      // Validate reward amounts
+      const dailyPay = Math.min(200, Math.max(50, sideHustle.dailyPay || 100)); // Cap at $200/day
+      const energyCost = Math.min(30, Math.max(5, sideHustle.dailyEnergyCost || 15)); // Cap at 30 energy
+      
+      const oldMoney = playerData.currentMoney || 1000;
+      const newMoney = oldMoney + dailyPay;
+      const oldEnergy = playerData.energy || 100;
+      const newEnergy = Math.max(0, oldEnergy - energyCost);
+      
+      // Validate money change
+      if (!validateMoneyChange(oldMoney, newMoney, 'side_hustle')) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid side hustle reward');
+      }
+      
+      // Check if contract expired
+      const endDate = toDateSafe(sideHustle.endDate);
+      const isExpired = gameDate && endDate && gameDate > endDate;
+      
+      const updates = {
+        currentMoney: newMoney,
+        energy: newEnergy,
+        lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      if (isExpired) {
+        updates.activeSideHustle = admin.firestore.FieldValue.delete();
+      } else {
+        updates.activeSideHustle = {
+          ...sideHustle,
+          lastRewardDate: admin.firestore.Timestamp.fromDate(gameDate),
+        };
+      }
+      
+      transaction.update(playerRef, updates);
+      
+      return {
+        success: true,
+        rewards: {
+          money: dailyPay,
+          energyCost: energyCost,
+        },
+        contractExpired: isExpired,
+        newStats: {
+          money: newMoney,
+          energy: newEnergy,
+        },
+      };
+    });
+  } catch (error) {
+    console.error('Error in secureSideHustleReward:', error);
+    throw error;
+  }
+});
 
 async function checkNoDuplicateSongName(playerId, title) {
   const playerDoc = await db.collection('players').doc(playerId).get();
@@ -1788,12 +2283,16 @@ exports.simulateNPCActivity = functions.pubsub
           };
         });
         
-        // 2. Occasionally release new songs (based on release frequency)
+        // 2. Release new songs when release frequency threshold is met
         const daysSinceLastRelease = Math.floor(
           (Date.now() - npc.lastReleaseDate.toDate().getTime()) / (1000 * 60 * 60 * 24)
         );
         
-        if (daysSinceLastRelease >= npc.releaseFrequency && Math.random() > 0.7) {
+        // Release if frequency threshold is met (with small random variance to feel natural)
+        // Base threshold + random 0-2 days variance = releases happen reliably but not on exact same day
+        const shouldRelease = daysSinceLastRelease >= (npc.releaseFrequency + Math.floor(Math.random() * 3));
+        
+        if (shouldRelease) {
           const newSong = {
             id: `${npc.id}_song_${Date.now()}`,
             title: generateNPCSongTitle(npc.primaryGenre),
@@ -1811,11 +2310,14 @@ exports.simulateNPCActivity = functions.pubsub
           
           // Update last release date
           npc.lastReleaseDate = admin.firestore.Timestamp.fromDate(new Date());
+          
+          // Post announcement on EchoX about the new release
+          await createNPCEchoXPost(npc, 'song_release', newSong.title);
         }
         
-        // 3. Post on EchoX occasionally
-        if (shouldNPCPostOnEchoX(npc.socialActivity)) {
-          await createNPCEchoXPost(npc);
+        // 3. Post on EchoX occasionally (not during song releases - those create their own posts)
+        if (!shouldRelease && shouldNPCPostOnEchoX(npc.socialActivity)) {
+          await createNPCEchoXPost(npc, 'general');
           echoxPosts++;
         }
         
@@ -1898,20 +2400,206 @@ function shouldNPCPostOnEchoX(socialActivity) {
 }
 
 // Helper: Create NPC EchoX post
-async function createNPCEchoXPost(npc) {
+async function createNPCEchoXPost(npc, postType = 'general', songTitle = null) {
   try {
-    const postTemplates = [
-      `Just dropped a new track! 🔥`,
-      `In the studio working on something special...`,
-      `${npc.region.toUpperCase()} stand up! 🙌`,
-      `New music coming soon 👀`,
-      `Working late nights on this album 💯`,
-      `Thank you for the love and support ❤️`,
-      `${npc.primaryGenre} vibes all day 🎵`,
-      `Grateful for this journey 🙏`,
-    ];
+    let content = '';
     
-    const content = postTemplates[Math.floor(Math.random() * postTemplates.length)];
+    // Unique personality-based posts for each NPC
+    const personalityPosts = {
+      npc_jaylen_sky: {
+        general: [
+          'Real recognize real 💯',
+          'Atlanta forever, this my city 🏙️',
+          'Every bar I write, I own it. Period.',
+          'Built this from the ground up, no handouts 📈',
+          'They tried to take credit for my work... not happening 👊',
+          'SoundCloud to stadium shows. That\'s the journey 🚀',
+          'Pen game too strong, they can\'t fake this 📝',
+          'Late nights in the studio, this is what dedication looks like 🎤',
+        ],
+        song_release: [
+          `"${songTitle}" out now! Every word mine, every bar authentic 🔥`,
+          `New track "${songTitle}" - wrote this one myself too 💯`,
+          `Just dropped "${songTitle}" - real Hip Hop, no ghostwriters 🎤`,
+          `"${songTitle}" live! Atlanta stand up! 🏙️`,
+        ],
+      },
+      npc_luna_grey: {
+        general: [
+          'Sometimes staying true to yourself costs everything... worth it ✨',
+          'Between the radio hits and my soul... choosing my soul 🎵',
+          'London nights got me feeling inspired 🌙',
+          'Major label pressure vs artistic integrity. We know which one wins 💪',
+          'Thank you for loving the real me, not the industry version ❤️',
+          'Writing sessions that feel like therapy 📝',
+          'Pop music can still have depth. I\'m proving it every day ✨',
+          'Staying authentic in a manufactured world 🎯',
+        ],
+        song_release: [
+          `New single "${songTitle}" out now - this one\'s from the heart ❤️`,
+          `"${songTitle}" is live! My truth, my sound, my rules ✨`,
+          `Just released "${songTitle}" - raw, honest, unapologetic 🎵`,
+          `"${songTitle}" available now. This is me, unfiltered 💫`,
+        ],
+      },
+      npc_elodie_rain: {
+        general: [
+          'Dans l\'obscurité, on trouve la lumière... (In darkness, we find light) 🌙',
+          'Creating soundscapes for the digital age 🎹',
+          'My synths speak the language words cannot express ✨',
+          'Art and technology, forever intertwined 🤖',
+          'Midnight in Paris, where the music breathes 🌃',
+          'The machine learns... but who teaches the machine? 🧠',
+          'Experimental is just another word for fearless 💫',
+          'Poetry in code, emotion in synthesis 🎵',
+        ],
+        song_release: [
+          `Nouveau morceau: "${songTitle}" 🎹 Listen with headphones`,
+          `"${songTitle}" - an exploration of sound and silence 🌌`,
+          `New release: "${songTitle}" - where AI meets artistry ✨`,
+          `"${songTitle}" est disponible maintenant. Close your eyes and feel it 🎧`,
+        ],
+      },
+      npc_santiago_vega: {
+        general: [
+          '¡La vida es un baile! Life is a dance 💃',
+          'They talk about rivalry... I talk about excellence 🔥',
+          'Brazil + Puerto Rico = unstoppable energy 🇧🇷🇵🇷',
+          'El fuego nunca duerme (The fire never sleeps) 🌟',
+          'Dance like the world is watching... because it is 👀',
+          'Controversy keeps my name trending. Free promo 📱',
+          'Passion, rhythm, and a little bit of danger ⚡',
+          'Making history one performance at a time 🎤',
+        ],
+        song_release: [
+          `¡NUEVO! "${songTitle}" disponible ahora! 🔥💃`,
+          `"${songTitle}" out now! Prepárense to move! 🎵`,
+          `New track "${songTitle}" - Latino heat at maximum! 🌶️`,
+          `"${songTitle}" is live! Dale play! 🚀`,
+        ],
+      },
+      npc_zyrah: {
+        general: [
+          'From open mics to global stages - the journey continues 🌍',
+          'Lagos raised me, the world will know me 🇳🇬',
+          'They say success changes you... I say it reveals you 👑',
+          'Afrobeat forever! This is our time! 🥁',
+          'My crew been real since day one. Nothing changes that 💯',
+          'Rising star? Nah, I\'m a whole constellation ✨',
+          'African excellence in every note 🎵',
+          'Confidence isn\'t arrogance when you can back it up 💪',
+        ],
+        song_release: [
+          `"${songTitle}" out now! Afrobeat magic 🌍✨`,
+          `New music: "${songTitle}" - this one\'s special! 🎵`,
+          `Just dropped "${songTitle}"! Lagos to the world! 🇳🇬`,
+          `"${songTitle}" available now - pure Afrobeat energy! 🔥`,
+        ],
+      },
+      npc_kazuya_rin: {
+        general: [
+          'Tokyo nights inspire Tokyo sounds 🌃',
+          '音楽は魂の言語 (Music is the language of the soul) 🎧',
+          'Anime aesthetics meet electronic precision ⚡',
+          'Creating visions, questioning everything 🤔',
+          'The future sounds like this 🚀',
+          'Discipline in chaos, order in creativity 🎹',
+          'Sometimes the artist needs to rest... but the music doesn\'t stop 💫',
+          'Neon lights and synthesized dreams ✨',
+        ],
+        song_release: [
+          `New release: "${songTitle}" 🎧 Enter the soundscape`,
+          `"${songTitle}" out now - a journey through sound 🌌`,
+          `"${songTitle}" available. Visuals coming soon 👁️`,
+          `Just released "${songTitle}" - the future is now ⚡`,
+        ],
+      },
+      npc_nova_reign: {
+        general: [
+          'Melancholy is just beauty in disguise 🌙',
+          'Toronto winters shape Toronto sounds ❄️',
+          'The mystery is part of the art ✨',
+          'Some secrets are meant to stay secrets 🤫',
+          'Cinematic moments in everyday life 🎬',
+          'Behind every hit song... never mind 👀',
+          'Dreamscapes and soundscapes 💭',
+          'Identity is fluid, art is eternal 🌊',
+        ],
+        song_release: [
+          `"${songTitle}" - a new chapter begins 📖`,
+          `New music: "${songTitle}" out now 🎵`,
+          `Just released "${songTitle}" - dive in 🌊`,
+          `"${songTitle}" available everywhere. Listen in the dark 🌙`,
+        ],
+      },
+      npc_jax_carter: {
+        general: [
+          'Surf\'s up, music\'s loud 🏄',
+          'Sydney sunsets hit different when the creativity flows 🌅',
+          'That album leak? Best thing that ever happened to me 📈',
+          'Indie music with island vibes 🌴',
+          'Multi-instrumental chaos, perfectly orchestrated 🎸',
+          'Good friends, good music, good life 🤙',
+          'Sometimes accidents lead to success 🍀',
+          'Creating freely, living fully ✨',
+        ],
+        song_release: [
+          `New track "${songTitle}" riding the waves! 🌊`,
+          `"${songTitle}" out now! Turn it up! 🔊`,
+          `Just dropped "${songTitle}" - indie anthem vibes 🎸`,
+          `"${songTitle}" is live! Surf rock meets indie dreams 🏄`,
+        ],
+      },
+      npc_kofi_dray: {
+        general: [
+          'Highlife Revival isn\'t a trend, it\'s a movement 🥁',
+          'Old grooves, new energy. That\'s the formula 🎵',
+          'Amapiano meets Highlife - the future of African music 🌍',
+          'Global fame won\'t change my principles 💯',
+          'Producer mindset, singer\'s heart 🎤',
+          'Patience is the key to greatness ⏳',
+          'From the studio to the streets, music for the people 🙏',
+          'Keeping our culture alive, one beat at a time 🇬🇭',
+        ],
+        song_release: [
+          `New music: "${songTitle}" - Highlife Revival continues! 🥁`,
+          `"${songTitle}" out now! Feel the groove 🎵`,
+          `Just released "${songTitle}" - old soul, new sound 🌍`,
+          `"${songTitle}" available everywhere. Africa rising! 🚀`,
+        ],
+      },
+      npc_hana_seo: {
+        general: [
+          '자유 (Freedom) tastes sweeter than fame 👑',
+          'From idol to artist - this is my evolution ✨',
+          'Breaking free was the scariest and best decision 💪',
+          'K-Pop trained me, R&B freed me 🎵',
+          'Perfectionism isn\'t a flaw, it\'s a superpower ⚡',
+          'Seoul nights, independent life 🌃',
+          'My fans who grew with me - this journey is ours ❤️',
+          'Rebellion looks like authenticity 🔥',
+        ],
+        song_release: [
+          `"${songTitle}" out now! This is the real me 👑`,
+          `New single "${songTitle}" - mature, bold, unapologetic 🎵`,
+          `Just dropped "${songTitle}"! Independent and loving it! ✨`,
+          `"${songTitle}" available now. The new era begins 🚀`,
+        ],
+      },
+    };
+    
+    // Get posts for this NPC
+    const npcPosts = personalityPosts[npc.id] || {
+      general: ['New music coming soon! 🎵'],
+      song_release: [`Just dropped "${songTitle}"! 🔥`],
+    };
+    
+    // Select appropriate post type
+    if (postType === 'song_release' && songTitle && npcPosts.song_release) {
+      content = npcPosts.song_release[Math.floor(Math.random() * npcPosts.song_release.length)];
+    } else {
+      content = npcPosts.general[Math.floor(Math.random() * npcPosts.general.length)];
+    }
     
     await db.collection('echox_posts').add({
       authorId: npc.id,
@@ -1924,7 +2612,7 @@ async function createNPCEchoXPost(npc) {
       isNPC: true, // Mark as NPC post
     });
     
-    console.log(`📱 ${npc.name} posted on EchoX`);
+    console.log(`📱 ${npc.name} posted on EchoX: "${content}"`);
   } catch (error) {
     console.error(`❌ Error creating EchoX post for ${npc.name}:`, error);
   }
@@ -2093,13 +2781,63 @@ exports.forceNPCRelease = functions.https.onCall(async (data, context) => {
 });
 
 // =============================================================================
-// ADMIN: Send Gift to Player
+// ADMIN VALIDATION FUNCTIONS
 // =============================================================================
-exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
-  // Verify admin authentication
+
+/**
+ * Server-side admin validation - centralizes all admin checks
+ * Never trust client-side admin claims
+ */
+async function validateAdminAccess(context) {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
+
+  const userId = context.auth.uid;
+  
+  // Define admin user IDs server-side only
+  const ADMIN_USER_IDS = [
+    'xjJFuMCEKMZwkI8uIP34Jl2bfQA3', // Primary admin
+    // Add additional admin IDs here as needed
+  ];
+
+  // Check hardcoded admin list first (fastest)
+  if (ADMIN_USER_IDS.includes(userId)) {
+    return true;
+  }
+
+  // Check dynamic admin collection
+  try {
+    const adminDoc = await db.collection('admins').doc(userId).get();
+    if (adminDoc.exists && adminDoc.data().isAdmin === true) {
+      return true;
+    }
+  } catch (error) {
+    console.warn('Error checking admin collection:', error);
+  }
+
+  // Not an admin
+  throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+}
+
+// =============================================================================
+// ADMIN: Check Admin Status (Secure)
+// =============================================================================
+exports.checkAdminStatus = functions.https.onCall(async (data, context) => {
+  try {
+    await validateAdminAccess(context);
+    return { isAdmin: true };
+  } catch (error) {
+    return { isAdmin: false };
+  }
+});
+
+// =============================================================================
+// ADMIN: Send Gift to Player (Secure)
+// =============================================================================
+exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
+  // Validate admin access server-side
+  await validateAdminAccess(context);
 
   const { recipientId, giftType, amount, message } = data;
 
@@ -2280,3 +3018,191 @@ exports.triggerWeeklyLeaderboardUpdate = functions.https.onCall(async (data, con
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
+
+// ============================================================================
+// GLOBAL NOTIFICATION DISTRIBUTION
+// ============================================================================
+
+/**
+ * Distribute a global notification to all players
+ * This creates individual notification documents in each player's subcollection
+ */
+exports.sendGlobalNotificationToPlayers = functions.https.onCall(async (data, context) => {
+  // Validate admin access
+  await validateAdminAccess(context);
+
+  const { title, message } = data;
+
+  if (!title || !message) {
+    throw new functions.https.HttpsError('invalid-argument', 'Title and message are required');
+  }
+
+  console.log(`📢 Distributing global notification: "${title}"`);
+
+  try {
+    // Get all players
+    const playersSnapshot = await db.collection('players').get();
+    console.log(`👥 Found ${playersSnapshot.size} players`);
+
+    // Create notifications in batches (Firestore limit: 500 writes per batch)
+    const batchSize = 500;
+    let batchCount = 0;
+    let batch = db.batch();
+    let totalNotifications = 0;
+
+    for (const playerDoc of playersSnapshot.docs) {
+      const notificationRef = db
+        .collection('players')
+        .doc(playerDoc.id)
+        .collection('notifications')
+        .doc(); // Auto-generate ID
+
+      batch.set(notificationRef, {
+        title: title,
+        message: message,
+        type: 'global',
+        read: false,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        source: 'admin_broadcast',
+      });
+
+      batchCount++;
+      totalNotifications++;
+
+      // Commit batch when it reaches the limit
+      if (batchCount >= batchSize) {
+        await batch.commit();
+        console.log(`✅ Committed batch of ${batchCount} notifications`);
+        batch = db.batch();
+        batchCount = 0;
+      }
+    }
+
+    // Commit remaining notifications
+    if (batchCount > 0) {
+      await batch.commit();
+      console.log(`✅ Committed final batch of ${batchCount} notifications`);
+    }
+
+    console.log(`🎉 Successfully distributed ${totalNotifications} notifications to ${playersSnapshot.size} players`);
+
+    return {
+      success: true,
+      playersNotified: playersSnapshot.size,
+      notificationsSent: totalNotifications,
+    };
+  } catch (error) {
+    console.error('❌ Error distributing global notification:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================================
+// SIDE HUSTLE CONTRACT GENERATION
+// ============================================================================
+
+/**
+ * Generate new side hustle contracts daily
+ * Removes old unavailable contracts and adds fresh ones to the pool
+ */
+async function generateDailySideHustleContracts() {
+  console.log('💼 Starting daily side hustle contract generation...');
+  
+  try {
+    const contractsRef = db.collection('side_hustle_contracts');
+    
+    // 1. Clean up old unavailable contracts (older than 2 days)
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const oldContractsSnapshot = await contractsRef
+      .where('isAvailable', '==', false)
+      .where('createdAt', '<', admin.firestore.Timestamp.fromDate(twoDaysAgo))
+      .get();
+    
+    if (!oldContractsSnapshot.empty) {
+      const deleteBatch = db.batch();
+      oldContractsSnapshot.docs.forEach(doc => {
+        deleteBatch.delete(doc.ref);
+      });
+      await deleteBatch.commit();
+      console.log(`🗑️  Deleted ${oldContractsSnapshot.size} old contracts`);
+    }
+    
+    // 2. Count currently available contracts
+    const availableSnapshot = await contractsRef
+      .where('isAvailable', '==', true)
+      .get();
+    
+    const currentAvailable = availableSnapshot.size;
+    console.log(`📊 Current available contracts: ${currentAvailable}`);
+    
+    // 3. Generate new contracts to maintain pool of 15-20
+    const targetContracts = 18; // Target pool size
+    const contractsToGenerate = Math.max(0, targetContracts - currentAvailable);
+    
+    if (contractsToGenerate > 0) {
+      const newContractsBatch = db.batch();
+      
+      for (let i = 0; i < contractsToGenerate; i++) {
+        const contract = generateRandomSideHustleContract();
+        const docRef = contractsRef.doc(); // Auto-generate ID
+        newContractsBatch.set(docRef, contract);
+      }
+      
+      await newContractsBatch.commit();
+      console.log(`✅ Generated ${contractsToGenerate} new side hustle contracts`);
+    } else {
+      console.log(`✅ Contract pool is healthy (${currentAvailable}/${targetContracts}), no new contracts needed`);
+    }
+    
+    return { success: true, generated: contractsToGenerate, currentPool: currentAvailable + contractsToGenerate };
+  } catch (error) {
+    console.error('❌ Error in generateDailySideHustleContracts:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate a random side hustle contract
+ */
+function generateRandomSideHustleContract() {
+  const hustleTypes = [
+    { name: 'Security Guard', icon: '🛡️', basePayPerDay: 150, baseEnergyPerDay: 15 },
+    { name: 'Dog Walker', icon: '🐕', basePayPerDay: 80, baseEnergyPerDay: 10 },
+    { name: 'Babysitter', icon: '👶', basePayPerDay: 120, baseEnergyPerDay: 20 },
+    { name: 'Food Delivery', icon: '🚴', basePayPerDay: 100, baseEnergyPerDay: 12 },
+    { name: 'Rideshare Driver', icon: '🚗', basePayPerDay: 130, baseEnergyPerDay: 12 },
+    { name: 'Retail Clerk', icon: '🛒', basePayPerDay: 90, baseEnergyPerDay: 15 },
+    { name: 'Tutor', icon: '📚', basePayPerDay: 140, baseEnergyPerDay: 8 },
+    { name: 'Bartender', icon: '🍸', basePayPerDay: 110, baseEnergyPerDay: 18 },
+    { name: 'Cleaner', icon: '🧹', basePayPerDay: 95, baseEnergyPerDay: 25 },
+    { name: 'Waiter/Waitress', icon: '🍽️', basePayPerDay: 105, baseEnergyPerDay: 18 },
+  ];
+  
+  // Pick random hustle type
+  const hustleType = hustleTypes[Math.floor(Math.random() * hustleTypes.length)];
+  
+  // Random contract length (5-25 days)
+  const contractLength = 5 + Math.floor(Math.random() * 21);
+  
+  // Add variance to pay (±30%)
+  const payVariance = Math.floor(hustleType.basePayPerDay * 0.3);
+  const dailyPay = hustleType.basePayPerDay + Math.floor(Math.random() * payVariance * 2) - payVariance;
+  
+  // Add variance to energy (±20%)
+  const energyVariance = Math.floor(hustleType.baseEnergyPerDay * 0.2);
+  const dailyEnergy = Math.max(5, Math.min(40, 
+    hustleType.baseEnergyPerDay + Math.floor(Math.random() * energyVariance * 2) - energyVariance
+  ));
+  
+  return {
+    name: hustleType.name,
+    icon: hustleType.icon,
+    dailyPay: dailyPay,
+    dailyEnergyCost: dailyEnergy,
+    contractLength: contractLength,
+    totalPay: dailyPay * contractLength,
+    isAvailable: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+

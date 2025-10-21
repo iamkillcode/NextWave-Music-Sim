@@ -17,15 +17,8 @@ class AdminService {
   bool? _isAdminCached;
   String? _cachedUserId;
 
-  /// List of admin user IDs (update this with your actual Firebase User ID)
-  /// You can find your user ID in Firebase Console > Authentication
-  static const List<String> ADMIN_USER_IDS = [
-    // Add your Firebase User IDs here
-    'xjJFuMCEKMZwkI8uIP34Jl2bfQA3',
-    // Example: 'abc123xyz456',
-  ];
-
   /// Check if current user is an admin
+  /// Server-side validation ensures security
   Future<bool> isAdmin() async {
     final user = _auth.currentUser;
     if (user == null) return false;
@@ -36,24 +29,61 @@ class AdminService {
     }
 
     try {
-      // Check hardcoded list first (fastest)
-      if (ADMIN_USER_IDS.contains(user.uid)) {
-        _isAdminCached = true;
+      // TEMPORARY FALLBACK: Check hardcoded admin list locally
+      // This provides admin access until Cloud Functions are deployed
+      // TODO: Remove this fallback after deploying Cloud Functions
+      const ADMIN_USER_IDS = [
+        'xjJFuMCEKMZwkI8uIP34Jl2bfQA3', // Primary admin
+      ];
+      
+      // Try Cloud Function first
+      try {
+        final result = await _functions.httpsCallable('checkAdminStatus').call();
+        final isAdmin = result.data['isAdmin'] ?? false;
+
+        // Cache result
+        _isAdminCached = isAdmin;
         _cachedUserId = user.uid;
-        return true;
+
+        return isAdmin;
+      } catch (e) {
+        print('Cloud Function error (expected if not deployed): $e');
+        
+        // FALLBACK: Check hardcoded list if Cloud Function fails
+        // This happens when functions aren't deployed yet
+        if (ADMIN_USER_IDS.contains(user.uid)) {
+          print('✅ Admin access granted via local fallback (UID: ${user.uid})');
+          _isAdminCached = true;
+          _cachedUserId = user.uid;
+          return true;
+        }
+        
+        // Also check Firestore admin collection as backup
+        try {
+          final adminDoc = await _firestore.collection('admins').doc(user.uid).get();
+          if (adminDoc.exists && adminDoc.data()?['isAdmin'] == true) {
+            print('✅ Admin access granted via Firestore (UID: ${user.uid})');
+            _isAdminCached = true;
+            _cachedUserId = user.uid;
+            return true;
+          }
+        } catch (firestoreError) {
+          print('Firestore check error: $firestoreError');
+        }
       }
-
-      // Check Firestore admin flag
-      final doc = await _firestore.collection('admins').doc(user.uid).get();
-      final isAdmin = doc.exists && (doc.data()?['isAdmin'] == true);
-
-      // Cache result
-      _isAdminCached = isAdmin;
+      
+      // Not an admin
+      _isAdminCached = false;
       _cachedUserId = user.uid;
-
-      return isAdmin;
+      return false;
+      
     } catch (e) {
       print('Error checking admin status: $e');
+      
+      // Clear cache on error
+      _isAdminCached = null;
+      _cachedUserId = null;
+      
       return false;
     }
   }
@@ -276,12 +306,14 @@ class AdminService {
   }
 
   /// Send system notification to all players (Admin Only)
+  /// This creates both a global announcement and individual notifications for each player
   Future<bool> sendGlobalNotification(String title, String message) async {
     if (!await isAdmin()) {
       throw Exception('Admin access required');
     }
 
     try {
+      // 1. Create global announcement (visible in Announcements tab)
       await _firestore.collection('system_notifications').add({
         'title': title,
         'message': message,
@@ -289,6 +321,19 @@ class AdminService {
         'createdBy': _auth.currentUser?.uid,
         'type': 'global',
       });
+
+      // 2. Send individual notification to each player
+      // This is done via Cloud Function to avoid client-side limitations
+      try {
+        final callable = _functions.httpsCallable('sendGlobalNotificationToPlayers');
+        await callable.call({
+          'title': title,
+          'message': message,
+        });
+        print('✅ Global notification distributed to all players');
+      } catch (e) {
+        print('⚠️ Cloud Function not available, notification saved to system_notifications only: $e');
+      }
 
       return true;
     } catch (e) {
@@ -298,6 +343,7 @@ class AdminService {
   }
 
   /// Adjust player stats (Admin Only - for testing/debugging)
+  /// Now uses secure server-side validation
   Future<bool> adjustPlayerStats(
     String playerId,
     Map<String, dynamic> adjustments,
@@ -307,8 +353,19 @@ class AdminService {
     }
 
     try {
-      await _firestore.collection('players').doc(playerId).update(adjustments);
-      return true;
+      // Use secure Cloud Function instead of direct Firestore write
+      final callable = _functions.httpsCallable('secureStatUpdate');
+      final result = await callable.call({
+        'playerId': playerId,
+        'updates': adjustments,
+        'action': 'admin_stat_adjustment',
+        'context': {
+          'timestamp': DateTime.now().toIso8601String(),
+          'reason': 'Admin debugging/testing adjustment',
+        },
+      });
+
+      return result.data['success'] ?? false;
     } catch (e) {
       print('Error adjusting player stats: $e');
       return false;

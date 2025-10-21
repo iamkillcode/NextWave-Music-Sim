@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/side_hustle.dart';
+import '../models/album.dart';
 import '../services/firebase_service.dart';
 import '../services/demo_firebase_service.dart';
 import '../services/game_time_service.dart';
@@ -20,6 +21,8 @@ import 'activity_hub_screen.dart';
 import 'release_manager_screen.dart';
 import '../utils/firebase_status.dart';
 import 'settings_screen.dart';
+import 'notifications_screen.dart';
+import '../services/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final dynamic initialStats;
@@ -54,7 +57,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final GameTimeService _gameTimeService = GameTimeService();
   final StreamGrowthService _streamGrowthService = StreamGrowthService();
   final SideHustleService _sideHustleService = SideHustleService();
+  final NotificationService _notificationService = NotificationService();
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
+  int _unreadNotificationCount = 0; // Track unread notification count
   String _timeUntilNextDay = ''; // Formatted time until next day
   bool _hasPendingSave = false; // Track if we have pending changes to save
   List<PendingPractice> pendingPractices =
@@ -100,6 +105,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Check for Firebase notifications (gifts from admin, etc.)
     _loadFirebaseNotifications();
+    
+    // Initialize notification service
+    _notificationService.initialize();
+    
+    // Load unread count
+    _loadUnreadNotificationCount();
 
     // Initialize Firebase authentication
     _initializeOnlineMode();
@@ -335,6 +346,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           loadedGenreMastery[primaryGenre] = 0;
         }
 
+        // Load albums (EPs and Albums)
+        List<Album> loadedAlbums = [];
+        if (data['albums'] != null) {
+          try {
+            final albumsList = data['albums'] as List<dynamic>;
+            loadedAlbums = albumsList
+                .map((albumData) =>
+                    Album.fromJson(Map<String, dynamic>.from(albumData)))
+                .toList();
+            print('✅ Loaded ${loadedAlbums.length} albums/EPs');
+          } catch (e) {
+            print('⚠️ Error loading albums: $e');
+          }
+        }
+
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? 'Unknown Artist',
@@ -354,6 +380,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             compositionSkill: (data['compositionSkill'] ?? 10).toInt(),
             inspirationLevel: (data['inspirationLevel'] ?? 0).toInt(),
             songs: loadedSongs,
+            albums: loadedAlbums,
             currentRegion: data['homeRegion'] ?? 'usa',
             age: (data['age'] ?? 18).toInt(),
             careerStartDate:
@@ -427,6 +454,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .toList();
           } catch (e) {
             print('⚠️ Error loading songs in real-time update: $e');
+          }
+        }
+
+        // Load albums from the update
+        List<Album> loadedAlbums = [];
+        if (data['albums'] != null) {
+          try {
+            final albumsList = data['albums'] as List<dynamic>;
+            loadedAlbums = albumsList
+                .map((albumData) =>
+                    Album.fromJson(Map<String, dynamic>.from(albumData)))
+                .toList();
+          } catch (e) {
+            print('⚠️ Error loading albums in real-time update: $e');
           }
         }
 
@@ -506,6 +547,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (data['inspirationLevel'] ?? artistStats.inspirationLevel)
                     .toInt(),
             songs: loadedSongs,
+            albums: loadedAlbums,
             currentRegion: data['homeRegion'] ?? artistStats.currentRegion,
             age: (data['age'] ?? artistStats.age).toInt(),
             careerStartDate:
@@ -585,6 +627,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             // Mark as read after showing
             change.doc.reference.update({'read': true});
+            
+            // Update unread count
+            _loadUnreadNotificationCount();
           }
         }
       },
@@ -594,6 +639,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     print('✅ Real-time listeners set up successfully');
+  }
+
+  /// Load unread notification count
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final count = await _notificationService.getUnreadCount();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationCount = count;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading unread notification count: $e');
+    }
   }
 
   /// Show a notification snackbar with custom styling based on type
@@ -780,49 +839,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       print('💾 Saving user profile for: ${user.uid}');
 
-      await FirebaseFirestore.instance
-          .collection('players')
-          .doc(user.uid)
-          .update({
-        'currentFame': artistStats.fame,
-        'currentMoney': artistStats.money,
-        'previousMoney': artistStats
-            .money, // Store current money as previous for next session
-        'inspirationLevel': artistStats.inspirationLevel,
-        'level': artistStats.fanbase, // Level tied to fanbase for compatibility
-        'fanbase': artistStats.fanbase, // Store fanbase explicitly
-        'loyalFanbase': artistStats.loyalFanbase,
-        'albumsReleased': artistStats.albumsSold,
-        'songsPublished': artistStats.songsWritten,
-        'concertsPerformed': artistStats.concertsPerformed,
-        'songwritingSkill': artistStats.songwritingSkill,
-        'experience': artistStats.experience,
-        'lyricsSkill': artistStats.lyricsSkill,
-        'compositionSkill': artistStats.compositionSkill,
-        'homeRegion': artistStats.currentRegion,
-        'age': artistStats.age,
-        'regionalFanbase': artistStats.regionalFanbase,
-        'primaryGenre': artistStats.primaryGenre, // 🎸 Save primary genre
-        'genreMastery': artistStats.genreMastery, // 🎸 Save genre mastery
-        'unlockedGenres': artistStats.unlockedGenres, // 🎸 Save unlocked genres
-        'lastActive': Timestamp.fromDate(
-          DateTime.now(),
-        ), // Track last activity
-        'songs': artistStats.songs.map((song) => song.toJson()).toList(),
-        'activeSideHustle': artistStats.activeSideHustle?.toJson(),
-        'pendingPractices': pendingPractices
-            .map((p) => p.toMap())
-            .toList(), // Save pending training programs
-        if (artistStats.careerStartDate != null)
-          'careerStartDate': Timestamp.fromDate(
-            artistStats.careerStartDate!,
-          ),
-      }).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () {
-          throw Exception('Profile save timeout');
-        },
-      );
+      // Use secure Firebase service instead of direct writes
+      await FirebaseService().updatePlayerStats(artistStats);
 
       _hasPendingSave = false;
       print('✅ Profile saved successfully');
@@ -999,27 +1017,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
           '🌅 Day changed! Old: ${currentGameDate!.day} → New: ${newGameDate.day}',
         );
 
-        // Calculate passive income for the time that has passed
-        final now = DateTime.now();
-        final realSecondsSinceLastUpdate =
-            now.difference(_lastSyncTime!).inSeconds;
-        _calculatePassiveIncome(realSecondsSinceLastUpdate);
+        // ✅ RELOAD stats from Firebase (Cloud Function has updated streams/money/fanbase/fame)
+        print('🔄 Reloading player stats from server...');
+        await _loadUserProfile();
 
-        // Apply stream growth to all released songs
-        _applyDailyStreamGrowth(newGameDate);
+        // ❌ REMOVED: Client-side stream calculation (_applyDailyStreamGrowth)
+        // ALL progression stats are now server-authoritative (full Option A implementation)
+        // Server calculates: streams, last7DaysStreams, income, fanbase, fame
+        // Client only handles: energy replenishment, UI updates, side hustle energy cost
+
+        // Check for side hustle expiration (client-side check only)
+        bool sideHustleExpired = false;
+        if (artistStats.activeSideHustle != null) {
+          final result = _sideHustleService.applyDailySideHustle(
+            sideHustle: artistStats.activeSideHustle!,
+            currentMoney: artistStats.money,
+            currentEnergy: artistStats.energy,
+            currentGameDate: newGameDate,
+          );
+          sideHustleExpired = result['expired'] == 1;
+        }
 
         // Update last sync time
-        _lastSyncTime = now;
+        _lastSyncTime = DateTime.now();
 
         // Replenish energy for the new day (only if still mounted)
         if (mounted) {
           setState(() {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
-            artistStats = artistStats.copyWith(energy: 100);
+            artistStats = artistStats.copyWith(
+              energy: 100,
+              clearSideHustle: sideHustleExpired,
+            );
           });
 
           _showMessage('☀️ New day! Energy fully restored to 100');
+          
+          if (sideHustleExpired) {
+            _addNotification(
+              'Contract Ended',
+              'Your ${artistStats.activeSideHustle!.type.displayName} contract has ended!',
+              icon: Icons.work_off,
+            );
+          }
+          
+          _addNotification(
+            'New Day Stats',
+            'Your daily streams, royalties, and fanbase have been updated by the server!',
+            icon: Icons.cloud_done,
+          );
           _addNotification(
             'Energy Restored',
             'A new day has begun! Your energy has been fully restored to 100.',
@@ -1118,20 +1165,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    // Only update if we earned something meaningful (avoid tiny fractions)
+    // Only show notification if earning something meaningful (avoid tiny fractions)
+    // ❌ REMOVED: Money update (passive income is display-only, actual income from Cloud Function)
     if (totalStreamsGained > 0) {
       final totalIncome = (totalIncomePerSecond * realSecondsPassed);
 
-      setState(() {
-        artistStats = artistStats.copyWith(
-          money: artistStats.money + totalIncome.round(),
-          songs: List.from(
-            artistStats.songs,
-          ), // Create new list to trigger update
-        );
-      });
+      // Note: We DON'T update money here anymore - Cloud Function handles income
+      // This prevents duplicate income from passive calculations + server calculations
 
-      // Show notification for significant income (every $100+)
+      // Show notification for significant streaming activity (every $100+ estimated)
       if (totalIncome >= 100 &&
           DateTime.now()
                   .difference(_lastPassiveIncomeTime ?? DateTime.now())
@@ -1139,258 +1181,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
               60) {
         _lastPassiveIncomeTime = DateTime.now();
         print(
-          '💰 Passive income: \$${totalIncome.toStringAsFixed(2)} from $totalStreamsGained streams',
+          '� Streaming activity: ~\$${totalIncome.toStringAsFixed(2)} estimated from $totalStreamsGained streams',
         );
         _addNotification(
-          'Streaming Income',
-          'Your ${releasedSongs.length} song${releasedSongs.length > 1 ? 's' : ''} earned \$${totalIncome.toStringAsFixed(0)} from $totalStreamsGained streams!',
+          'Streaming Activity',
+          'Your ${releasedSongs.length} song${releasedSongs.length > 1 ? 's' : ''} is getting ${_streamGrowthService.formatStreams(totalStreamsGained)} streams!',
           icon: Icons.music_note,
         );
       }
     }
   }
 
-  /// Apply daily stream growth to all released songs
-  void _applyDailyStreamGrowth(DateTime currentGameDate) {
-    final List<Song> updatedSongs = [];
-    int totalNewStreams = 0;
-    int totalNewIncome = 0;
-
-    for (final song in artistStats.songs) {
-      // First, decay the 7-day stream count (one day drops off the rolling window)
-      final decayedLast7Days = _streamGrowthService.decayLast7DaysStreams(
-        song.last7DaysStreams,
-      );
-
-      // If song is not released, just apply decay and skip growth
-      if (song.state != SongState.released || song.releasedDate == null) {
-        updatedSongs.add(song.copyWith(last7DaysStreams: decayedLast7Days));
-        continue;
-      }
-
-      // ✅ Stream updates are handled by Cloud Functions (every 1 hour = 1 game day)
-      // No need for client-side timing checks - server controls the schedule
-
-      // Calculate stream growth for this song
-      final newStreams = _streamGrowthService.calculateDailyStreamGrowth(
-        song: song,
-        artistStats: artistStats,
-        currentGameDate: currentGameDate,
-      );
-
-      // Distribute streams regionally
-      final regionalStreamDelta =
-          _streamGrowthService.calculateRegionalStreamDistribution(
-        totalDailyStreams: newStreams,
-        currentRegion: artistStats.currentRegion,
-        regionalFanbase: artistStats.regionalFanbase,
-        genre: song.genre,
-      );
-
-      // Update regional streams for the song
-      final updatedRegionalStreams = Map<String, int>.from(
-        song.regionalStreams,
-      );
-      regionalStreamDelta.forEach((region, delta) {
-        updatedRegionalStreams[region] =
-            (updatedRegionalStreams[region] ?? 0) + delta;
-      });
-
-      // Update days on chart
-      final daysSinceRelease =
-          currentGameDate.difference(song.releasedDate!).inDays + 1;
-
-      // Check if this is a new peak
-      final newPeak = _streamGrowthService.updatePeakDailyStreams(
-        song.peakDailyStreams,
-        newStreams,
-      );
-
-      // Calculate income from new streams (pay artists daily royalties)
-      int songIncome = 0;
-      for (final platform in song.streamingPlatforms) {
-        if (platform == 'tunify') {
-          // Tunify: 85% reach, $0.003 per stream royalty
-          songIncome += (newStreams * 0.85 * 0.003).round();
-        } else if (platform == 'maple_music') {
-          // Maple Music: 65% reach, $0.01 per stream royalty
-          songIncome += (newStreams * 0.65 * 0.01).round();
-        }
-      }
-
-      // Update the song (including daily and weekly streams for charts)
-      // Add new streams to the already-decayed 7-day count
-      final updatedSong = song.copyWith(
-        streams: song.streams + newStreams,
-        lastDayStreams: newStreams, // Update daily streams for daily charts
-        last7DaysStreams: decayedLast7Days + newStreams,
-        regionalStreams: updatedRegionalStreams,
-        daysOnChart: daysSinceRelease,
-        peakDailyStreams: newPeak,
-        lastStreamUpdateDate:
-            currentGameDate, // Track when streams were last updated
-      );
-
-      updatedSongs.add(updatedSong);
-      totalNewStreams += newStreams;
-      totalNewIncome += songIncome;
-
-      print(
-        '📈 ${song.title}: +${_streamGrowthService.formatStreams(newStreams)} streams (Total: ${_streamGrowthService.formatStreams(updatedSong.streams)})',
-      );
-    }
-
-    // 🎯 BALANCE ARTIST STATS: Calculate fanbase and fame growth from streams
-    // More streams = more fans discovering your music + growing reputation
-    int fanbaseGrowth = 0;
-    int fameGrowth = 0;
-    int fameDecay = 0;
-    int loyalFanGrowth = 0;
-
-    // ⚠️ FAME DECAY - Fame decreases based on artist idleness
-    if (artistStats.lastActivityDate != null) {
-      final daysSinceActivity =
-          currentGameDate.difference(artistStats.lastActivityDate!).inDays;
-
-      // After 7 days of inactivity, start losing 1% fame per day
-      if (daysSinceActivity > 7) {
-        final inactiveDays = daysSinceActivity - 7;
-        fameDecay = (artistStats.fame * 0.01 * inactiveDays).floor();
-        print(
-          '⚠️ Fame decay: $daysSinceActivity days inactive, -$fameDecay fame',
-        );
-      }
-    }
-
-    if (totalNewStreams > 0) {
-      // Every 1,000 streams converts 1 casual listener to a fan
-      // Apply diminishing returns for established artists (prevents exploits)
-      final baseFanGrowth = (totalNewStreams / 1000).floor();
-      final diminishingFactor = 1.0 / (1.0 + artistStats.fanbase / 10000);
-      fanbaseGrowth = (baseFanGrowth * diminishingFactor).round().clamp(
-            0,
-            50,
-          ); // Max 50 fans per day
-
-      // Every 10,000 streams increases fame by 1 point
-      // Also has diminishing returns for mega-celebrities
-      final baseFameGrowth = (totalNewStreams / 10000).floor();
-      final fameDiminishing = 1.0 / (1.0 + artistStats.fame / 500);
-      fameGrowth = (baseFameGrowth * fameDiminishing).round().clamp(
-            0,
-            10,
-          ); // Max 10 fame per day
-
-      // Convert casual fans to loyal fans based on consistent streaming
-      // Every 5,000 streams converts 1 casual fan to loyal (they love your music!)
-      final casualFans = (artistStats.fanbase - artistStats.loyalFanbase)
-          .clamp(0, double.infinity)
-          .toInt();
-      if (casualFans > 0) {
-        final baseLoyalGrowth = (totalNewStreams / 5000).floor();
-        final loyalDiminishing = 1.0 / (1.0 + artistStats.loyalFanbase / 5000);
-        final maxConvertible =
-            (casualFans * 0.05).round(); // Max 5% of casual fans per day
-        loyalFanGrowth = (baseLoyalGrowth * loyalDiminishing).round().clamp(
-              0,
-              maxConvertible,
-            );
-      }
-    }
-
-    // 💼 SIDE HUSTLE SYSTEM: Apply daily side hustle effects (energy cost + pay)
-    int sideHustlePay = 0;
-    int sideHustleEnergyCost = 0;
-    bool sideHustleExpired = false;
-
-    if (artistStats.activeSideHustle != null) {
-      final result = _sideHustleService.applyDailySideHustle(
-        sideHustle: artistStats.activeSideHustle!,
-        currentMoney: artistStats.money + totalNewIncome,
-        currentEnergy: artistStats.energy,
-        currentGameDate: currentGameDate,
-      );
-
-      sideHustlePay = result['money']! - (artistStats.money + totalNewIncome);
-      sideHustleEnergyCost = (artistStats.energy - result['energy']!).round();
-      sideHustleExpired = result['expired'] == 1;
-
-      totalNewIncome += sideHustlePay;
-
-      print(
-        '💼 Side hustle (${artistStats.activeSideHustle!.type.displayName}): -$sideHustleEnergyCost energy, +\$$sideHustlePay pay',
-      );
-    }
-
-    // Update artist stats with new songs, income, and growth from streaming success
-    if (totalNewStreams > 0 ||
-        fanbaseGrowth > 0 ||
-        fameGrowth > 0 ||
-        fameDecay > 0 ||
-        loyalFanGrowth > 0 ||
-        sideHustlePay > 0 ||
-        sideHustleEnergyCost > 0) {
-      setState(() {
-        artistStats = artistStats.copyWith(
-          songs: updatedSongs,
-          money: artistStats.money + totalNewIncome,
-          energy: sideHustleEnergyCost > 0
-              ? (artistStats.energy - sideHustleEnergyCost).clamp(0, 100)
-              : artistStats.energy,
-          fanbase: artistStats.fanbase + fanbaseGrowth,
-          fame: (artistStats.fame + fameGrowth - fameDecay).clamp(0, 999),
-          loyalFanbase: artistStats.loyalFanbase + loyalFanGrowth,
-          clearSideHustle: sideHustleExpired, // Clear if contract expired
-        );
-      });
-
-      print(
-        '💰 Total daily streaming income: \$$totalNewIncome from ${_streamGrowthService.formatStreams(totalNewStreams)} streams',
-      );
-
-      if (fanbaseGrowth > 0 ||
-          fameGrowth > 0 ||
-          fameDecay > 0 ||
-          loyalFanGrowth > 0) {
-        String growthMessage = '📈 Artist growth:';
-        if (fanbaseGrowth > 0) growthMessage += ' +$fanbaseGrowth fans';
-        if (loyalFanGrowth > 0) growthMessage += ' (+$loyalFanGrowth loyal)';
-        if (fameGrowth > 0) growthMessage += ' +$fameGrowth fame';
-        if (fameDecay > 0) growthMessage += ' -$fameDecay fame (inactivity)';
-        print(growthMessage);
-      }
-
-      if (sideHustleExpired) {
-        print(
-          '⏰ Side hustle contract expired: ${artistStats.activeSideHustle!.type.displayName}',
-        );
-        _addNotification(
-          'Contract Ended',
-          'Your ${artistStats.activeSideHustle!.type.displayName} contract has ended!',
-          icon: Icons.work_off,
-        );
-      }
-
-      // Notify about fame decay if significant
-      if (fameDecay > 0) {
-        _addNotification(
-          'Fame Declining',
-          'You lost $fameDecay fame due to inactivity. Keep creating to maintain your status!',
-          icon: Icons.trending_down,
-        );
-      }
-
-      // Save to Firebase to persist the income and growth (debounced to reduce writes)
-      _debouncedSave();
-
-      // Show notification
-      _addNotification(
-        'Daily Streams',
-        'Your music earned ${_streamGrowthService.formatStreams(totalNewStreams)} streams and \$$totalNewIncome today!',
-        icon: Icons.trending_up,
-      );
-    }
-  }
+  // ❌ REMOVED: _applyDailyStreamGrowth function
+  // ALL progression stats (streams, money, fanbase, fame) are now server-authoritative
+  // Cloud Function (dailyGameUpdate) handles:
+  //   - Stream growth calculation
+  //   - last7DaysStreams decay + addition
+  //   - Regional stream distribution
+  //   - Income calculation
+  //   - Fanbase/fame growth
+  // Client only handles:
+  //   - Energy replenishment
+  //   - Side hustle energy cost
+  //   - UI updates
+  //   - Loading server data
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1422,160 +1236,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _showNotifications() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: const Color(0xFF21262D),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            constraints: const BoxConstraints(maxHeight: 600, maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.notifications,
-                          color: Color(0xFFFF6B9D),
-                          size: 24,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Notifications',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_notifications.isNotEmpty)
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _notifications.clear();
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Clear All',
-                          style: TextStyle(color: Color(0xFFFF6B9D)),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(color: Colors.white24),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _notifications.isEmpty
-                      ? const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.notifications_none,
-                                color: Colors.white38,
-                                size: 64,
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'No notifications yet',
-                                style: TextStyle(
-                                  color: Colors.white38,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _notifications.length,
-                          itemBuilder: (context, index) {
-                            final notification = _notifications[index];
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2D333B),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.white12),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    notification['icon'] as IconData,
-                                    color: const Color(0xFF00D9FF),
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          notification['title'] as String,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          notification['message'] as String,
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00D9FF),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    // Navigate to the full notifications screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NotificationsScreen(),
+      ),
+    ).then((_) {
+      // Reload unread count when returning from notifications screen
+      _loadUnreadNotificationCount();
+    });
   }
 
   @override
@@ -1759,7 +1429,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _showNotifications();
                     },
                   ),
-                  if (_notifications.isNotEmpty)
+                  if (_unreadNotificationCount > 0)
                     Positioned(
                       right: 8,
                       top: 8,
@@ -1774,7 +1444,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           minHeight: 16,
                         ),
                         child: Text(
-                          '${_notifications.length}',
+                          '$_unreadNotificationCount',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -2001,7 +1671,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$value',
+                          status,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
@@ -3439,109 +3109,82 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _createCustomSong(String title, String genre, int effort) {
-    Navigator.of(context).pop(); // Close dialog
-
-    // Calculate song quality and skill gains
-    double songQuality = artistStats.calculateSongQuality(genre, effort);
-    Map<String, int> skillGains = artistStats.calculateSkillGains(
-      genre,
-      effort,
-      songQuality,
-    );
-    int energyCost = _getEnergyCostForEffort(effort);
-
-    // Calculate rewards based on quality (much more modest)
-    // Writing songs shouldn't make you rich - performing and releasing them should
-    int moneyGain = ((songQuality / 100) * 100 * effort)
-        .round(); // Max $300 for excellent song with max effort
-    int fameGain = ((songQuality / 100) * 2 * effort)
-        .round(); // Max 6 fame for excellent song
-    int creativityGain = effort * 2;
-
-    // Create the new song object
-    final newSong = Song(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      genre: genre,
-      quality: songQuality.round(),
-      createdDate: DateTime.now(),
-      state: SongState.written,
-    );
-
-    // Calculate genre mastery gain
-    int masteryGain = artistStats.calculateGenreMasteryGain(
-      genre,
-      effort,
-      songQuality,
-    );
-    Map<String, int> updatedMastery = artistStats.applyGenreMasteryGain(
-      genre,
-      masteryGain,
-    );
-
-    setState(() {
-      // Update main stats
-      artistStats = artistStats.copyWith(
-        energy: artistStats.energy - energyCost,
-        // songsWritten removed - only counts when released
-        money: artistStats.money + moneyGain,
-        fame: artistStats.fame + fameGain,
-        creativity: artistStats.creativity + creativityGain,
-        songs: [...artistStats.songs, newSong], // Add the new song
-        // Update skills
-        songwritingSkill:
-            (artistStats.songwritingSkill + skillGains['songwritingSkill']!)
-                .clamp(0, 100),
-        experience: (artistStats.experience + skillGains['experience']!).clamp(
-          0,
-          10000,
-        ),
-        lyricsSkill: (artistStats.lyricsSkill + skillGains['lyricsSkill']!)
-            .clamp(0, 100),
-        compositionSkill:
-            (artistStats.compositionSkill + skillGains['compositionSkill']!)
-                .clamp(0, 100),
-        inspirationLevel:
-            (artistStats.inspirationLevel + skillGains['inspirationLevel']!)
-                .clamp(0, 100),
-        // Update genre mastery
-        genreMastery: updatedMastery,
-      );
-    });
-
-    _debouncedSave(); // ✅ Save after creating custom song
-
-    // Publish song to Firebase if online
-    if (_isOnlineMode) {
-      _publishSongOnline(title, genre, songQuality.round());
-    }
-
-    // Show detailed success message
-    String qualityRating = artistStats.getSongQualityRating(songQuality);
-    String onlineStatus = _isOnlineMode ? ' 🌐 Published online!' : '';
-    _showMessage(
-      '🎵 Created "$title" ($genre - $qualityRating)\n'
-      '💰 +\$${moneyGain.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} '
-      '⭐ +$fameGain Fame +$creativityGain Hype\n'
-      '📈 +${skillGains['experience']} XP, Skills improved!$onlineStatus',
-    );
+  String _getSongQualityRating(double quality) {
+    if (quality >= 90) return "Legendary";
+    if (quality >= 80) return "Masterpiece";
+    if (quality >= 70) return "Excellent";
+    if (quality >= 60) return "Great";
+    if (quality >= 50) return "Good";
+    if (quality >= 40) return "Decent";
+    if (quality >= 30) return "Average";
+    if (quality >= 20) return "Poor";
+    return "Terrible";
   }
 
-  Future<void> _publishSongOnline(
-    String title,
-    String genre,
-    int quality,
-  ) async {
+  void _createCustomSong(String title, String genre, int effort) async {
+    Navigator.of(context).pop(); // Close dialog
+
     try {
-      await _multiplayerService.publishSong(
+      // Use secure server-side song creation
+      final firebaseService = FirebaseService();
+      final result = await firebaseService.createSongSecurely(
         title: title,
         genre: genre,
-        playerName: artistStats.name,
-        quality: quality,
+        effort: effort,
       );
+
+      if (result == null) {
+        _showMessage("❌ Failed to create song. Please try again.");
+        return;
+      }
+
+      if (!result['success']) {
+        _showMessage("❌ ${result['error'] ?? 'Unknown error occurred'}");
+        return;
+      }
+
+      // Extract server-validated data
+      final song = result['song'] as Map<String, dynamic>;
+      final gains = result['gains'] as Map<String, dynamic>;
+      final newStats = result['newStats'] as Map<String, dynamic>;
+
+      // Create Song object from server response
+      final newSong = Song(
+        id: song['id'],
+        title: song['title'],
+        genre: song['genre'],
+        quality: song['quality'],
+        createdDate: DateTime.now(), // Use current time for display
+        state: SongState.written,
+      );
+
+      setState(() {
+        // Update stats with server-validated values
+        artistStats = artistStats.copyWith(
+          energy: newStats['energy'],
+          money: newStats['money'],
+          fame: newStats['fame'],
+          songs: [...artistStats.songs, newSong],
+          // Server handles skill updates internally
+        );
+      });
+
+      // Save the updated profile
+      await _saveUserProfile();
+
+      // Show success message with actual gains
+      final moneyGain = gains['money'] ?? 0;
+      final fameGain = gains['fame'] ?? 0;
+      final qualityText = _getSongQualityRating(song['quality'].toDouble());
+      
+      _showMessage(
+        "🎵 Song created! Quality: $qualityText\n"
+        "💰 +\$${moneyGain} | ⭐ +${fameGain} Fame",
+      );
+
     } catch (e) {
-      print('Failed to publish song online: $e');
+      print('Error creating song: $e');
+      _showMessage("❌ Error creating song: ${e.toString()}");
     }
   }
 

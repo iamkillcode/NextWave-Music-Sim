@@ -320,6 +320,9 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
         final contracts = snapshot.data ?? [];
 
         if (contracts.isEmpty) {
+          print('⚠️ No contracts found in Firestore');
+          print('📍 Connection state: ${snapshot.connectionState}');
+          
           return Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(

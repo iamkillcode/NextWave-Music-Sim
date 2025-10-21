@@ -141,7 +141,13 @@ class ArtistStats {
     );
   }
 
-  // Calculate current age based on career start and in-game time
+  /// Calculate current age based on career start and in-game time
+  /// 
+  /// This accounts for the passage of in-game years since career start.
+  /// Example: If you start at 18 in Jan 2020, and it's now Jan 2025 (in-game),
+  /// your character would be 23 years old.
+  /// 
+  /// IMPORTANT: careerStartDate must be set to the GAME-WORLD date, not real-world date!
   int getCurrentAge(DateTime currentGameDate) {
     if (careerStartDate == null) return age;
     final yearsPassed =

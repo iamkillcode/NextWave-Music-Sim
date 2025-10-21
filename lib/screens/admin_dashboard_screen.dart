@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../services/admin_service.dart';
+import '../services/side_hustle_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -13,6 +15,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final AdminService _adminService = AdminService();
+  final SideHustleService _sideHustleService = SideHustleService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = true;
@@ -301,6 +304,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             description: 'Regenerate weekly leaderboard snapshots',
             color: Colors.cyan,
             onPressed: _showTriggerWeeklyChartsDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.work,
+            label: 'Generate Side Hustle Contracts',
+            description: 'Create new job contracts for players',
+            color: Colors.deepPurple,
+            onPressed: _showGenerateContractsDialog,
           ),
           const SizedBox(height: 12),
           _buildActionButton(
@@ -860,6 +871,128 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               'Check the Weekly Charts tab to see updated data.',
         );
         await _loadData();
+      }
+    } catch (e) {
+      _safePopNavigator();
+      if (mounted) {
+        _showError('Error', e.toString());
+      }
+    }
+  }
+
+  void _showGenerateContractsDialog() {
+    int contractCount = 10;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Row(
+            children: [
+              Icon(Icons.work, color: Colors.deepPurple),
+              SizedBox(width: 8),
+              Text(
+                'Generate Side Hustle Contracts',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This will create new side hustle job contracts for players to claim.',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Number of contracts to generate:',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove, color: Colors.white),
+                    onPressed: () {
+                      if (contractCount > 5) {
+                        setState(() => contractCount -= 5);
+                      }
+                    },
+                  ),
+                  Container(
+                    width: 60,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2D2D2D),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.deepPurple),
+                    ),
+                    child: Text(
+                      '$contractCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: () {
+                      if (contractCount < 50) {
+                        setState(() => contractCount += 5);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Contracts will be added to the shared pool for all players',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                _generateContracts(contractCount);
+              },
+              child: const Text('Generate Contracts'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _generateContracts(int count) async {
+    _showLoadingDialog('Generating $count side hustle contracts...');
+
+    try {
+      await _sideHustleService.generateNewContracts(count);
+
+      _safePopNavigator();
+
+      if (mounted) {
+        _showSuccessDialog(
+          'Contracts Generated!',
+          'Successfully created $count new side hustle contracts.\n\n'
+              'Players can now see and claim these contracts in the Side Hustle screen.',
+        );
       }
     } catch (e) {
       _safePopNavigator();
@@ -1991,22 +2124,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               _showLoadingDialog('Updating player...');
 
               try {
-                await _firestore
-                    .collection('players')
-                    .doc(player['id'])
-                    .update({
-                  'currentMoney': int.parse(moneyController.text),
-                  'fame': int.parse(fameController.text),
-                  'level': int.parse(fanbaseController.text),
+                // Use secure server-side validation for admin stat updates
+                final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+                    .httpsCallable('secureStatUpdate');
+                
+                final result = await callable.call({
+                  'playerId': player['id'], // Specify which player to update
+                  'updates': {
+                    'currentMoney': int.parse(moneyController.text),
+                    'fame': int.parse(fameController.text),
+                    'fanbase': int.parse(fanbaseController.text),
+                  },
+                  'action': 'admin_stat_update',
+                  'context': {
+                    'timestamp': DateTime.now().toIso8601String(),
+                    'reason': 'Admin manual adjustment',
+                  },
                 });
 
                 if (mounted) {
                   Navigator.pop(context);
-                  _showSuccessDialog(
-                    'Updated!',
-                    'Player stats updated successfully.',
-                  );
-                  await _loadData();
+                  if (result.data['success'] == true) {
+                    _showSuccessDialog(
+                      'Updated!',
+                      'Player stats updated successfully.',
+                    );
+                    await _loadData();
+                  } else {
+                    Navigator.pop(context);
+                    _showSuccessDialog(
+                      'Error',
+                      'Failed to update player: ${result.data['error'] ?? 'Unknown error'}',
+                    );
+                  }
                 }
               } catch (e) {
                 if (mounted) {

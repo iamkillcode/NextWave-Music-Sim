@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import '../models/album.dart';
 
 class ViralWaveScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -22,45 +25,45 @@ class ViralWaveScreen extends StatefulWidget {
 class _ViralWaveScreenState extends State<ViralWaveScreen> {
   String _selectedPromotionType = 'song';
   Song? _selectedSong;
+  Album? _selectedAlbum;
+  
+  // Custom promotion settings
+  int _promoDays = 7; // Default 7 days
+  double _budgetMultiplier = 1.0; // 1.0 = base cost, 2.0 = double cost/effect
 
   final Map<String, Map<String, dynamic>> _promotionTypes = {
     'song': {
       'name': 'Single Song',
       'emoji': '🎵',
-      'energyCost': 10,
-      'moneyCost': 100,
+      'baseCost': 100,
       'baseReach': 5000,
       'color': const Color(0xFF00D9FF),
-      'description': 'Promote one song to gain streams and fans',
-    },
-    'single': {
-      'name': 'Single (1-2 songs)',
-      'emoji': '💿',
-      'energyCost': 15,
-      'moneyCost': 300,
-      'baseReach': 12000,
-      'color': const Color(0xFF9B59B6),
-      'description': 'Promote a single for wider reach',
+      'description': 'Promote one song to targeted audiences',
     },
     'ep': {
-      'name': 'EP (3-6 songs)',
-      'emoji': '📀',
-      'energyCost': 20,
-      'moneyCost': 800,
+      'name': 'EP Campaign',
+      'emoji': '�',
+      'baseCost': 800,
       'baseReach': 25000,
       'color': const Color(0xFFFF9F0A),
-      'description': 'Promote an EP to multiple audiences',
+      'description': 'Promote your EP across multiple channels',
     },
     'lp': {
-      'name': 'LP/Album (7+ songs)',
+      'name': 'Album Campaign',
       'emoji': '💽',
-      'energyCost': 30,
-      'moneyCost': 2000,
+      'baseCost': 2000,
       'baseReach': 50000,
       'color': const Color(0xFFFF1744),
-      'description': 'Major album promotion campaign',
+      'description': 'Major album promotional campaign',
     },
   };
+
+  // Calculate total cost based on base cost, days, and budget multiplier
+  int get _totalCost {
+    final baseCost = _promotionTypes[_selectedPromotionType]!['baseCost'] as int;
+    // Cost = base × days × budget multiplier
+    return (baseCost * _promoDays * _budgetMultiplier).round();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,8 +71,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
         .where((s) => s.state == SongState.released)
         .toList();
 
-    final canPromote = widget.artistStats.energy >= _currentEnergyCost &&
-        widget.artistStats.money >= _currentMoneyCost;
+    final canPromote = widget.artistStats.money >= _totalCost;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
@@ -163,8 +165,15 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                     // Song/Album selector
                     if (_selectedPromotionType == 'song')
                       _buildSongSelector(releasedSongs)
+                    else if (_selectedPromotionType == 'ep')
+                      _buildEPSelector()
                     else
-                      _buildAlbumInfo(),
+                      _buildAlbumSelector(),
+
+                    const SizedBox(height: 24),
+
+                    // Promotion customization controls
+                    _buildPromotionControls(),
 
                     const SizedBox(height: 24),
 
@@ -213,28 +222,30 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   int get _currentMoneyCost =>
       _promotionTypes[_selectedPromotionType]!['moneyCost'] as int;
 
-  /// Check if a promotion type is available based on released songs
+  /// Check if a promotion type is available based on released songs/albums
   bool _isPromotionTypeAvailable(String promotionType) {
     final releasedSongs = widget.artistStats.songs
         .where((s) => s.state == SongState.released)
         .toList();
-
-    final releasedSingles = releasedSongs.where((s) => !s.isAlbum).toList();
-    final releasedAlbumSongs = releasedSongs.where((s) => s.isAlbum).toList();
+    
+    final releasedAlbums = widget.artistStats.albums
+        .where((a) => a.state == AlbumState.released)
+        .toList();
+    
+    // Get EPs and Albums separately
+    final releasedEPs = releasedAlbums.where((a) => a.type == AlbumType.ep).toList();
+    final releasedLPs = releasedAlbums.where((a) => a.type == AlbumType.album).toList();
 
     switch (promotionType) {
       case 'song':
-        // Need at least 1 released single
-        return releasedSingles.isNotEmpty;
-      case 'single':
-        // Need at least 1-2 released singles
-        return releasedSingles.isNotEmpty;
+        // Need at least 1 released song
+        return releasedSongs.isNotEmpty;
       case 'ep':
-        // Need at least 3 released singles
-        return releasedSingles.length >= 3;
+        // Need at least 1 released EP
+        return releasedEPs.isNotEmpty;
       case 'lp':
-        // Need at least 7 released album songs
-        return releasedAlbumSongs.length >= 7;
+        // Need at least 1 released Album
+        return releasedLPs.isNotEmpty;
       default:
         return false;
     }
@@ -242,22 +253,20 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
   /// Get the validation message for unavailable promotion types
   String _getValidationMessage(String promotionType) {
-    final releasedSongs = widget.artistStats.songs
-        .where((s) => s.state == SongState.released)
+    final releasedAlbums = widget.artistStats.albums
+        .where((a) => a.state == AlbumState.released)
         .toList();
-
-    final releasedSingles = releasedSongs.where((s) => !s.isAlbum).toList();
-    final releasedAlbumSongs = releasedSongs.where((s) => s.isAlbum).toList();
+    
+    final releasedEPs = releasedAlbums.where((a) => a.type == AlbumType.ep).toList();
+    final releasedLPs = releasedAlbums.where((a) => a.type == AlbumType.album).toList();
 
     switch (promotionType) {
       case 'song':
-        return 'Need at least 1 released single';
-      case 'single':
-        return 'Need at least 1 released single';
+        return 'Need at least 1 released song';
       case 'ep':
-        return 'Need at least 3 released singles (you have ${releasedSingles.length})';
+        return 'Need at least 1 released EP (you have ${releasedEPs.length})';
       case 'lp':
-        return 'Need at least 7 released album songs (you have ${releasedAlbumSongs.length})';
+        return 'Need at least 1 released Album (you have ${releasedLPs.length})';
       default:
         return 'Not available';
     }
@@ -360,11 +369,9 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              _buildHeaderStat('⚡', '${widget.artistStats.energy}'),
+              _buildHeaderStat('💰', '\$${NumberFormat('#,###').format(widget.artistStats.money)}'),
               const SizedBox(width: 12),
-              _buildHeaderStat('💰', '\$${widget.artistStats.money}'),
-              const SizedBox(width: 12),
-              _buildHeaderStat('👥', '${widget.artistStats.fanbase}'),
+              _buildHeaderStat('👥', NumberFormat('#,###').format(widget.artistStats.fanbase)),
             ],
           ),
         ],
@@ -403,10 +410,10 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
+      crossAxisCount: 3, // Changed to 3 columns for 3 options
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
-      childAspectRatio: 1.3,
+      childAspectRatio: 1.1,
       children: _promotionTypes.entries.map((entry) {
         final isSelected = _selectedPromotionType == entry.key;
         final data = entry.value;
@@ -522,7 +529,41 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                 ),
                 child: Row(
                   children: [
-                    Text('🎵', style: const TextStyle(fontSize: 24)),
+                    // Cover art thumbnail
+                    if (song.coverArtUrl != null && song.coverArtUrl!.isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: CachedNetworkImage(
+                          imageUrl: song.coverArtUrl!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.music_note, color: Colors.white54),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.music_note, color: Colors.white54),
+                      ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -562,7 +603,241 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     );
   }
 
-  Widget _buildAlbumInfo() {
+  Widget _buildEPSelector() {
+    final releasedEPs = widget.artistStats.albums
+        .where((album) => album.type == 'EP' && album.state == 'released')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select EP to Promote',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...releasedEPs.map((ep) {
+          final isSelected = _selectedAlbum?.id == ep.id;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedAlbum = ep;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF00D9FF).withOpacity(0.2)
+                      : const Color(0xFF161B22),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF00D9FF)
+                        : Colors.white.withOpacity(0.1),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Cover art thumbnail
+                    if (ep.coverArtUrl != null && ep.coverArtUrl!.isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: CachedNetworkImage(
+                          imageUrl: ep.coverArtUrl!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.album, color: Colors.white54),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.album, color: Colors.white54),
+                      ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            ep.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'EP • ${ep.songIds.length} songs',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF32D74B),
+                        size: 22,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildAlbumSelector() {
+    final releasedAlbums = widget.artistStats.albums
+        .where((album) => album.type == 'Album' && album.state == 'released')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select Album to Promote',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...releasedAlbums.map((album) {
+          final isSelected = _selectedAlbum?.id == album.id;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedAlbum = album;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF00D9FF).withOpacity(0.2)
+                      : const Color(0xFF161B22),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF00D9FF)
+                        : Colors.white.withOpacity(0.1),
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Cover art thumbnail
+                    if (album.coverArtUrl != null && album.coverArtUrl!.isNotEmpty)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: CachedNetworkImage(
+                          imageUrl: album.coverArtUrl!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 50,
+                            height: 50,
+                            color: Colors.grey[800],
+                            child: const Icon(Icons.album, color: Colors.white54),
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[800],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.album, color: Colors.white54),
+                      ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            album.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Album • ${album.songIds.length} songs',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF32D74B),
+                        size: 22,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildPromotionControls() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -573,54 +848,92 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            'Campaign Duration',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Icon(
-                Icons.info_outline,
-                color: _promotionTypes[_selectedPromotionType]!['color'],
-                size: 20,
+              Expanded(
+                child: Slider(
+                  value: _promoDays.toDouble(),
+                  min: 1,
+                  max: 30,
+                  divisions: 29,
+                  activeColor: const Color(0xFF00D9FF),
+                  inactiveColor: Colors.white.withOpacity(0.2),
+                  onChanged: (value) {
+                    setState(() {
+                      _promoDays = value.round();
+                    });
+                  },
+                ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'About ${_promotionTypes[_selectedPromotionType]!['name']}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D9FF).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_promoDays days',
+                  style: const TextStyle(
+                    color: Color(0xFF00D9FF),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            _promotionTypes[_selectedPromotionType]!['description'],
+          const SizedBox(height: 20),
+          const Text(
+            'Budget Multiplier',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A84FF).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.lightbulb_outline, color: Color(0xFF0A84FF)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'This campaign will boost all your released songs',
-                    style: const TextStyle(
-                      color: Color(0xFF0A84FF),
-                      fontSize: 13,
-                    ),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: _budgetMultiplier,
+                  min: 0.5,
+                  max: 3.0,
+                  divisions: 25,
+                  activeColor: const Color(0xFFFFD60A),
+                  inactiveColor: Colors.white.withOpacity(0.2),
+                  onChanged: (value) {
+                    setState(() {
+                      _budgetMultiplier = value;
+                    });
+                  },
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD60A).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${_budgetMultiplier.toStringAsFixed(1)}x',
+                  style: const TextStyle(
+                    color: Color(0xFFFFD60A),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -629,9 +942,11 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
   Widget _buildCampaignDetails() {
     final data = _promotionTypes[_selectedPromotionType]!;
+    final totalCost = _totalCost;
     final potentialReach = _calculatePotentialReach();
-    final estimatedFans = (potentialReach * 0.15).round();
-    final estimatedStreams = (potentialReach * 0.3).round();
+    final estimatedFans = (potentialReach * 0.15 * _budgetMultiplier).round();
+    final estimatedStreamsPerDay = (potentialReach * 0.3 * _budgetMultiplier / _promoDays).round();
+    final totalStreams = estimatedStreamsPerDay * _promoDays;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -658,26 +973,45 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ),
           const SizedBox(height: 16),
           _buildDetailRow(
-            'Cost',
-            '${data['energyCost']} ⚡ + \$${data['moneyCost']}',
+            'Total Cost',
+            '\$${NumberFormat('#,###').format(totalCost)}',
             Icons.payments,
           ),
           _buildDetailRow(
+            'Duration',
+            '$_promoDays in-game days',
+            Icons.schedule,
+          ),
+          _buildDetailRow(
+            'Budget Level',
+            '${_budgetMultiplier.toStringAsFixed(1)}x',
+            Icons.trending_up,
+          ),
+          _buildDetailRow(
             'Potential Reach',
-            '$potentialReach people',
+            '${NumberFormat('#,###').format(potentialReach)} people',
             Icons.people,
           ),
           _buildDetailRow(
             'Estimated Fans',
-            '+$estimatedFans fans',
+            '+${NumberFormat('#,###').format(estimatedFans)} fans',
             Icons.person_add,
           ),
           _buildDetailRow(
-            'Estimated Streams',
-            '+$estimatedStreams streams',
+            'Daily Streams',
+            '+${NumberFormat('#,###').format(estimatedStreamsPerDay)} streams/day',
             Icons.play_arrow,
           ),
-          _buildDetailRow('Fame Boost', '+${_calculateFameGain()}', Icons.star),
+          _buildDetailRow(
+            'Total Streams',
+            '+${NumberFormat('#,###').format(totalStreams)} streams',
+            Icons.trending_up,
+          ),
+          _buildDetailRow(
+            'Fame Boost',
+            '+${_calculateFameGain()}',
+            Icons.star,
+          ),
         ],
       ),
     );
@@ -781,18 +1115,22 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   int _calculateFameGain() {
+    int baseFame;
     switch (_selectedPromotionType) {
       case 'song':
-        return 3;
-      case 'single':
-        return 5;
+        baseFame = 3;
+        break;
       case 'ep':
-        return 10;
+        baseFame = 10;
+        break;
       case 'lp':
-        return 20;
+        baseFame = 20;
+        break;
       default:
-        return 3;
+        baseFame = 3;
     }
+    // Scale with budget multiplier
+    return (baseFame * _budgetMultiplier).round();
   }
 
   void _launchCampaign() {
@@ -801,20 +1139,21 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
     // Calculate actual results with some randomness (80-120% of estimate)
     final reachMultiplier = 0.8 + random.nextDouble() * 0.4;
-    final actualReach = (potentialReach * reachMultiplier).round();
+    final actualReach = (potentialReach * reachMultiplier * _budgetMultiplier).round();
     final fansGained =
         (actualReach * (0.12 + random.nextDouble() * 0.06)).round();
-    final streamsGained =
-        (actualReach * (0.25 + random.nextDouble() * 0.1)).round();
+    final totalStreamsGained =
+        (actualReach * (0.25 + random.nextDouble() * 0.1) * _budgetMultiplier).round();
     final fameGain = _calculateFameGain();
 
     // Update songs
     List<Song> updatedSongs = List.from(widget.artistStats.songs);
 
-    final promoDurationDays = 5; // e.g., 5 in-game days
+    // Use user-selected duration
+    final promoDurationDays = _promoDays;
     final promoEndDate =
         widget.currentGameDate.add(Duration(days: promoDurationDays));
-    final dailyBuffer = (streamsGained / promoDurationDays).round();
+    final dailyBuffer = (totalStreamsGained / promoDurationDays).round();
 
     if (_selectedPromotionType == 'song' && _selectedSong != null) {
       // Promote single song with buffer
@@ -827,16 +1166,31 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           promoEndDate: promoEndDate,
         );
       }
-    } else {
-      // Promote all released songs with buffer
-      final releasedCount =
-          updatedSongs.where((s) => s.state == SongState.released).length;
-      final songBuffer = (streamsGained /
+    } else if (_selectedPromotionType == 'ep' && _selectedAlbum != null) {
+      // Promote all songs in the selected EP
+      final epSongIds = _selectedAlbum!.songIds.toSet();
+      final songBuffer = (totalStreamsGained /
               promoDurationDays /
-              (releasedCount > 0 ? releasedCount : 1))
+              epSongIds.length)
           .round();
       updatedSongs = updatedSongs.map((song) {
-        if (song.state == SongState.released) {
+        if (epSongIds.contains(song.id)) {
+          return song.copyWith(
+            promoBuffer: songBuffer,
+            promoEndDate: promoEndDate,
+          );
+        }
+        return song;
+      }).toList();
+    } else if (_selectedPromotionType == 'lp' && _selectedAlbum != null) {
+      // Promote all songs in the selected Album
+      final albumSongIds = _selectedAlbum!.songIds.toSet();
+      final songBuffer = (totalStreamsGained /
+              promoDurationDays /
+              albumSongIds.length)
+          .round();
+      updatedSongs = updatedSongs.map((song) {
+        if (albumSongIds.contains(song.id)) {
           return song.copyWith(
             promoBuffer: songBuffer,
             promoEndDate: promoEndDate,
@@ -848,8 +1202,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
     // Update artist stats
     final updatedStats = widget.artistStats.copyWith(
-      energy: widget.artistStats.energy - _currentEnergyCost,
-      money: widget.artistStats.money - _currentMoneyCost,
+      money: widget.artistStats.money - _totalCost,
       fanbase: widget.artistStats.fanbase + fansGained,
       fame: widget.artistStats.fame + fameGain,
       songs: updatedSongs,
@@ -857,6 +1210,14 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     );
 
     widget.onStatsUpdated(updatedStats);
+
+    // Get the promoted item name for display
+    String promotedItemName = 'Unknown';
+    if (_selectedPromotionType == 'song' && _selectedSong != null) {
+      promotedItemName = _selectedSong!.title;
+    } else if (_selectedAlbum != null) {
+      promotedItemName = _selectedAlbum!.title;
+    }
 
     // Show results
     showDialog(
@@ -870,7 +1231,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Campaign Successful!',
+                'Campaign Launched!',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -881,13 +1242,38 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Your ${_promotionTypes[_selectedPromotionType]!['name']} campaign reached $actualReach people!',
+              'Your campaign for "$promotedItemName" is now active!',
               style: const TextStyle(color: Colors.white, fontSize: 15),
             ),
             const SizedBox(height: 16),
-            _buildResultRow('👥 New Fans', '+$fansGained'),
-            _buildResultRow('▶️ Streams', '+$streamsGained'),
-            _buildResultRow('⭐ Fame', '+$fameGain'),
+            _buildResultRow('📅 Duration', '$_promoDays in-game days'),
+            _buildResultRow('👥 Expected Fans', '+$fansGained'),
+            _buildResultRow('▶️ Daily Streams', '+$dailyBuffer/day'),
+            _buildResultRow('▶️ Total Streams', '+$totalStreamsGained'),
+            _buildResultRow('⭐ Fame Boost', '+$fameGain'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A84FF).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFF0A84FF), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Streams will accumulate gradually over $_promoDays days',
+                      style: const TextStyle(
+                        color: Color(0xFF0A84FF),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -906,6 +1292,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               Navigator.pop(context);
               setState(() {
                 _selectedSong = null;
+                _selectedAlbum = null;
               });
             },
             style: ElevatedButton.styleFrom(

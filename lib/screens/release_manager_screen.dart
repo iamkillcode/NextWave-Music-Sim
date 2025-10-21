@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
@@ -27,6 +30,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   final _albumTitleController = TextEditingController();
   AlbumType _selectedType = AlbumType.ep;
   final List<String> _selectedSongIds = [];
+  String? _uploadedCoverArtUrl; // Album/EP cover art URL
 
   @override
   void initState() {
@@ -39,6 +43,39 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     _tabController.dispose();
     _albumTitleController.dispose();
     super.dispose();
+  }
+
+  Future<void> _uploadCoverArt() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Read image as bytes and convert to base64
+      final Uint8List imageBytes = await image.readAsBytes();
+      final String base64Image = base64Encode(imageBytes);
+      final String dataUrl = 'data:image/jpeg;base64,$base64Image';
+
+      setState(() {
+        _uploadedCoverArtUrl = dataUrl;
+      });
+    } catch (e) {
+      print('Error uploading cover art: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to upload cover art'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -115,6 +152,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           _buildTypeSelector(),
           const SizedBox(height: 24),
           _buildTitleInput(),
+          const SizedBox(height: 24),
+          _buildCoverArtUploader(),
           const SizedBox(height: 24),
           _buildSongSelector(recordedSongs, releasedSingles),
           const SizedBox(height: 24),
@@ -310,6 +349,131 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     );
   }
 
+  Widget _buildCoverArtUploader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.image, color: Color(0xFF9B59B6), size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Cover Art',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C2128),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _uploadedCoverArtUrl != null
+                  ? const Color(0xFF9B59B6)
+                  : Colors.white24,
+              width: 2,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Preview or placeholder
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: _uploadedCoverArtUrl != null
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF9B59B6).withOpacity(0.3),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          )
+                        ]
+                      : null,
+                  image: _uploadedCoverArtUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(_uploadedCoverArtUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: _uploadedCoverArtUrl != null
+                    ? null
+                    : const Icon(
+                        Icons.album,
+                        color: Colors.white38,
+                        size: 40,
+                      ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _uploadedCoverArtUrl != null
+                          ? 'Cover Art Uploaded ✓'
+                          : 'No Cover Art',
+                      style: TextStyle(
+                        color: _uploadedCoverArtUrl != null
+                            ? const Color(0xFF9B59B6)
+                            : Colors.white60,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _uploadedCoverArtUrl != null
+                          ? 'Songs without cover art will use this'
+                          : 'Optional - Upload custom album artwork',
+                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _uploadCoverArt,
+                icon: Icon(_uploadedCoverArtUrl != null
+                    ? Icons.edit
+                    : Icons.upload),
+                label: Text(_uploadedCoverArtUrl != null ? 'Change' : 'Upload'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9B59B6),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_uploadedCoverArtUrl != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _uploadedCoverArtUrl = null;
+                });
+              },
+              icon: const Icon(Icons.close, size: 16, color: Colors.red),
+              label: const Text(
+                'Remove Cover Art',
+                style: TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildSongSelector(List<Song> recorded, List<Song> released) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -361,7 +525,6 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
 
   Widget _buildSongCheckbox(Song song, Color accentColor) {
     final isSelected = _selectedSongIds.contains(song.id);
-    final minSongs = _selectedType == AlbumType.ep ? 3 : 7;
     final maxSongs = _selectedType == AlbumType.ep ? 6 : 999;
 
     // Disable if at max capacity and not selected
@@ -661,6 +824,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       type: _selectedType,
       songIds: List.from(_selectedSongIds),
       state: AlbumState.planned,
+      coverArtUrl: _uploadedCoverArtUrl, // Store album cover art
     );
 
     // Update songs to mark them as part of this album
@@ -712,6 +876,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               setState(() {
                 _albumTitleController.clear();
                 _selectedSongIds.clear();
+                _uploadedCoverArtUrl = null; // Clear cover art
               });
               // Switch to scheduled tab
               _tabController.animateTo(1);
@@ -885,15 +1050,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: Open release screen for this album
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Release feature coming soon!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
+                    onPressed: () => _releaseAlbum(album),
                     icon: const Icon(Icons.rocket_launch),
                     label: const Text('Release Now'),
                     style: ElevatedButton.styleFrom(
@@ -910,6 +1067,103 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  void _releaseAlbum(Album album) {
+    // Get the songs in this album
+    final albumSongs = widget.artistStats.songs
+        .where((song) => album.songIds.contains(song.id))
+        .toList();
+
+    // RULE: If a song was already released as a single with cover art, keep it
+    // If a song has NO cover art, use the album's cover art
+    final updatedSongs = widget.artistStats.songs.map((song) {
+      if (album.songIds.contains(song.id)) {
+        // This song is part of the album
+        String? finalCoverArt = song.coverArtUrl; // Keep existing if it has one
+        
+        // If song has NO cover art AND album has cover art, use album's
+        if (finalCoverArt == null && album.coverArtUrl != null) {
+          finalCoverArt = album.coverArtUrl;
+        }
+
+        return song.copyWith(
+          state: SongState.released,
+          releasedDate: DateTime.now(),
+          coverArtUrl: finalCoverArt,
+          // Keep the albumId and releaseType already set
+        );
+      }
+      return song;
+    }).toList();
+
+    // Mark album as released
+    final updatedAlbum = album.copyWith(
+      state: AlbumState.released,
+      releasedDate: DateTime.now(),
+    );
+
+    // Update albums list
+    final updatedAlbums = widget.artistStats.albums.map((a) {
+      return a.id == album.id ? updatedAlbum : a;
+    }).toList();
+
+    // Calculate stats bonuses for album release
+    final avgQuality = albumSongs.isEmpty
+        ? 50
+        : albumSongs.map((s) => s.finalQuality).reduce((a, b) => a + b) /
+            albumSongs.length;
+    
+    final fameGain = 5 + (avgQuality ~/ 20); // 5-10 fame based on quality
+    final fanbaseGain = 100 + (fameGain * 20); // Larger fanbase boost for albums
+
+    final updatedStats = widget.artistStats.copyWith(
+      songs: updatedSongs,
+      albums: updatedAlbums,
+      fame: widget.artistStats.fame + fameGain,
+      fanbase: widget.artistStats.fanbase + fanbaseGain,
+    );
+
+    widget.onStatsUpdated(updatedStats);
+
+    // Show success dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Text(album.typeEmoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Released!',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '${album.typeDisplay} "${album.title}" is now live!\n\n'
+          '✨ Fame +$fameGain\n'
+          '👥 Fanbase +$fanbaseGain\n'
+          '🎵 ${album.songIds.length} songs released\n\n'
+          'Songs will earn streams and royalties daily!',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Switch to released tab
+              _tabController.animateTo(2);
+            },
+            child: const Text('View Released'),
+          ),
         ],
       ),
     );

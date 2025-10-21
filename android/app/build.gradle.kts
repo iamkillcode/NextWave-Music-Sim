@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         applicationId = "com.nextwave.musicgame"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 35  // Updated to match compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName

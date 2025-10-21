@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/published_song.dart';
 import '../models/multiplayer_player.dart';
 import '../models/artist_stats.dart';
@@ -12,14 +13,15 @@ class FirebaseService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'], // Minimal scopes to avoid People API dependency
+  );
 
   // Collections
   CollectionReference get _songsCollection => _firestore.collection('songs');
   CollectionReference get _playersCollection =>
       _firestore.collection('players');
-  CollectionReference get _leaderboardsCollection =>
-      _firestore.collection('leaderboards');
 
   // Current user
   User? get currentUser => _auth.currentUser;
@@ -107,12 +109,98 @@ class FirebaseService {
   Future<void> updatePlayerStats(ArtistStats stats) async {
     if (!isSignedIn) return;
 
-    await _playersCollection.doc(currentUser!.uid).update({
-      'currentMoney': stats.money,
-      'currentFame': stats.fame,
-      'level': stats.fanbase,
-      'lastActive': Timestamp.fromDate(DateTime.now()),
-    });
+    // Use secure server-side validation for all stat updates
+    try {
+      final callable = _functions.httpsCallable('secureStatUpdate');
+      final result = await callable.call({
+        'updates': {
+          'currentMoney': stats.money,
+          'currentFame': stats.fame,
+          'fanbase': stats.fanbase,
+          'energy': stats.energy,
+          'creativity': stats.creativity, // 🎨 FIX: Save Hype stat!
+          'songwritingSkill': stats.songwritingSkill,
+          'lyricsSkill': stats.lyricsSkill,
+          'compositionSkill': stats.compositionSkill,
+          'experience': stats.experience,
+          'inspirationLevel': stats.inspirationLevel,
+          // ✅ CRITICAL FIX: Include songs array to persist song data
+          'songs': stats.songs.map((s) => s.toJson()).toList(),
+          'albums': stats.albums.map((a) => a.toJson()).toList(),
+          'loyalFanbase': stats.loyalFanbase,
+          'regionalFanbase': stats.regionalFanbase,
+          'currentRegion': stats.currentRegion,
+        },
+        'action': 'stat_update',
+        'context': {
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      });
+
+      if (!result.data['success']) {
+        throw Exception('Server rejected stat update: ${result.data['error']}');
+      }
+
+      // Log any flags returned by server
+      if (result.data['flags'] != null) {
+        print('⚠️ Server flagged suspicious activity: ${result.data['flags']}');
+      }
+    } catch (e) {
+      print('Error updating player stats: $e');
+      rethrow;
+    }
+  }
+
+  /// Secure song creation using server-side validation
+  Future<Map<String, dynamic>?> createSongSecurely({
+    required String title,
+    required String genre,
+    required int effort,
+  }) async {
+    if (!isSignedIn) return null;
+
+    try {
+      final callable = _functions.httpsCallable('secureSongCreation');
+      final result = await callable.call({
+        'title': title,
+        'genre': genre,
+        'effort': effort,
+      });
+
+      if (result.data['success']) {
+        return result.data;
+      } else {
+        throw Exception('Server rejected song creation: ${result.data['error']}');
+      }
+    } catch (e) {
+      print('Error creating song: $e');
+      return null;
+    }
+  }
+
+  /// Secure side hustle reward processing
+  Future<Map<String, dynamic>?> processSideHustleReward({
+    required String sideHustleId,
+    required DateTime currentGameDate,
+  }) async {
+    if (!isSignedIn) return null;
+
+    try {
+      final callable = _functions.httpsCallable('secureSideHustleReward');
+      final result = await callable.call({
+        'sideHustleId': sideHustleId,
+        'currentGameDate': currentGameDate.toIso8601String(),
+      });
+
+      if (result.data['success']) {
+        return result.data;
+      } else {
+        throw Exception('Server rejected side hustle reward: ${result.data['error']}');
+      }
+    } catch (e) {
+      print('Error processing side hustle reward: $e');
+      return null;
+    }
   }
 
   Future<MultiplayerPlayer?> getPlayer(String playerId) async {
@@ -125,6 +213,17 @@ class FirebaseService {
       print('Error getting player: $e');
     }
     return null;
+  }
+
+  // Password Reset
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+      return true;
+    } catch (e) {
+      print('Error sending password reset email: $e');
+      return false;
+    }
   }
 
   // Song Methods

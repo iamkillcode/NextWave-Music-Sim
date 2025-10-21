@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_screen_new.dart';
 import '../models/artist_stats.dart';
+import '../services/game_time_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final User user;
@@ -94,6 +95,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     print('   User ID: ${widget.user.uid}');
 
     try {
+      // Get current game date to set as career start date
+      DateTime careerStartGameDate;
+      try {
+        final gameTimeService = GameTimeService();
+        careerStartGameDate = await gameTimeService.getCurrentGameDate();
+        print('✅ Career starting in game-world date: $careerStartGameDate');
+      } catch (e) {
+        print('⚠️ Could not get game date, using default: $e');
+        // Fallback to game world start date (Jan 1, 2020)
+        careerStartGameDate = DateTime(2020, 1, 1);
+      }
+
       // Create player profile in Firestore
       final playerData = {
         'id': widget.user.uid,
@@ -121,7 +134,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'compositionSkill': 10,
         'experience': 0,
         'age': _selectedAge,
-        'careerStartDate': Timestamp.now(),
+        'careerStartDate': Timestamp.fromDate(careerStartGameDate), // Use game-world date!
         'inspirationLevel': 0, // No hype yet - you're just starting!
         'regionalFanbase': {}, // Empty regional fanbase initially
         'songs': [], // Empty songs list initially
@@ -172,7 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           songs: [],
           currentRegion: _selectedRegion,
           age: _selectedAge,
-          careerStartDate: DateTime.now(),
+          careerStartDate: careerStartGameDate, // Use game-world date!
         );
 
         // Navigate to dashboard and pass initial stats
