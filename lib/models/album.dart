@@ -1,4 +1,5 @@
 /// Represents an Album or EP - a collection of songs released together
+import '../utils/firestore_sanitizer.dart';
 class Album {
   final String id;
   final String title;
@@ -81,7 +82,7 @@ class Album {
           ? DateTime.parse(json['scheduledDate'] as String)
           : null,
       coverArtUrl: json['coverArtUrl'] as String?,
-      totalStreams: (json['totalStreams'] as num?)?.toInt() ?? 0,
+  totalStreams: safeParseInt(json['totalStreams'], fallback: 0),
       state: AlbumState.values.firstWhere(
         (e) => e.name == json['state'],
         orElse: () => AlbumState.planned,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
+import '../utils/firestore_sanitizer.dart';
 import 'echox_screen.dart';
 
 class EchoXCommentsScreen extends StatefulWidget {
@@ -487,10 +488,10 @@ class _EchoXCommentsScreenState extends State<EchoXCommentsScreen> {
           .add(comment.toFirestore());
 
       // Update post comment count
-      await FirebaseFirestore.instance
-          .collection('echox_posts')
-          .doc(widget.post.id)
-          .update({'comments': FieldValue.increment(1)});
+    await FirebaseFirestore.instance
+      .collection('echox_posts')
+      .doc(widget.post.id)
+      .update(sanitizeForFirestore({'comments': FieldValue.increment(1)}));
 
       // Update stats
       _currentStats = _currentStats.copyWith(
@@ -539,10 +540,10 @@ class _EchoXCommentsScreenState extends State<EchoXCommentsScreen> {
           .doc(widget.post.id)
           .collection('comments')
           .doc(comment.id)
-          .update({
+          .update(sanitizeForFirestore({
         'likes': isLiked ? FieldValue.increment(-1) : FieldValue.increment(1),
         'likedBy': newLikedBy,
-      });
+      }));
     } catch (e) {
       print('Error toggling comment like: $e');
     }
@@ -590,10 +591,10 @@ class _EchoXCommentsScreenState extends State<EchoXCommentsScreen> {
           .delete();
 
       // Update post comment count
-      await FirebaseFirestore.instance
-          .collection('echox_posts')
-          .doc(widget.post.id)
-          .update({'comments': FieldValue.increment(-1)});
+    await FirebaseFirestore.instance
+      .collection('echox_posts')
+      .doc(widget.post.id)
+      .update(sanitizeForFirestore({'comments': FieldValue.increment(-1)}));
 
       if (mounted) {
         _showMessage('🗑️ Comment deleted');

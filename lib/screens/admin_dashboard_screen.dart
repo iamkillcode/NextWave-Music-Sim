@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import '../utils/firestore_sanitizer.dart';
 import '../services/admin_service.dart';
 import '../services/side_hustle_service.dart';
 
@@ -2210,13 +2211,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 await _firestore
                     .collection('players')
                     .doc(player['id'])
-                    .update({
+                    .update(sanitizeForFirestore({
                   'currentMoney': 5000,
                   'fame': 0,
                   'level': 0,
                   'loyalFanbase': 0,
                   'songs': [],
-                });
+                }));
 
                 if (mounted) {
                   Navigator.pop(context);
@@ -2463,11 +2464,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           await _firestore
                               .collection('gameSettings')
                               .doc('globalTime')
-                              .update({
+                              .update(sanitizeForFirestore({
                             'realWorldStartDate':
                                 Timestamp.fromDate(adjustedRealWorldStart),
                             'lastUpdated': FieldValue.serverTimestamp(),
-                          });
+                          }));
 
                           final newDate = DateTime(
                             currentDate.year,

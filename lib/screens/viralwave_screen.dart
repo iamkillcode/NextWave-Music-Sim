@@ -1239,8 +1239,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     final baseReach =
         _promotionTypes[_selectedPromotionType]!['baseReach'] as int;
     // REDUCED BONUSES: Fame and fanbase bonuses are now much smaller
-    final fameBonus = (widget.artistStats.fame * 20).toInt(); // Reduced from 100
-    final fanbaseBonus = (widget.artistStats.fanbase * 10).toInt(); // Reduced from 50
+  final fameBonus = widget.artistStats.fame * 20; // Reduced from 100
+  final fanbaseBonus = widget.artistStats.fanbase * 10; // Reduced from 50
 
     return baseReach + fameBonus + fanbaseBonus;
   }

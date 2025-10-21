@@ -1036,9 +1036,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             .artistStats.money, // No immediate payment - royalties paid daily
         fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
         fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
-        loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
-            .clamp(0, double.infinity)
-            .toInt(),
+    loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
+      .clamp(0, 1e12)
+      .toInt(),
         regionalFanbase: updatedRegionalFanbase,
         songs: widget.artistStats.songs
             .map((s) => s.id == updatedSong.id ? updatedSong : s)

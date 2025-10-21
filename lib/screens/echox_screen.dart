@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../utils/firestore_sanitizer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
 import 'echox_comments_screen.dart';
@@ -674,10 +675,10 @@ class _EchoXScreenState extends State<EchoXScreen>
       await FirebaseFirestore.instance
           .collection('echox_posts')
           .doc(post.id)
-          .update({
+          .update(sanitizeForFirestore({
         'likes': isLiked ? post.likes - 1 : post.likes + 1,
         'likedBy': newLikedBy,
-      });
+      }));
     } catch (e) {
       _showMessage('❌ Failed to like post');
     }
@@ -693,9 +694,9 @@ class _EchoXScreenState extends State<EchoXScreen>
       await FirebaseFirestore.instance
           .collection('echox_posts')
           .doc(post.id)
-          .update({
+          .update(sanitizeForFirestore({
         'echoes': post.echoes + 1,
-      });
+      }));
 
       _currentStats = _currentStats.copyWith(
         energy: _currentStats.energy - 3,

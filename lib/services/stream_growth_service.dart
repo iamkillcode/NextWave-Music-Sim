@@ -12,6 +12,8 @@ import '../models/artist_stats.dart';
 /// - Global vs regional appeal
 class StreamGrowthService {
   final Random _random = Random();
+  // Safety cap for any stream/fan calculations to avoid Infinity -> toInt() errors
+  static const double _maxStreamBound = 1e12; // 1 trillion streams is effectively unlimited
 
   /// All supported regions
   static const List<String> regions = [
@@ -111,7 +113,8 @@ class StreamGrowthService {
       finalStreams = minimumStreams;
     }
 
-    return finalStreams.clamp(0, double.infinity).toInt();
+  // Safely clamp to a very large finite upper bound before converting to int
+  return finalStreams.clamp(0, _maxStreamBound).toInt();
   }
 
   /// Calculate regional stream distribution
@@ -384,9 +387,9 @@ class StreamGrowthService {
     required int songQuality,
   }) {
     // Casual fanbase (total - loyal)
-    final casualFans = (artistStats.fanbase - artistStats.loyalFanbase)
-        .clamp(0, double.infinity)
-        .toInt();
+  final casualFans = (artistStats.fanbase - artistStats.loyalFanbase)
+    .clamp(0, _maxStreamBound)
+    .toInt();
 
     // Only a fraction of casual fans stream on any given day
     final engagementRate =
@@ -516,7 +519,7 @@ class StreamGrowthService {
   int decayLast7DaysStreams(int currentLast7DaysStreams) {
     // Keep 6/7ths (85.7%) of the streams - one day drops off
     final decayed = (currentLast7DaysStreams * 0.857).round();
-    return decayed.clamp(0, double.infinity).toInt();
+  return decayed.clamp(0, _maxStreamBound).toInt();
   }
 
   /// Reset daily streams to new value - replaces yesterday's streams

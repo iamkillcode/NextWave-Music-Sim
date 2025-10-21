@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import '../models/artist_stats.dart';
 import '../services/admin_service.dart';
 import 'admin_dashboard_screen.dart';
+import '../utils/firestore_sanitizer.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -93,11 +94,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     try {
-      final userId = _auth.currentUser?.uid;
-      if (userId != null) {
-        await _firestore.collection('players').doc(userId).update({
-          'gender': gender,
-        });
+          final userId = _auth.currentUser?.uid;
+          if (userId != null) {
+            await _firestore.collection('players').doc(userId).update(
+              sanitizeForFirestore({
+                'gender': gender,
+              }),
+            );
 
         setState(() {
           _currentGender = gender;
@@ -132,12 +135,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final userId = _auth.currentUser?.uid;
       if (userId != null) {
-        await _firestore.collection('players').doc(userId).update({
-          'notificationsEnabled': _notificationsEnabled,
-          'soundEnabled': _soundEnabled,
-          'vibrationEnabled': _vibrationEnabled,
-          'showOnlineStatus': _showOnlineStatus,
-        });
+            await _firestore.collection('players').doc(userId).update(
+              sanitizeForFirestore({
+                'notificationsEnabled': _notificationsEnabled,
+                'soundEnabled': _soundEnabled,
+                'vibrationEnabled': _vibrationEnabled,
+                'showOnlineStatus': _showOnlineStatus,
+              }),
+            );
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -240,10 +245,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final userId = _auth.currentUser?.uid;
-      if (userId != null) {
-        await _firestore.collection('players').doc(userId).update({
-          'artistName': newName,
-        });
+        if (userId != null) {
+        await _firestore.collection('players').doc(userId).update(
+          sanitizeForFirestore({
+            'artistName': newName,
+          }),
+        );
 
         // Update the artist stats and notify parent
         final updatedStats = widget.artistStats.copyWith(name: newName);
@@ -295,9 +302,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Save avatar URL to Firestore
       final userId = _auth.currentUser?.uid;
       if (userId != null) {
-        await _firestore.collection('players').doc(userId).update({
-          'avatarUrl': _avatarUrl,
-        });
+            await _firestore.collection('players').doc(userId).update(
+              sanitizeForFirestore({
+                'avatarUrl': _avatarUrl,
+              }),
+            );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -533,12 +542,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: const Text('Settings', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Text('Settings', style: TextStyle(color: Colors.white)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

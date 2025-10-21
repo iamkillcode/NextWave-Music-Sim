@@ -1,3 +1,5 @@
+import '../utils/firestore_sanitizer.dart';
+
 class Song {
   final String id;
   final String title;
@@ -178,7 +180,7 @@ class Song {
       id: json['id'] as String,
       title: json['title'] as String,
       genre: json['genre'] as String,
-      quality: (json['quality'] as num).toInt(),
+  quality: safeParseInt(json['quality'], fallback: 0),
       createdDate: DateTime.parse(json['createdDate'] as String),
       state: SongState.values.firstWhere(
         (e) => e.name == json['state'],
@@ -191,8 +193,8 @@ class Song {
       releasedDate: json['releasedDate'] != null
           ? DateTime.parse(json['releasedDate'] as String)
           : null,
-      streams: (json['streams'] as num?)?.toInt() ?? 0,
-      likes: (json['likes'] as num?)?.toInt() ?? 0,
+  streams: safeParseInt(json['streams'], fallback: 0),
+  likes: safeParseInt(json['likes'], fallback: 0),
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? {}),
       coverArtStyle: json['coverArtStyle'] as String?,
       coverArtColor: json['coverArtColor'] as String?,
@@ -200,10 +202,10 @@ class Song {
         json['streamingPlatforms'] as List? ?? [],
       ),
       coverArtUrl: json['coverArtUrl'] as String?,
-      viralityScore: (json['viralityScore'] as num?)?.toDouble() ?? 0.5,
-      peakDailyStreams: (json['peakDailyStreams'] as num?)?.toInt() ?? 0,
-      daysOnChart: (json['daysOnChart'] as num?)?.toInt() ?? 0,
-      lastDayStreams: (json['lastDayStreams'] as num?)?.toInt() ?? 0,
+  viralityScore: safeParseDouble(json['viralityScore'], fallback: 0.5),
+  peakDailyStreams: safeParseInt(json['peakDailyStreams'], fallback: 0),
+  daysOnChart: safeParseInt(json['daysOnChart'], fallback: 0),
+  lastDayStreams: safeParseInt(json['lastDayStreams'], fallback: 0),
       isAlbum: json['isAlbum'] as bool? ?? false,
       lastStreamUpdateDate: json['lastStreamUpdateDate'] != null
           ? DateTime.parse(json['lastStreamUpdateDate'] as String)

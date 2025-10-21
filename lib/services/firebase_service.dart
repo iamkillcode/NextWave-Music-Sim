@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../models/published_song.dart';
+import '../utils/firestore_sanitizer.dart';
 import '../models/multiplayer_player.dart';
 import '../models/artist_stats.dart';
 
@@ -87,7 +88,7 @@ class FirebaseService {
     final playerDoc = _playersCollection.doc(user.uid);
     final playerSnapshot = await playerDoc.get();
 
-    if (!playerSnapshot.exists) {
+      if (!playerSnapshot.exists) {
       // Create new player
       final newPlayer = MultiplayerPlayer(
         id: user.uid,
@@ -96,13 +97,14 @@ class FirebaseService {
         joinDate: DateTime.now(),
         lastActive: DateTime.now(),
       );
-      await playerDoc.set(newPlayer.toFirestore());
+        // Sanitize before writing to Firestore
+      await playerDoc.set(sanitizeForFirestore(newPlayer.toFirestore()));
     } else {
       // Update last active
-      await playerDoc.update({
-        'lastActive': Timestamp.fromDate(DateTime.now()),
-        'isOnline': true,
-      });
+        await playerDoc.update(sanitizeForFirestore({
+          'lastActive': Timestamp.fromDate(DateTime.now()),
+          'isOnline': true,
+        }));
     }
   }
 
@@ -112,7 +114,7 @@ class FirebaseService {
     // Use secure server-side validation for all stat updates
     try {
       final callable = _functions.httpsCallable('secureStatUpdate');
-      final result = await callable.call({
+      final rawPayload = {
         'updates': {
           'currentMoney': stats.money,
           'currentFame': stats.fame,
@@ -124,7 +126,7 @@ class FirebaseService {
           'compositionSkill': stats.compositionSkill,
           'experience': stats.experience,
           'inspirationLevel': stats.inspirationLevel,
-          // ✅ CRITICAL FIX: Include songs array to persist song data
+          // ✅ CRITICAL Fix: Include songs array to persist song data
           'songs': stats.songs.map((s) => s.toJson()).toList(),
           'albums': stats.albums.map((a) => a.toJson()).toList(),
           'loyalFanbase': stats.loyalFanbase,
@@ -135,7 +137,11 @@ class FirebaseService {
         'context': {
           'timestamp': DateTime.now().toIso8601String(),
         },
-      });
+      };
+
+      // Sanitize everything to avoid NaN/Infinity being sent upstream
+      final sanitizedPayload = sanitizeForFirestore(Map<String, dynamic>.from(rawPayload));
+      final result = await callable.call(sanitizedPayload);
 
       if (!result.data['success']) {
         throw Exception('Server rejected stat update: ${result.data['error']}');
@@ -246,12 +252,12 @@ class FirebaseService {
         releaseDate: DateTime.now(),
       );
 
-      final docRef = await _songsCollection.add(song.toFirestore());
+  final docRef = await _songsCollection.add(sanitizeForFirestore(song.toFirestore()));
 
       // Update player song count
-      await _playersCollection.doc(currentUser!.uid).update({
+      await _playersCollection.doc(currentUser!.uid).update(sanitizeForFirestore({
         'songsPublished': FieldValue.increment(1),
-      });
+      }));
 
       return docRef.id;
     } catch (e) {

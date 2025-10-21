@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math' as math;
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/side_hustle.dart';
@@ -20,6 +21,7 @@ import 'studios_list_screen.dart';
 import 'activity_hub_screen.dart';
 import 'release_manager_screen.dart';
 import '../utils/firebase_status.dart';
+import '../utils/firestore_sanitizer.dart';
 import 'settings_screen.dart';
 import 'notifications_screen.dart';
 import '../services/notification_service.dart';
@@ -250,10 +252,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print('⚠️ No user signed in, using demo stats');
-        return;
+        print('⚠️ No user signed in, waiting for authentication...');
+        
+        // Wait a bit for Firebase to initialize after hot restart
+        await Future.delayed(const Duration(seconds: 2));
+        final retryUser = FirebaseAuth.instance.currentUser;
+        
+        if (retryUser == null) {
+          print('❌ Still no user after waiting, using demo stats');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Not signed in. Pull down to refresh when ready.'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+        
+        print('✅ User authenticated after waiting: ${retryUser.uid}');
+        return _loadUserProfileForUser(retryUser);
       }
 
+      return _loadUserProfileForUser(user);
+    } catch (e) {
+      print('❌ Error in _loadUserProfile: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading profile: $e'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadUserProfileForUser(User user) async {
+    try {
       print('📥 Loading user profile for: ${user.uid}');
 
       final doc = await FirebaseFirestore.instance
@@ -295,10 +332,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Map<String, int> loadedRegionalFanbase = {};
         if (data['regionalFanbase'] != null) {
           try {
-            final regionalData =
-                data['regionalFanbase'] as Map<dynamic, dynamic>;
+            final regionalData = Map<String, dynamic>.from(
+                data['regionalFanbase'] as Map<dynamic, dynamic>);
             loadedRegionalFanbase = regionalData.map(
-              (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+              (key, value) =>
+                  MapEntry(key.toString(), safeParseInt(value, fallback: 0)),
             );
             print(
               '✅ Loaded regional fanbase for ${loadedRegionalFanbase.length} regions',
@@ -329,9 +367,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // Load genre mastery map (default empty for new players)
         Map<String, int> loadedGenreMastery = {};
         if (data['genreMastery'] != null) {
-          final masteryData = data['genreMastery'] as Map<dynamic, dynamic>;
+          final masteryData = Map<String, dynamic>.from(data['genreMastery']);
           loadedGenreMastery = masteryData.map(
-            (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+            (key, value) => MapEntry(key.toString(), safeParseInt(value)),
           );
         }
 
@@ -347,10 +385,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         // Load albums (EPs and Albums)
-        List<Album> loadedAlbums = [];
-        if (data['albums'] != null) {
+  List<Album> loadedAlbums = [];
+  if (data['albums'] != null) {
           try {
-            final albumsList = data['albums'] as List<dynamic>;
+      final albumsList = List<Map<String, dynamic>>.from(
+        (data['albums'] as List<dynamic>));
             loadedAlbums = albumsList
                 .map((albumData) =>
                     Album.fromJson(Map<String, dynamic>.from(albumData)))
@@ -364,25 +403,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? 'Unknown Artist',
-            fame: (data['currentFame'] ?? 0).toInt(),
-            money: (data['currentMoney'] ?? 5000).toInt(),
+            fame: safeParseInt(data['currentFame'], fallback: 0),
+            money: safeParseInt(data['currentMoney'], fallback: 5000),
             energy: 100, // Always start with full energy
-            creativity: (data['inspirationLevel'] ?? 0).toInt(),
-            fanbase: ((data['fanbase'] ?? data['level'] ?? 100).toInt())
-                .clamp(100, double.infinity.toInt()), // Minimum 100 fans
-            loyalFanbase: (data['loyalFanbase'] ?? 0).toInt(),
-            albumsSold: (data['albumsReleased'] ?? 0).toInt(),
-            songsWritten: (data['songsPublished'] ?? 0).toInt(),
-            concertsPerformed: (data['concertsPerformed'] ?? 0).toInt(),
-            songwritingSkill: (data['songwritingSkill'] ?? 10).toInt(),
-            experience: (data['experience'] ?? 0).toInt(),
-            lyricsSkill: (data['lyricsSkill'] ?? 10).toInt(),
-            compositionSkill: (data['compositionSkill'] ?? 10).toInt(),
-            inspirationLevel: (data['inspirationLevel'] ?? 0).toInt(),
+            creativity: safeParseInt(data['inspirationLevel'], fallback: 0),
+            fanbase: math.max(
+                100, safeParseInt(data['fanbase'] ?? data['level'], fallback: 100)),
+            loyalFanbase: safeParseInt(data['loyalFanbase'], fallback: 0),
+            albumsSold: safeParseInt(data['albumsReleased'], fallback: 0),
+            songsWritten: safeParseInt(data['songsPublished'], fallback: 0),
+            concertsPerformed: safeParseInt(data['concertsPerformed'], fallback: 0),
+            songwritingSkill: safeParseInt(data['songwritingSkill'], fallback: 10),
+            experience: safeParseInt(data['experience'], fallback: 0),
+            lyricsSkill: safeParseInt(data['lyricsSkill'], fallback: 10),
+            compositionSkill: safeParseInt(data['compositionSkill'], fallback: 10),
+            inspirationLevel: safeParseInt(data['inspirationLevel'], fallback: 0),
             songs: loadedSongs,
             albums: loadedAlbums,
             currentRegion: data['homeRegion'] ?? 'usa',
-            age: (data['age'] ?? 18).toInt(),
+            age: safeParseInt(data['age'], fallback: 18),
             careerStartDate:
                 (data['careerStartDate'] as Timestamp?)?.toDate() ??
                     DateTime.now(),
@@ -408,11 +447,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _setupRealtimeListeners();
       } else {
         print('⚠️ Profile not found in Firestore, using demo stats');
+        // Show a message to the user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile not found. Using demo mode.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('❌ Error loading profile: $e');
-      print('💡 Using demo stats instead');
-      // Keep the default stats if loading fails
+      print('💡 Retrying profile load in 3 seconds...');
+      
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading profile: $e. Retrying...'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
+        // Retry loading after a delay
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            print('🔄 Retrying profile load...');
+            _loadUserProfile();
+          }
+        });
+      }
     }
   }
 
@@ -478,7 +543,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final regionalData =
                 data['regionalFanbase'] as Map<dynamic, dynamic>;
             loadedRegionalFanbase = regionalData.map(
-              (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+              (key, value) => MapEntry(key.toString(), safeParseInt(value)),
             );
           } catch (e) {
             print('⚠️ Error loading regional fanbase in real-time: $e');
@@ -501,9 +566,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final String primaryGenre = data['primaryGenre'] ?? 'Hip Hop';
         Map<String, int> loadedGenreMastery = {};
         if (data['genreMastery'] != null) {
-          final masteryData = data['genreMastery'] as Map<dynamic, dynamic>;
+          final masteryData = Map<String, dynamic>.from(
+              data['genreMastery'] as Map<dynamic, dynamic>);
           loadedGenreMastery = masteryData.map(
-            (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+            (key, value) => MapEntry(key.toString(), safeParseInt(value)),
           );
         }
 
@@ -519,37 +585,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? artistStats.name,
-            fame: (data['currentFame'] ?? artistStats.fame).toInt(),
-            money: (data['currentMoney'] ?? artistStats.money).toInt(),
-            energy: (data['energy'] ?? artistStats.energy).toInt(),
-            creativity:
-                (data['inspirationLevel'] ?? artistStats.creativity).toInt(),
-            fanbase: (data['fanbase'] ?? artistStats.fanbase).toInt(),
-            loyalFanbase:
-                (data['loyalFanbase'] ?? artistStats.loyalFanbase).toInt(),
-            albumsSold:
-                (data['albumsReleased'] ?? artistStats.albumsSold).toInt(),
-            songsWritten:
-                (data['songsPublished'] ?? artistStats.songsWritten).toInt(),
-            concertsPerformed:
-                (data['concertsPerformed'] ?? artistStats.concertsPerformed)
-                    .toInt(),
-            songwritingSkill:
-                (data['songwritingSkill'] ?? artistStats.songwritingSkill)
-                    .toInt(),
-            experience: (data['experience'] ?? artistStats.experience).toInt(),
-            lyricsSkill:
-                (data['lyricsSkill'] ?? artistStats.lyricsSkill).toInt(),
-            compositionSkill:
-                (data['compositionSkill'] ?? artistStats.compositionSkill)
-                    .toInt(),
-            inspirationLevel:
-                (data['inspirationLevel'] ?? artistStats.inspirationLevel)
-                    .toInt(),
+      fame: safeParseInt(data['currentFame'], fallback: artistStats.fame),
+      money: safeParseInt(data['currentMoney'], fallback: artistStats.money),
+      energy: safeParseInt(data['energy'], fallback: artistStats.energy),
+      creativity:
+        safeParseInt(data['inspirationLevel'], fallback: artistStats.creativity),
+      fanbase: safeParseInt(data['fanbase'], fallback: artistStats.fanbase),
+      loyalFanbase:
+        safeParseInt(data['loyalFanbase'], fallback: artistStats.loyalFanbase),
+      albumsSold:
+        safeParseInt(data['albumsReleased'], fallback: artistStats.albumsSold),
+      songsWritten:
+        safeParseInt(data['songsPublished'], fallback: artistStats.songsWritten),
+      concertsPerformed: safeParseInt(data['concertsPerformed'],
+        fallback: artistStats.concertsPerformed),
+      songwritingSkill: safeParseInt(data['songwritingSkill'],
+        fallback: artistStats.songwritingSkill),
+      experience:
+        safeParseInt(data['experience'], fallback: artistStats.experience),
+      lyricsSkill: safeParseInt(data['lyricsSkill'],
+        fallback: artistStats.lyricsSkill),
+      compositionSkill: safeParseInt(data['compositionSkill'],
+        fallback: artistStats.compositionSkill),
+      inspirationLevel: safeParseInt(data['inspirationLevel'],
+        fallback: artistStats.inspirationLevel),
             songs: loadedSongs,
             albums: loadedAlbums,
             currentRegion: data['homeRegion'] ?? artistStats.currentRegion,
-            age: (data['age'] ?? artistStats.age).toInt(),
+            age: safeParseInt(data['age'], fallback: artistStats.age),
             careerStartDate:
                 (data['careerStartDate'] as Timestamp?)?.toDate() ??
                     artistStats.careerStartDate,
@@ -909,12 +972,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      final sanitizedPractices =
+          pendingPractices.map((p) => sanitizeForFirestore(p.toMap())).toList();
       await FirebaseFirestore.instance
           .collection('players')
           .doc(user.uid)
-          .update({
-        'pendingPractices': pendingPractices.map((p) => p.toMap()).toList(),
-      });
+          .update(sanitizeForFirestore({
+        'pendingPractices': sanitizedPractices,
+      }));
 
       print('✅ Saved ${pendingPractices.length} pending practices');
     } catch (e) {
@@ -940,8 +1005,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         switch (practice.practiceType) {
           case 'songwriting':
             artistStats = artistStats.copyWith(
-              songwritingSkill:
-                  artistStats.songwritingSkill + practice.skillGain,
+              songwritingSkill: artistStats.songwritingSkill + practice.skillGain,
               experience: artistStats.experience + practice.xpGain,
             );
             break;
@@ -953,23 +1017,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             break;
           case 'composition':
             artistStats = artistStats.copyWith(
-              compositionSkill:
-                  artistStats.compositionSkill + practice.skillGain,
+              compositionSkill: artistStats.compositionSkill + practice.skillGain,
               experience: artistStats.experience + practice.xpGain,
             );
             break;
           case 'inspiration':
             artistStats = artistStats.copyWith(
-              inspirationLevel:
-                  artistStats.inspirationLevel + practice.skillGain,
+              inspirationLevel: artistStats.inspirationLevel + practice.skillGain,
               experience: artistStats.experience + practice.xpGain,
             );
             break;
+          default:
+            // Unknown practice type — award XP only
+            artistStats = artistStats.copyWith(
+              experience: artistStats.experience + practice.xpGain,
+            );
         }
       });
-
-      print(
-          '✅ Applied ${practice.displayName}: +${practice.skillGain} skill, +${practice.xpGain} XP');
     }
 
     // Remove completed practices
@@ -1257,20 +1321,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: const Color(0xFF00D9FF),
         backgroundColor: const Color(0xFF21262D),
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                // Top Status Bar
-                _buildTopStatusBar(),
-                // Game Status Row
-                _buildGameStatusRow(),
-                // Profile Section (simplified)
-                _buildProfileSection(),
-                // Action Panel - Core gameplay (now scrollable)
-                _buildActionPanel(),
-              ],
-            ),
+          child: Column(
+            children: [
+              // Show loading banner if profile not loaded
+              if (artistStats.name == "Loading...")
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFFF6B9D), Color(0xFFE94560)],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Loading profile... Pull down to refresh if stuck.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                        onPressed: _handleRefresh,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      // Top Status Bar
+                      _buildTopStatusBar(),
+                      // Game Status Row
+                      _buildGameStatusRow(),
+                      // Profile Section (simplified)
+                      _buildProfileSection(),
+                      // Action Panel - Core gameplay (now scrollable)
+                      _buildActionPanel(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

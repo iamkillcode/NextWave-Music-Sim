@@ -224,6 +224,17 @@ exports.validateSongRelease = functions.https.onCall(async (data, context) => {
   
   const playerId = context.auth.uid;
   const { song, productionCost } = data;
+  // Validate numeric inputs
+  if (typeof productionCost !== 'number' || !Number.isFinite(productionCost)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid productionCost');
+  }
+  // Validate nested numeric fields in the song payload
+  try {
+    validateNestedNumbers(song, 'song');
+  } catch (err) {
+    console.warn('Invalid numeric in song payload:', err.message || err);
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid numeric value in song payload');
+  }
   
   try {
     // Get player data
@@ -1424,6 +1435,29 @@ function validateEnergyConsumption(energyUsed, action) {
   return energyUsed <= maxEnergy;
 }
 
+// Helper: ensure a value is a finite number
+function isFiniteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+// Recursively validate nested objects/arrays to ensure no non-finite numbers
+function validateNestedNumbers(obj, path = '') {
+  if (obj === null || obj === undefined) return;
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      validateNestedNumbers(obj[i], `${path}[${i}]`);
+    }
+  } else if (typeof obj === 'object') {
+    for (const [k, v] of Object.entries(obj)) {
+      validateNestedNumbers(v, path ? `${path}.${k}` : k);
+    }
+  } else if (typeof obj === 'number') {
+    if (!Number.isFinite(obj)) {
+      throw new functions.https.HttpsError('invalid-argument', `Invalid numeric value at ${path}: ${obj}`);
+    }
+  }
+}
+
 function detectSuspiciousActivity(playerData, changes) {
   const flags = [];
   
@@ -1468,6 +1502,10 @@ exports.secureSongCreation = functions.https.onCall(async (data, context) => {
   
   const playerId = context.auth.uid;
   const { title, genre, effort } = data;
+  // Validate 'effort' is a finite number
+  if (typeof effort !== 'number' || !Number.isFinite(effort)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid effort value');
+  }
   
   try {
     return await db.runTransaction(async (transaction) => {
@@ -1619,7 +1657,22 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
       // Validate each stat change
       for (const [stat, newValue] of Object.entries(updates)) {
         const oldValue = playerData[stat] || 0;
-        
+
+        // Reject any direct non-finite numeric values immediately
+        if (typeof newValue === 'number' && !Number.isFinite(newValue)) {
+          throw new functions.https.HttpsError('invalid-argument', `Invalid numeric value for ${stat}: ${newValue}`);
+        }
+
+        // For compound payloads (songs/albums/regionalFanbase) ensure nested numbers are finite
+        if (['songs', 'albums', 'regionalFanbase'].includes(stat)) {
+          try {
+            validateNestedNumbers(newValue, stat);
+          } catch (err) {
+            console.warn('Payload validation failed for', stat, err.message || err);
+            throw new functions.https.HttpsError('invalid-argument', `Invalid numeric value inside ${stat}`);
+          }
+        }
+
         switch (stat) {
           case 'currentMoney':
             if (!validateMoneyChange(oldValue, newValue, action, actionContext)) {
@@ -1941,6 +1994,9 @@ exports.catchUpMissedDays = functions.https.onCall(async (data, context) => {
   try {
     const start = new Date(startDate);
     const end = new Date(endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid start or end date');
+    }
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     
     if (days > 30) {

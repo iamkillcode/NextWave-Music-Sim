@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/firestore_sanitizer.dart';
 
 class PublishedSong {
   final String id;
@@ -36,12 +37,13 @@ class PublishedSong {
       playerName: data['playerName'] ?? '',
       title: data['title'] ?? '',
       genre: data['genre'] ?? '',
-      quality: data['quality'] ?? 0,
-      streams: data['streams'] ?? 0,
-      likes: data['likes'] ?? 0,
+  quality: safeParseInt(data['quality'], fallback: 0),
+  streams: safeParseInt(data['streams'], fallback: 0),
+  likes: safeParseInt(data['likes'], fallback: 0),
       releaseDate: (data['releaseDate'] as Timestamp).toDate(),
-      weeklyStreams: Map<String, int>.from(data['weeklyStreams'] ?? {}),
-      isActive: data['isActive'] ?? true,
+    weeklyStreams: safeParseIntMap(
+      Map<String, dynamic>.from(data['weeklyStreams'] ?? {})),
+    isActive: data['isActive'] ?? true,
     );
   }
 

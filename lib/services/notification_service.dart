@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../utils/firestore_sanitizer.dart';
 
 /// Service for managing in-app and push notifications
 class NotificationService {
@@ -245,14 +246,14 @@ class NotificationService {
           .collection('players')
           .doc(user.uid)
           .collection('notifications')
-          .add({
+          .add(sanitizeForFirestore({
         'title': title,
         'message': message,
         'type': type,
         'read': false,
         'timestamp': FieldValue.serverTimestamp(),
         'data': data ?? {},
-      });
+      }));
     } catch (e) {
       print('❌ Error creating notification: $e');
     }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/firestore_sanitizer.dart';
 
 class MultiplayerPlayer {
   final String id;
@@ -41,15 +42,16 @@ class MultiplayerPlayer {
       displayName: data['displayName'] ?? '',
       email: data['email'] ?? '',
       gender: data['gender'] as String?,
-      totalStreams: data['totalStreams'] ?? 0,
-      totalLikes: data['totalLikes'] ?? 0,
-      songsPublished: data['songsPublished'] ?? 0,
-      currentMoney: data['currentMoney'] ?? 5000,
-      currentFame: data['currentFame'] ?? 0,
-      level: data['level'] ?? 1,
+  totalStreams: safeParseInt(data['totalStreams'], fallback: 0),
+  totalLikes: safeParseInt(data['totalLikes'], fallback: 0),
+  songsPublished: safeParseInt(data['songsPublished'], fallback: 0),
+  currentMoney: safeParseInt(data['currentMoney'], fallback: 5000),
+  currentFame: safeParseInt(data['currentFame'], fallback: 0),
+  level: safeParseInt(data['level'], fallback: 1),
       joinDate: (data['joinDate'] as Timestamp).toDate(),
       lastActive: (data['lastActive'] as Timestamp).toDate(),
-      achievements: Map<String, int>.from(data['achievements'] ?? {}),
+    achievements: Map<String, int>.from((data['achievements'] ?? {})
+      .map((k, v) => MapEntry(k.toString(), safeParseInt(v)))),
       isOnline: data['isOnline'] ?? false,
     );
   }
