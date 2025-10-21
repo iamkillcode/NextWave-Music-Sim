@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:nextwave/firebase_options.dart';
 
 /// Temporary script to initialize admin access in Firestore
 /// Run this once to set up admin access for UID: xjJFuMCEKMZwkI8uIP34Jl2bfQA3
