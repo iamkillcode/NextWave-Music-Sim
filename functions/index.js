@@ -7,6 +7,43 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+// ---------------------------------------------------------------------------
+// Exportable helpers for unit tests
+// (kept small and pure so they can be tested without initializing Firestore)
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge incoming song list with existing songs and preserve server-managed fields
+ * unless performing an admin update.
+ */
+function mergeSongs(incomingValue, existingSongs, action) {
+  const incomingSongs = Array.isArray(incomingValue) ? incomingValue : [];
+  const existing = existingSongs || [];
+
+  if (action === 'admin_stat_update') {
+    return incomingSongs;
+  }
+
+  return incomingSongs.map((inc) => {
+    if (!inc || !inc.id) return inc;
+    const ex = existing.find((s) => s.id === inc.id) || {};
+
+    return {
+      ...ex,
+      ...inc,
+      streams: (ex.streams !== undefined && ex.streams !== null) ? ex.streams : inc.streams,
+      lastDayStreams: (ex.lastDayStreams !== undefined && ex.lastDayStreams !== null) ? ex.lastDayStreams : inc.lastDayStreams,
+      last7DaysStreams: (ex.last7DaysStreams !== undefined && ex.last7DaysStreams !== null) ? ex.last7DaysStreams : inc.last7DaysStreams,
+      regionalStreams: (ex.regionalStreams !== undefined && ex.regionalStreams !== null) ? ex.regionalStreams : inc.regionalStreams,
+      peakDailyStreams: (ex.peakDailyStreams !== undefined && ex.peakDailyStreams !== null) ? ex.peakDailyStreams : inc.peakDailyStreams,
+      daysOnChart: (ex.daysOnChart !== undefined && ex.daysOnChart !== null) ? ex.daysOnChart : inc.daysOnChart,
+    };
+  });
+}
+
+// Export helpers for unit tests
+module.exports.mergeSongs = mergeSongs;
+
 // Utility: normalize various date shapes (Firestore Timestamp, JS Date, string, epoch)
 function toDateSafe(value) {
   if (!value) return null;
@@ -730,6 +767,8 @@ function calculateRegionalFanbaseGrowth(currentFanbase, songs, homeRegion, playe
   
   return updatedFanbase;
 }
+
+module.exports.calculateRegionalFanbaseGrowth = calculateRegionalFanbaseGrowth;
 
 // ✅ NEW: Song age categories for lifecycle management
 function getAgeCategory(daysOld) {
@@ -1729,9 +1768,44 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
           
           // ✅ CRITICAL FIX: Allow songs, albums, and fanbase arrays to be saved
           case 'songs':
+            // Merge incoming songs with existing songs to preserve server-managed fields
+            // (streams, lastDayStreams, last7DaysStreams, regionalStreams, peakDailyStreams, daysOnChart)
+            try {
+              const incomingSongs = Array.isArray(newValue) ? newValue : [];
+              const existingSongs = playerData.songs || [];
+
+              // Admin updates can overwrite everything
+              if (action === 'admin_stat_update') {
+                validatedUpdates[stat] = incomingSongs;
+                break;
+              }
+
+              const mergedSongs = incomingSongs.map((inc) => {
+                if (!inc || !inc.id) return inc;
+                const existing = existingSongs.find((s) => s.id === inc.id) || {};
+
+                // Preserve server-managed stats unless the client explicitly provided them (admin only)
+                return {
+                  ...existing,
+                  ...inc,
+                  streams: (existing.streams !== undefined && existing.streams !== null) ? existing.streams : inc.streams,
+                  lastDayStreams: (existing.lastDayStreams !== undefined && existing.lastDayStreams !== null) ? existing.lastDayStreams : inc.lastDayStreams,
+                  last7DaysStreams: (existing.last7DaysStreams !== undefined && existing.last7DaysStreams !== null) ? existing.last7DaysStreams : inc.last7DaysStreams,
+                  regionalStreams: (existing.regionalStreams !== undefined && existing.regionalStreams !== null) ? existing.regionalStreams : inc.regionalStreams,
+                  peakDailyStreams: (existing.peakDailyStreams !== undefined && existing.peakDailyStreams !== null) ? existing.peakDailyStreams : inc.peakDailyStreams,
+                  daysOnChart: (existing.daysOnChart !== undefined && existing.daysOnChart !== null) ? existing.daysOnChart : inc.daysOnChart,
+                };
+              });
+
+              validatedUpdates[stat] = mergedSongs;
+            } catch (mergeError) {
+              console.warn('Error merging songs, using incoming value directly', mergeError);
+              validatedUpdates[stat] = newValue;
+            }
+            break;
           case 'albums':
           case 'regionalFanbase':
-            // Accept arrays/objects without validation (structure validated client-side)
+            // Accept arrays/objects without strict validation (structure validated client-side)
             validatedUpdates[stat] = newValue;
             break;
           
