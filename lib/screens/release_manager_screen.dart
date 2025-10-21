@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
+import '../services/firebase_service.dart';
 
 /// Screen for managing EP and Album releases
 /// Players can bundle songs into EPs (3-6 songs) or Albums (7+ songs)
@@ -987,13 +988,32 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      album.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            album.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Platform badges
+                        Row(
+                          children: (album.streamingPlatforms.isNotEmpty
+                                  ? album.streamingPlatforms
+                                  : <String>['tunify', 'maple_music'])
+                              .map((p) => Padding(
+                                    padding: const EdgeInsets.only(left: 6.0),
+                                    child: _buildPlatformBadge(p),
+                                  ))
+                              .toList(),
+                        ),
+                      ],
                     ),
                     Text(
                       '${album.typeDisplay} • ${album.songIds.length} songs',
@@ -1048,13 +1068,13 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               ),
             );
           }),
-          if (!isReleased) ...[
+              if (!isReleased) ...[
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _releaseAlbum(album),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _confirmRelease(album),
                     icon: const Icon(Icons.rocket_launch),
                     label: const Text('Release Now'),
                     style: ElevatedButton.styleFrom(
@@ -1076,7 +1096,110 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     );
   }
 
-  void _releaseAlbum(Album album) {
+  Widget _buildPlatformBadge(String platform) {
+    final name = platform == 'tunify' ? 'Tunify' : platform == 'maple_music' ? 'Maple' : platform;
+    final color = platform == 'tunify' ? const Color(0xFF1DB954) : const Color(0xFFFF6B9D);
+    final icon = platform == 'tunify' ? '🎵' : '🍁';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 6),
+          Text(
+            name,
+            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmRelease(Album album) async {
+    // Determine default platforms from album or its songs
+    final albumPlatforms = Set<String>.from(album.streamingPlatforms);
+    if (albumPlatforms.isEmpty) {
+      // Look up songs in current stats
+      for (final s in _currentStats.songs) {
+        if (album.songIds.contains(s.id)) {
+          albumPlatforms.addAll(s.streamingPlatforms);
+        }
+      }
+    }
+    if (albumPlatforms.isEmpty) albumPlatforms.addAll(['tunify', 'maple_music']);
+
+    // Show confirmation dialog with ability to edit platforms
+    final selected = Set<String>.from(albumPlatforms);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF161B22),
+            title: const Text('Confirm Release', style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('This release will be available on:', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: selected.contains('tunify'),
+                      onChanged: (v) => setState(() => v! ? selected.add('tunify') : selected.remove('tunify')),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('Tunify', style: TextStyle(color: Colors.white)),
+                    const SizedBox(width: 12),
+                    Checkbox(
+                      value: selected.contains('maple_music'),
+                      onChanged: (v) => setState(() => v! ? selected.add('maple_music') : selected.remove('maple_music')),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('Maple Music', style: TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Release Now'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+
+    if (result == true) {
+      // Call server to perform the release atomically
+      try {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🔄 Releasing...'), duration: Duration(seconds: 2)));
+        final payload = await FirebaseService().releaseAlbumSecurely(albumId: album.id, overridePlatforms: selected.toList());
+
+        if (payload != null && payload['success'] == true) {
+          // Update local state to reflect server commit
+          _releaseAlbum(album, overridePlatforms: selected.toList());
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Released successfully'), backgroundColor: Color(0xFF32D74B)));
+        } else {
+          print('Server release returned unexpected payload: $payload');
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Release incomplete, check logs'), backgroundColor: Colors.orange));
+        }
+      } catch (e) {
+        print('Error releasing album on server: $e');
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Failed to release album (server error)'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  void _releaseAlbum(Album album, {List<String>? overridePlatforms}) {
     // Get the songs in this album
     final albumSongs = _currentStats.songs
         .where((song) => album.songIds.contains(song.id))
@@ -1100,26 +1223,41 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
             ? song.releasedDate! // Keep existing release date
             : DateTime.now();     // Set new release date
 
-        // Ensure songs have streaming platforms for Tunify and Maple Music
-        final platforms = song.streamingPlatforms.isEmpty
-            ? ['tunify', 'maple_music']
-            : song.streamingPlatforms;
+        // Ensure songs have streaming platforms for Tunify and Maple Music.
+        // We merge (union) with any existing platforms so platforms aren't lost.
+        final platformsSet = Set<String>.from(song.streamingPlatforms);
+        if (overridePlatforms != null && overridePlatforms.isNotEmpty) {
+          platformsSet.addAll(overridePlatforms);
+        } else {
+          platformsSet.addAll(['tunify', 'maple_music']);
+        }
+        final platforms = platformsSet.toList();
 
         return song.copyWith(
           state: SongState.released,
           releasedDate: releaseDate,
           coverArtUrl: finalCoverArt,
           streamingPlatforms: platforms,
+          isAlbum: true,
           // Keep the albumId and releaseType already set
         );
       }
       return song;
     }).toList();
 
-    // Mark album as released
+    // Determine album-level platforms as the union of its songs' platforms
+    final albumSongIds = album.songIds.toSet();
+    final albumPlatformsSet = <String>{};
+    for (final s in updatedSongs) {
+      if (albumSongIds.contains(s.id)) albumPlatformsSet.addAll(s.streamingPlatforms);
+    }
+    if (albumPlatformsSet.isEmpty) albumPlatformsSet.addAll(['tunify', 'maple_music']);
+
+    // Mark album as released and assign platforms
     final updatedAlbum = album.copyWith(
       state: AlbumState.released,
       releasedDate: DateTime.now(),
+      streamingPlatforms: albumPlatformsSet.toList(),
     );
 
     // Update albums list

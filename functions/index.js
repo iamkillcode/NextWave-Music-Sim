@@ -938,7 +938,8 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
     
     // Add player songs
     playersSnapshot.forEach(playerDoc => {
-      const playerData = playerDoc.data();
+  const playerData = playerDoc.data();
+  const migrated = !!playerData.migratedToSubcollections;
       const songs = playerData.songs || [];
       
       songs.forEach(song => {
@@ -1682,6 +1683,16 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
   }
   
   try {
+    console.log('secureStatUpdate called for', targetPlayerId, 'action=', action);
+    if (updates && typeof updates === 'object') {
+      try {
+        const keys = Object.keys(updates || {});
+        console.log('secureStatUpdate payload keys:', keys.join(', '), 'songsLen=', Array.isArray(updates.songs) ? updates.songs.length : 0, 'albumsLen=', Array.isArray(updates.albums) ? updates.albums.length : 0);
+      } catch (kErr) {
+        console.warn('Failed to log payload summary', kErr);
+      }
+    }
+
     return await db.runTransaction(async (transaction) => {
       const playerRef = db.collection('players').doc(targetPlayerId);
       const playerDoc = await transaction.get(playerRef);
@@ -1696,6 +1707,7 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
       // Validate each stat change
       for (const [stat, newValue] of Object.entries(updates)) {
         const oldValue = playerData[stat] || 0;
+        console.log(`Processing stat: ${stat} (type=${typeof newValue})`);
 
         // Reject any direct non-finite numeric values immediately
         if (typeof newValue === 'number' && !Number.isFinite(newValue)) {
@@ -1712,7 +1724,8 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
           }
         }
 
-        switch (stat) {
+        try {
+          switch (stat) {
           case 'currentMoney':
             if (!validateMoneyChange(oldValue, newValue, action, actionContext)) {
               throw new functions.https.HttpsError('invalid-argument', `Invalid money change: ${oldValue} -> ${newValue}`);
@@ -1772,11 +1785,85 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
             // (streams, lastDayStreams, last7DaysStreams, regionalStreams, peakDailyStreams, daysOnChart)
             try {
               const incomingSongs = Array.isArray(newValue) ? newValue : [];
+              // If the player has been migrated to subcollections, write each song as
+              // its own document instead of storing the entire songs array on the player doc.
+              if (migrated) {
+                console.log('Player migrated -> writing songs to subcollection for', targetPlayerId, 'incomingSongs=', incomingSongs.length);
+                let written = 0;
+                for (const inc of incomingSongs) {
+                  try {
+                    if (!inc || !inc.id) continue;
+                    const songId = String(inc.id);
+                    const songRef = playerRef.collection('songs').doc(songId);
+                    const existingSongSnap = await transaction.get(songRef);
+                    const existing = existingSongSnap.exists ? existingSongSnap.data() : {};
+
+                    // Merge policy: preserve server-managed numeric stats unless admin explicitly set them
+                    const merged = Object.assign({}, existing, inc);
+                    merged.streams = (existing.streams !== undefined && existing.streams !== null) ? existing.streams : (inc.streams !== undefined ? inc.streams : 0);
+                    merged.lastDayStreams = (existing.lastDayStreams !== undefined && existing.lastDayStreams !== null) ? existing.lastDayStreams : (inc.lastDayStreams !== undefined ? inc.lastDayStreams : 0);
+                    merged.last7DaysStreams = (existing.last7DaysStreams !== undefined && existing.last7DaysStreams !== null) ? existing.last7DaysStreams : (inc.last7DaysStreams !== undefined ? inc.last7DaysStreams : 0);
+                    merged.regionalStreams = (existing.regionalStreams !== undefined && existing.regionalStreams !== null) ? existing.regionalStreams : (inc.regionalStreams !== undefined ? inc.regionalStreams : {});
+                    merged.peakDailyStreams = (existing.peakDailyStreams !== undefined && existing.peakDailyStreams !== null) ? existing.peakDailyStreams : (inc.peakDailyStreams !== undefined ? inc.peakDailyStreams : 0);
+                    merged.daysOnChart = (existing.daysOnChart !== undefined && existing.daysOnChart !== null) ? existing.daysOnChart : (inc.daysOnChart !== undefined ? inc.daysOnChart : 0);
+
+                    // Normalize streaming platforms and union with existing ones
+                    merged.streamingPlatforms = Array.isArray(merged.streamingPlatforms) ? merged.streamingPlatforms.map(String) : [];
+                    if (Array.isArray(existing.streamingPlatforms)) {
+                      const union = new Set([...(existing.streamingPlatforms || []).map(String), ...(merged.streamingPlatforms || [])].map(String));
+                      merged.streamingPlatforms = Array.from(union);
+                    }
+
+                    // Convert date strings to Timestamps
+                    if (merged.releasedDate && typeof merged.releasedDate === 'string') {
+                      const d = new Date(merged.releasedDate);
+                      if (!isNaN(d.getTime())) merged.releasedDate = admin.firestore.Timestamp.fromDate(d);
+                    }
+                    if (merged.promoEndDate && typeof merged.promoEndDate === 'string') {
+                      const d2 = new Date(merged.promoEndDate);
+                      if (!isNaN(d2.getTime())) merged.promoEndDate = admin.firestore.Timestamp.fromDate(d2);
+                    }
+                    merged.isAlbum = !!merged.albumId || merged.releaseType === 'ep' || merged.releaseType === 'album';
+
+                    // Write the merged song doc
+                    transaction.set(songRef, merged);
+                    written++;
+                  } catch (wErr) {
+                    console.error('Failed to write song to subcollection for player', targetPlayerId, 'songId=', inc && inc.id, wErr && wErr.stack ? wErr.stack : wErr);
+                    throw wErr;
+                  }
+                }
+                // Instead of writing a large songs array to the player doc, keep a small count
+                validatedUpdates['songsCount'] = written;
+                break;
+              }
+
               const existingSongs = playerData.songs || [];
 
               // Admin updates can overwrite everything
               if (action === 'admin_stat_update') {
-                validatedUpdates[stat] = incomingSongs;
+                // Still sanitize dates/platforms for storage
+                const adminSanitized = incomingSongs.map((s) => {
+                  const song = { ...s };
+                  song.streamingPlatforms = Array.isArray(song.streamingPlatforms)
+                    ? song.streamingPlatforms.map(String)
+                    : [];
+                  // Default released tracks to both platforms if none provided
+                  if (song.state === 'released' && song.streamingPlatforms.length === 0) {
+                    song.streamingPlatforms.push('tunify', 'maple_music');
+                  }
+                  if (song.releasedDate && typeof song.releasedDate === 'string') {
+                    const d = new Date(song.releasedDate);
+                    if (!isNaN(d.getTime())) song.releasedDate = admin.firestore.Timestamp.fromDate(d);
+                  }
+                  if (song.promoEndDate && typeof song.promoEndDate === 'string') {
+                    const d2 = new Date(song.promoEndDate);
+                    if (!isNaN(d2.getTime())) song.promoEndDate = admin.firestore.Timestamp.fromDate(d2);
+                  }
+                  song.isAlbum = !!song.albumId || song.releaseType === 'ep' || song.releaseType === 'album';
+                  return song;
+                });
+                validatedUpdates[stat] = adminSanitized;
                 break;
               }
 
@@ -1797,15 +1884,155 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
                 };
               });
 
-              validatedUpdates[stat] = mergedSongs;
+              // Post-process merged songs: sanitize platforms and convert date strings to Timestamps
+              const processedMerged = mergedSongs.map((song) => {
+                const s = { ...song };
+                s.streamingPlatforms = Array.isArray(s.streamingPlatforms) ? s.streamingPlatforms.map(String) : [];
+                // If released, ensure both platforms are present by default
+                if (s.state === 'released' && s.streamingPlatforms.length === 0) {
+                  s.streamingPlatforms.push('tunify', 'maple_music');
+                }
+                // Also union with any existing server-side platforms to avoid accidental removal
+                const existing = existingSongs.find((x) => x.id === s.id) || {};
+                if (Array.isArray(existing.streamingPlatforms)) {
+                  const union = new Set([...(existing.streamingPlatforms || []), ...(s.streamingPlatforms || [])].map(String));
+                  s.streamingPlatforms = Array.from(union);
+                }
+                if (s.releasedDate && typeof s.releasedDate === 'string') {
+                  const d = new Date(s.releasedDate);
+                  if (!isNaN(d.getTime())) s.releasedDate = admin.firestore.Timestamp.fromDate(d);
+                }
+                if (s.promoEndDate && typeof s.promoEndDate === 'string') {
+                  const d2 = new Date(s.promoEndDate);
+                  if (!isNaN(d2.getTime())) s.promoEndDate = admin.firestore.Timestamp.fromDate(d2);
+                }
+                s.isAlbum = !!s.albumId || s.releaseType === 'ep' || s.releaseType === 'album';
+                return s;
+              });
+
+              validatedUpdates[stat] = processedMerged;
             } catch (mergeError) {
               console.warn('Error merging songs, using incoming value directly', mergeError);
               validatedUpdates[stat] = newValue;
             }
             break;
           case 'albums':
+            try {
+              const incomingAlbums = Array.isArray(newValue) ? newValue : [];
+              const existingAlbums = playerData.albums || [];
+
+              // If player migrated to subcollections, write each album as its own document
+              if (migrated) {
+                console.log('Player migrated -> writing albums to subcollection for', targetPlayerId, 'incomingAlbums=', incomingAlbums.length);
+                let awritten = 0;
+                for (const alb of incomingAlbums) {
+                  try {
+                    if (!alb || !alb.id) continue;
+                    const albumIdStr = String(alb.id);
+                    const albumRef = playerRef.collection('albums').doc(albumIdStr);
+                    const existingAlbumSnap = await transaction.get(albumRef);
+                    const existingAlbum = existingAlbumSnap.exists ? existingAlbumSnap.data() : {};
+
+                    const merged = Object.assign({}, existingAlbum, alb);
+                    merged.streamingPlatforms = Array.isArray(merged.streamingPlatforms) ? merged.streamingPlatforms.map(String) : [];
+
+                    // Aggregate platforms from songs in the subcollection belonging to this album
+                    const albumSongIds = Array.isArray(merged.songIds) ? merged.songIds : [];
+                    for (const sid of albumSongIds) {
+                      try {
+                        if (!sid) continue;
+                        const songRef = playerRef.collection('songs').doc(String(sid));
+                        const songSnap = await transaction.get(songRef);
+                        if (!songSnap.exists) continue;
+                        const sdoc = songSnap.data();
+                        if (sdoc && Array.isArray(sdoc.streamingPlatforms)) {
+                          for (const p of sdoc.streamingPlatforms) merged.streamingPlatforms.push(String(p));
+                        }
+                      } catch (e) {
+                        // ignore per-song failures
+                      }
+                    }
+
+                    // Deduplicate platforms and ensure defaults
+                    const set = new Set((merged.streamingPlatforms || []).map(String));
+                    if (set.size === 0) {
+                      set.add('tunify');
+                      set.add('maple_music');
+                    }
+                    merged.streamingPlatforms = Array.from(set);
+
+                    // Normalize dates
+                    if (merged.releasedDate && typeof merged.releasedDate === 'string') {
+                      const d = new Date(merged.releasedDate);
+                      if (!isNaN(d.getTime())) merged.releasedDate = admin.firestore.Timestamp.fromDate(d);
+                    }
+                    if (merged.scheduledDate && typeof merged.scheduledDate === 'string') {
+                      const d2 = new Date(merged.scheduledDate);
+                      if (!isNaN(d2.getTime())) merged.scheduledDate = admin.firestore.Timestamp.fromDate(d2);
+                    }
+
+                    transaction.set(albumRef, merged);
+                    awritten++;
+                  } catch (wErr) {
+                    console.error('Failed to write album to subcollection for player', targetPlayerId, 'albumId=', alb && alb.id, wErr && wErr.stack ? wErr.stack : wErr);
+                    throw wErr;
+                  }
+                }
+
+                validatedUpdates['albumsCount'] = awritten;
+                break;
+              }
+
+              const candidateSongs = Array.isArray(updates.songs) ? updates.songs : (playerData.songs || []);
+
+              const processedAlbums = incomingAlbums.map((album) => {
+                const a = { ...album };
+                a.streamingPlatforms = Array.isArray(a.streamingPlatforms) ? a.streamingPlatforms.map(String) : [];
+
+                // Collect platforms from candidate songs that belong to this album
+                const albumSongIds = new Set(Array.isArray(a.songIds) ? a.songIds : []);
+                for (const s of candidateSongs) {
+                  try {
+                    if (!s || !s.id) continue;
+                    if (albumSongIds.has(s.id)) {
+                      if (Array.isArray(s.streamingPlatforms)) {
+                        for (const p of s.streamingPlatforms) a.streamingPlatforms.push(String(p));
+                      }
+                    }
+                  } catch (e) {
+                    // ignore malformed song entries
+                  }
+                }
+
+                // Deduplicate platforms
+                const set = new Set((a.streamingPlatforms || []).map(String));
+                if (set.size === 0) {
+                  set.add('tunify');
+                  set.add('maple_music');
+                }
+                a.streamingPlatforms = Array.from(set);
+
+                // Normalize dates
+                if (a.releasedDate && typeof a.releasedDate === 'string') {
+                  const d = new Date(a.releasedDate);
+                  if (!isNaN(d.getTime())) a.releasedDate = admin.firestore.Timestamp.fromDate(d);
+                }
+                if (a.scheduledDate && typeof a.scheduledDate === 'string') {
+                  const d2 = new Date(a.scheduledDate);
+                  if (!isNaN(d2.getTime())) a.scheduledDate = admin.firestore.Timestamp.fromDate(d2);
+                }
+
+                return a;
+              });
+
+              validatedUpdates[stat] = processedAlbums;
+            } catch (albumError) {
+              console.warn('Error processing albums payload, saving incoming as-is', albumError);
+              validatedUpdates[stat] = newValue;
+            }
+            break;
           case 'regionalFanbase':
-            // Accept arrays/objects without strict validation (structure validated client-side)
+            // Accept regional fanbase payload after numeric validation above
             validatedUpdates[stat] = newValue;
             break;
           
@@ -1817,6 +2044,11 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
             
           default:
             validatedUpdates[stat] = newValue;
+          }
+        } catch (statErr) {
+          console.error(`Error processing stat ${stat}:`, statErr && statErr.stack ? statErr.stack : statErr);
+          // Convert unexpected errors to an HttpsError so the client gets a controlled error code
+          throw new functions.https.HttpsError('internal', `Failed processing ${stat}: ${statErr && statErr.message ? statErr.message : String(statErr)}`);
         }
       }
       
@@ -1841,7 +2073,36 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
         }
       }
       
-      transaction.update(playerRef, validatedUpdates);
+      try {
+        transaction.update(playerRef, validatedUpdates);
+      } catch (updateErr) {
+        try {
+          const keys = Object.keys(validatedUpdates || {});
+          console.error('Failed to write player updates, keys:', keys.join(', '), 'songsLen=', Array.isArray(validatedUpdates.songs) ? validatedUpdates.songs.length : 0);
+          if (Array.isArray(validatedUpdates.songs)) {
+            console.error('Sample song ids:', validatedUpdates.songs.slice(0, 5).map(s => s && s.id).join(', '));
+          }
+
+          // Persist a sanitized summary to diagnostics collection for offline debugging
+          const audit = summarizeUpdatesForAudit(validatedUpdates || {});
+          await db.collection('diagnostics').add({
+            type: 'failed_player_update',
+            playerId: targetPlayerId,
+            keys: audit.keys,
+            songsCount: audit.songsCount,
+            albumsCount: audit.albumsCount,
+            sampleSongIds: audit.sampleSongIds,
+            sampleAlbumIds: audit.sampleAlbumIds,
+            error: (updateErr && updateErr.message) ? updateErr.message : String(updateErr),
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } catch (auditErr) {
+          console.error('Failed to persist diagnostics for failed update:', auditErr);
+        }
+
+        console.error('Transaction update error:', updateErr && updateErr.stack ? updateErr.stack : updateErr);
+        throw new functions.https.HttpsError('internal', 'Failed to persist player updates');
+      }
       
       return {
         success: true,
@@ -1941,6 +2202,340 @@ exports.secureSideHustleReward = functions.https.onCall(async (data, context) =>
   }
 });
 
+/**
+ * Securely release an album/EP for the calling player (or for a target player if admin).
+ * This runs in a transaction and ensures songs and album objects are updated atomically
+ * with platform availability, release dates, and stat gains.
+ */
+exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  }
+
+  const albumId = data.albumId;
+  const overridePlatforms = Array.isArray(data.overridePlatforms) ? data.overridePlatforms.map(String) : null;
+  const playerId = data.playerId; // optional, admin-only
+
+  if (!albumId || typeof albumId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'albumId is required');
+  }
+
+  let targetPlayerId = context.auth.uid;
+  if (playerId && playerId !== context.auth.uid) {
+    // Allow admins to release on behalf of other players
+    await validateAdminAccess(context);
+    targetPlayerId = playerId;
+  }
+
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const playerRef = db.collection('players').doc(targetPlayerId);
+      const playerDoc = await transaction.get(playerRef);
+      if (!playerDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Player not found');
+      }
+
+      const playerData = playerDoc.data();
+      const migrated = !!playerData.migratedToSubcollections;
+
+      // If the player has been migrated, operate on per-player subcollection docs
+      if (migrated) {
+        // Try to locate the album doc in the albums subcollection
+        const albumRef = playerRef.collection('albums').doc(String(albumId));
+        const albumDoc = await transaction.get(albumRef);
+        if (!albumDoc.exists) {
+          throw new functions.https.HttpsError('not-found', 'Album not found (migrated)');
+        }
+
+        const album = albumDoc.data();
+        if (album.state === 'released') {
+          return { success: true, message: 'Album already released' };
+        }
+
+        const albumSongIds = new Set(Array.isArray(album.songIds) ? album.songIds : []);
+        const nowTs = admin.firestore.Timestamp.fromDate(new Date());
+
+        // Fetch and update each song doc that belongs to this album
+        const updatedSongsForAlbum = [];
+        for (const sid of albumSongIds) {
+          try {
+            const sidStr = String(sid);
+            const sref = playerRef.collection('songs').doc(sidStr);
+            const sdoc = await transaction.get(sref);
+            if (!sdoc.exists) continue;
+            const sdata = sdoc.data() || {};
+            const updated = Object.assign({}, sdata);
+            if (!updated.releasedDate) updated.releasedDate = nowTs;
+            updated.state = 'released';
+            // Apply override platforms or default to both
+            const set = new Set(Array.isArray(updated.streamingPlatforms) ? updated.streamingPlatforms.map(String) : []);
+            if (Array.isArray(overridePlatforms) && overridePlatforms.length > 0) {
+              overridePlatforms.forEach((p) => set.add(String(p)));
+            } else {
+              set.add('tunify');
+              set.add('maple_music');
+            }
+            updated.streamingPlatforms = Array.from(set);
+            updated.isAlbum = true;
+            updated.albumId = String(albumId);
+            if (updated.promoEndDate && typeof updated.promoEndDate === 'string') {
+              const d = new Date(updated.promoEndDate);
+              if (!isNaN(d.getTime())) updated.promoEndDate = admin.firestore.Timestamp.fromDate(d);
+            }
+
+            transaction.set(sref, updated);
+            updatedSongsForAlbum.push(updated);
+          } catch (sErr) {
+            console.error('Failed to update song in release transaction:', sErr);
+            throw sErr;
+          }
+        }
+
+        // Update album doc
+        const albumPlatformsSet = new Set();
+        for (const s of updatedSongsForAlbum) {
+          if (Array.isArray(s.streamingPlatforms)) {
+            for (const p of s.streamingPlatforms) albumPlatformsSet.add(String(p));
+          }
+        }
+        if (albumPlatformsSet.size === 0) {
+          albumPlatformsSet.add('tunify');
+          albumPlatformsSet.add('maple_music');
+        }
+
+        const updatedAlbum = Object.assign({}, album, {
+          state: 'released',
+          releasedDate: nowTs,
+          streamingPlatforms: Array.from(albumPlatformsSet),
+        });
+        transaction.set(albumRef, updatedAlbum);
+
+        // Compute stat gains
+        const albumSongsForQuality = updatedSongsForAlbum;
+        const avgQuality = albumSongsForQuality.length === 0
+          ? 50
+          : Math.round(albumSongsForQuality.reduce((sum, s) => {
+              const rq = (s.recordingQuality !== undefined && s.recordingQuality !== null) ? s.recordingQuality : s.quality || 50;
+              return sum + (rq || 50);
+            }, 0) / albumSongsForQuality.length);
+
+        const fameGain = 5 + Math.floor(avgQuality / 20);
+        const fanbaseGain = 100 + (fameGain * 20);
+
+        const validatedUpdates = {
+          currentFame: Math.max(0, (playerData.currentFame || 0) + fameGain),
+          fanbase: Math.max(0, (playerData.fanbase || 0) + fanbaseGain),
+          lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        // Increment albumsCount
+        validatedUpdates.albumsCount = (playerData.albumsCount || 0) + 1;
+
+        try {
+          transaction.update(playerRef, validatedUpdates);
+        } catch (uErr) {
+          console.error('Failed to write player stats during migrated album release', uErr);
+          throw new functions.https.HttpsError('internal', 'Failed to persist release stats');
+        }
+
+        return {
+          success: true,
+          appliedUpdates: validatedUpdates,
+          newStats: {
+            currentFame: validatedUpdates.currentFame,
+            fanbase: validatedUpdates.fanbase,
+          },
+        };
+      }
+
+      // Fallback: non-migrated players use array-based model
+      const existingSongs = Array.isArray(playerData.songs) ? playerData.songs : [];
+      const existingAlbums = Array.isArray(playerData.albums) ? playerData.albums : [];
+
+      const albumIndex = existingAlbums.findIndex((a) => a.id === albumId);
+      if (albumIndex === -1) {
+        throw new functions.https.HttpsError('not-found', 'Album not found');
+      }
+
+      const album = { ...existingAlbums[albumIndex] };
+      if (album.state === 'released') {
+        // Already released — idempotent success
+        return { success: true, message: 'Album already released' };
+      }
+
+      // Determine which songs belong to the album
+      const albumSongIds = new Set(Array.isArray(album.songIds) ? album.songIds : []);
+
+      // Build incoming updated song objects
+      const nowTs = admin.firestore.Timestamp.fromDate(new Date());
+      const incomingSongs = existingSongs.map((s) => {
+        if (!s || !s.id) return s;
+        if (!albumSongIds.has(s.id)) return s;
+
+        const updated = { ...s };
+        // Respect existing release date for singles, otherwise set now
+        if (!updated.releasedDate) updated.releasedDate = nowTs;
+        updated.state = 'released';
+        // Apply override platforms if provided, else ensure common platforms exist
+        const set = new Set(Array.isArray(updated.streamingPlatforms) ? updated.streamingPlatforms.map(String) : []);
+        if (Array.isArray(overridePlatforms) && overridePlatforms.length > 0) {
+          overridePlatforms.forEach((p) => set.add(String(p)));
+        } else {
+          set.add('tunify');
+          set.add('maple_music');
+        }
+        updated.streamingPlatforms = Array.from(set);
+        updated.isAlbum = true;
+        updated.albumId = albumId;
+        // Ensure promo fields and timestamps are normalized
+        if (updated.promoEndDate && typeof updated.promoEndDate === 'string') {
+          const d = new Date(updated.promoEndDate);
+          if (!isNaN(d.getTime())) updated.promoEndDate = admin.firestore.Timestamp.fromDate(d);
+        }
+        return updated;
+      });
+
+      // Determine album-level platforms from its updated songs
+      const albumPlatformsSet = new Set();
+      for (const s of incomingSongs) {
+        if (albumSongIds.has(s.id) && Array.isArray(s.streamingPlatforms)) {
+          for (const p of s.streamingPlatforms) albumPlatformsSet.add(String(p));
+        }
+      }
+      if (albumPlatformsSet.size === 0) {
+        albumPlatformsSet.add('tunify');
+        albumPlatformsSet.add('maple_music');
+      }
+
+      const updatedAlbum = { ...album };
+      updatedAlbum.state = 'released';
+      updatedAlbum.releasedDate = nowTs;
+      updatedAlbum.streamingPlatforms = Array.from(albumPlatformsSet);
+
+      // Compute stat gains (fame and fanbase) using a similar heuristic as client
+      const albumSongsForQuality = existingSongs.filter((s) => albumSongIds.has(s.id));
+      const avgQuality = albumSongsForQuality.length === 0
+        ? 50
+        : Math.round(albumSongsForQuality.reduce((sum, s) => {
+            const rq = (s.recordingQuality !== undefined && s.recordingQuality !== null) ? s.recordingQuality : s.quality || 50;
+            return sum + (rq || 50);
+          }, 0) / albumSongsForQuality.length);
+
+      const fameGain = 5 + Math.floor(avgQuality / 20);
+      const fanbaseGain = 100 + (fameGain * 20);
+
+      // Prepare validated updates
+      const validatedUpdates = {
+        songs: incomingSongs,
+        albums: existingAlbums.map((a) => a.id === albumId ? updatedAlbum : a),
+        currentFame: Math.max(0, (playerData.currentFame || 0) + fameGain),
+        fanbase: Math.max(0, (playerData.fanbase || 0) + fanbaseGain),
+        lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      // Check for suspicious activity
+      const flags = detectSuspiciousActivity({ ...playerData, ...validatedUpdates }, validatedUpdates);
+      if (flags.length > 0) {
+        await logSuspiciousActivity(targetPlayerId, 'release_album', flags, { albumId, validatedUpdates });
+        if (flags.length > 3) {
+          throw new functions.https.HttpsError('permission-denied', 'Suspicious activity detected');
+        }
+      }
+
+      // Commit transaction
+      try {
+        transaction.update(playerRef, validatedUpdates);
+      } catch (updateErr) {
+        console.error('Failed to commit release transaction for album', albumId, updateErr && updateErr.stack ? updateErr.stack : updateErr);
+        throw new functions.https.HttpsError('internal', 'Failed to write release updates');
+      }
+
+      return {
+        success: true,
+        appliedUpdates: validatedUpdates,
+        newStats: {
+          currentFame: validatedUpdates.currentFame,
+          fanbase: validatedUpdates.fanbase,
+        },
+      };
+    });
+  } catch (error) {
+    console.error('Error in secureReleaseAlbum:', error, error && error.stack ? error.stack : 'no-stack');
+    throw new functions.https.HttpsError('internal', error && error.message ? error.message : 'Internal error during album release');
+  }
+});
+
+/**
+ * One-off migration function: move songs/albums from player document arrays
+ * into per-player subcollections (players/{uid}/songs and players/{uid}/albums).
+ * Call this for specific players (admin only) or run over the user collection in batches.
+ */
+exports.migratePlayerContentToSubcollections = functions.https.onCall(async (data, context) => {
+  // Only admin may run this
+  await validateAdminAccess(context);
+
+  const playerId = data.playerId;
+  if (!playerId) {
+    throw new functions.https.HttpsError('invalid-argument', 'playerId is required');
+  }
+
+  try {
+    const playerRef = db.collection('players').doc(playerId);
+    const doc = await playerRef.get();
+    if (!doc.exists) return { success: false, message: 'Player not found' };
+
+    const dataObj = doc.data();
+    const songs = Array.isArray(dataObj.songs) ? dataObj.songs : [];
+    const albums = Array.isArray(dataObj.albums) ? dataObj.albums : [];
+
+    console.log(`Migrating player ${playerId}: songs=${songs.length}, albums=${albums.length}`);
+
+    const batch = db.batch();
+    let writes = 0;
+
+    for (const s of songs) {
+      if (!s || !s.id) continue;
+      const ref = playerRef.collection('songs').doc(String(s.id));
+      batch.set(ref, s);
+      writes++;
+      if (writes % 500 === 0) await batch.commit();
+    }
+    if (writes % 500 !== 0) await batch.commit();
+
+    // Albums
+    const batch2 = db.batch();
+    let awrites = 0;
+    for (const a of albums) {
+      if (!a || !a.id) continue;
+      const ref = playerRef.collection('albums').doc(String(a.id));
+      batch2.set(ref, a);
+      awrites++;
+      if (awrites % 500 === 0) await batch2.commit();
+    }
+    if (awrites % 500 !== 0) await batch2.commit();
+
+    console.log(`Migration complete for ${playerId}: songsWritten=${writes}, albumsWritten=${awrites}`);
+
+    // Mark player as migrated and persist counts
+    try {
+      await playerRef.update({
+        migratedToSubcollections: true,
+        migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+        songsCount: writes,
+        albumsCount: awrites,
+      });
+    } catch (uErr) {
+      console.error('Failed to mark player as migrated for', playerId, uErr);
+      // Not fatal for migration result, continue
+    }
+
+    return { success: true, songsWritten: writes, albumsWritten: awrites };
+  } catch (migErr) {
+    console.error('Migration error for player', playerId, migErr);
+    throw new functions.https.HttpsError('internal', 'Migration failed');
+  }
+});
+
 async function checkNoDuplicateSongName(playerId, title) {
   const playerDoc = await db.collection('players').doc(playerId).get();
   if (!playerDoc.exists) return true;
@@ -1968,6 +2563,31 @@ function getValidationErrors(validations) {
   if (!validations.validGenre) errors.push('Invalid genre');
   if (!validations.validPlatforms) errors.push('Invalid platforms');
   return errors.join(', ');
+}
+
+/**
+ * Create a small, safe summary of an incoming updates payload suitable for
+ * persisting to a diagnostics collection without including full user content.
+ */
+function summarizeUpdatesForAudit(updates) {
+  const summary = {
+    keys: Array.isArray(Object.keys(updates || {})) ? Object.keys(updates || {}) : [],
+    songsCount: Array.isArray(updates && updates.songs) ? updates.songs.length : 0,
+    albumsCount: Array.isArray(updates && updates.albums) ? updates.albums.length : 0,
+    sampleSongIds: [],
+    sampleAlbumIds: [],
+  };
+  try {
+    if (Array.isArray(updates && updates.songs)) {
+      summary.sampleSongIds = updates.songs.slice(0, 5).map(s => s && s.id).filter(Boolean);
+    }
+    if (Array.isArray(updates && updates.albums)) {
+      summary.sampleAlbumIds = updates.albums.slice(0, 5).map(a => a && a.id).filter(Boolean);
+    }
+  } catch (err) {
+    // Best-effort only - don't throw during diagnostics summarization
+  }
+  return summary;
 }
 
 function selectRandomRegion() {

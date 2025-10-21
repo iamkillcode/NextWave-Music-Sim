@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import '../models/album.dart';
 
 class MapleMusicScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -38,12 +39,16 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
   }
 
   List<Song> get releasedSongs => _currentStats.songs
-      .where(
-        (s) =>
-            s.state == SongState.released &&
-            s.streamingPlatforms.contains('maple_music'),
-      )
-      .toList();
+    .where(
+    (s) =>
+      s.state == SongState.released &&
+      s.streamingPlatforms.contains('maple_music'),
+    )
+    .toList();
+
+  List<Album> get releasedAlbums => _currentStats.albums
+    .where((a) => a.state == AlbumState.released && a.streamingPlatforms.contains('maple_music'))
+    .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +418,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
 
   // Songs Tab - Show released songs on Maple Music
   Widget _buildSongsTab() {
-    if (releasedSongs.isEmpty) {
+  if (releasedAlbums.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         child: Column(
@@ -681,21 +686,85 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // Grid of album covers
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.75,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+            // Grid of released albums
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.75,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: releasedAlbums.length,
+              itemBuilder: (context, index) {
+                final album = releasedAlbums[index];
+                return _buildAlbumTile(album);
+              },
             ),
-            itemCount: releasedSongs.length,
-            itemBuilder: (context, index) {
-              final song = releasedSongs[index];
-              return _buildAlbumCard(song);
-            },
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlbumTile(Album album) {
+    final cover = album.coverArtUrl;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFFFC3C44).withOpacity(0.8), const Color(0xFFFC3C44).withOpacity(0.4)],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+              ),
+              child: Center(
+                child: cover != null
+                    ? Image.network(cover, fit: BoxFit.cover)
+                    : const Icon(Icons.album_rounded, size: 48, color: Colors.white30),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    album.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${album.typeDisplay} • ${album.songIds.length} songs',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

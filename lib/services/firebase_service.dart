@@ -209,6 +209,40 @@ class FirebaseService {
     }
   }
 
+  /// Secure album/EP release handled server-side (atomic)
+  Future<Map<String, dynamic>?> releaseAlbumSecurely({
+    required String albumId,
+    List<String>? overridePlatforms,
+  }) async {
+    if (!isSignedIn) return null;
+
+    try {
+      final callable = _functions.httpsCallable('secureReleaseAlbum');
+      final result = await callable.call({
+        'albumId': albumId,
+        'overridePlatforms': overridePlatforms ?? [],
+        'action': 'release_album',
+      });
+
+      return result.data as Map<String, dynamic>?;
+    } catch (e) {
+      print('Error releasing album securely: $e');
+      rethrow;
+    }
+  }
+
+  /// Trigger server-side migration for a player's songs/albums arrays -> subcollections
+  Future<Map<String, dynamic>?> migratePlayerContent(String playerId) async {
+    try {
+      final callable = _functions.httpsCallable('migratePlayerContentToSubcollections');
+      final res = await callable.call({'playerId': playerId});
+      return res.data as Map<String, dynamic>?;
+    } catch (e) {
+      print('Error calling migratePlayerContent: $e');
+      rethrow;
+    }
+  }
+
   Future<MultiplayerPlayer?> getPlayer(String playerId) async {
     try {
       final doc = await _playersCollection.doc(playerId).get();

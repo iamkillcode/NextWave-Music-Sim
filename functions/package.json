@@ -10,7 +10,8 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "jest --runInBand"
+  "test": "jest --runInBand",
+  "migrate-player": "node scripts/migrate_player.js"
   },
   "engines": {
     "node": "18"
