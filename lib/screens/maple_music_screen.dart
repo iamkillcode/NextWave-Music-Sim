@@ -42,12 +42,12 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
     .where(
     (s) =>
       s.state == SongState.released &&
-      s.streamingPlatforms.contains('maple_music'),
+      (s.streamingPlatforms.contains('maple_music') || s.streamingPlatforms.isEmpty),
     )
     .toList();
 
   List<Album> get releasedAlbums => _currentStats.albums
-    .where((a) => a.state == AlbumState.released && a.streamingPlatforms.contains('maple_music'))
+    .where((a) => a.state == AlbumState.released && (a.streamingPlatforms.contains('maple_music') || a.streamingPlatforms.isEmpty))
     .toList();
 
   @override
@@ -418,7 +418,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
 
   // Songs Tab - Show released songs on Maple Music
   Widget _buildSongsTab() {
-  if (releasedAlbums.isEmpty) {
+  if (releasedSongs.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         child: Column(

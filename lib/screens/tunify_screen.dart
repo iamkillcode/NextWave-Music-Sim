@@ -38,8 +38,9 @@ class _TunifyScreenState extends State<TunifyScreen>
     super.dispose();
   }
 
-  List<Song> get releasedSongs =>
-    _currentStats.songs.where((s) => s.state == SongState.released).toList();
+  List<Song> get releasedSongs => _currentStats.songs
+    .where((s) => s.state == SongState.released && (s.streamingPlatforms.contains('tunify') || s.streamingPlatforms.isEmpty))
+    .toList();
 
   List<Album> get releasedAlbums => _currentStats.albums
     .where((a) => a.state == AlbumState.released && (a.streamingPlatforms.contains('tunify') || a.streamingPlatforms.isEmpty))
@@ -631,7 +632,7 @@ class _TunifyScreenState extends State<TunifyScreen>
 
   // Popular Tracks List (Enhanced Spotify-style)
   Widget _buildPopularTracksContent() {
-  if (releasedAlbums.isEmpty) {
+  if (releasedSongs.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         child: Column(
