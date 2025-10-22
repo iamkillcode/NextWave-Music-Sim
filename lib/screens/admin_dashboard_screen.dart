@@ -1240,16 +1240,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
               try {
                 await _adminService.sendGlobalNotification(title, message);
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Sent!',
                     'Notification sent to all players.',
                   );
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -1307,8 +1307,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
               try {
                 await _adminService.grantAdminAccess(userId);
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Success!',
                     'Admin access granted to user.',
@@ -1316,8 +1316,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   await _loadData();
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -1368,8 +1368,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
               try {
                 await _adminService.resetAllPlayerData();
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Data Reset',
                     'All player data has been deleted.',
@@ -1377,8 +1377,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   await _loadData();
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -2143,8 +2143,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   },
                 });
 
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   if (result.data['success'] == true) {
                     _showSuccessDialog(
                       'Updated!',
@@ -2152,16 +2152,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     );
                     await _loadData();
                   } else {
-                    Navigator.pop(context);
-                    _showSuccessDialog(
+                    _showError(
                       'Error',
                       'Failed to update player: ${result.data['error'] ?? 'Unknown error'}',
                     );
                   }
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -2219,8 +2218,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   'songs': [],
                 }));
 
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Reset Complete!',
                     '${player['name']} has been reset to starting values.',
@@ -2228,8 +2227,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   await _loadData();
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -2277,8 +2276,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     .doc(player['id'])
                     .delete();
 
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Deleted!',
                     '${player['name']}\'s account has been permanently deleted.',
@@ -2286,8 +2285,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   await _loadData();
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -2749,16 +2748,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 }
                 await batch.commit();
 
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Cleared!',
                     'Deleted ${notificationsSnapshot.size} old notifications.',
                   );
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
@@ -2809,8 +2808,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   'context': 'Admin Dashboard Test',
                 });
 
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showSuccessDialog(
                     'Test Error Created!',
                     'Check the error logs section to verify.',
@@ -2818,8 +2817,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   await _loadData();
                 }
               } catch (e) {
+                _safePopNavigator(); // Close loading dialog
                 if (mounted) {
-                  Navigator.pop(context);
                   _showError('Error', e.toString());
                 }
               }
