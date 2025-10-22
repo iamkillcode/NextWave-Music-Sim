@@ -173,7 +173,7 @@ class NextWaveTheme {
       textTheme: textTheme,
 
       // Card Theme
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surfaceDark,
         elevation: 0,
       ),

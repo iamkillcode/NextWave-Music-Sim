@@ -911,7 +911,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               surface: Color(0xFF21262D),
               onSurface: Colors.white,
             ),
-            dialogTheme: DialogTheme(
+            dialogTheme: DialogThemeData(
               backgroundColor: Color(0xFF21262D),
             ),
           ),
