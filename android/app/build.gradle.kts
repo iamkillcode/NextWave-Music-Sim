@@ -24,8 +24,8 @@ android {
 
     defaultConfig {
         applicationId = "com.nextwave.musicgame"
-        minSdk = flutter.minSdkVersion
-    targetSdk = 36  // Updated to match compileSdk
+        minSdk = 23  // Required by Firebase Auth 23.2.1+
+        targetSdk = 36  // Updated to match compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
