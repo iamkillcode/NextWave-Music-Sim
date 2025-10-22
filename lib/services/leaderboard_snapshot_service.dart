@@ -97,6 +97,7 @@ class LeaderboardSnapshotService {
           'genre': item['genre'] ?? 'Unknown',
           'streams': item['streams'] ?? 0, // Regional streams for this region
           'totalStreams': item['totalStreams'] ?? 0,
+          'coverArtUrl': item['coverArtUrl'],
           'isNPC': item['isNPC'] ?? false,
           'movement': item['movement'] ?? 0, // Chart movement from last week
           'lastWeekPosition': item['lastWeekPosition'],

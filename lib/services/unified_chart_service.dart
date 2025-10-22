@@ -98,7 +98,7 @@ class UnifiedChartService {
                     'releaseDate': null,
                     'state': 'released',
                     'isAlbum': false,
-                    'coverArtUrl': null,
+                    'coverArtUrl': entry['coverArtUrl'],
                     'position': entry['position'],
                     'movement': entry['movement'],
                     'lastWeekPosition': entry['lastWeekPosition'],

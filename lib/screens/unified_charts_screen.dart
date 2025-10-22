@@ -16,7 +16,7 @@ import '../services/unified_chart_service.dart';
 /// - Daily/Weekly Artists (Global/Regional)
 class UnifiedChartsScreen extends StatefulWidget {
   final String? initialPeriod; // 'daily' | 'weekly'
-  final String? initialType;   // 'singles' | 'albums' | 'artists'
+  final String? initialType; // 'singles' | 'albums' | 'artists'
   final String? initialRegion; // 'global' | region code
 
   const UnifiedChartsScreen({
@@ -528,16 +528,10 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       ),
                     ),
                     child: Text(
-                      position <= 3
-                          ? (position == 1
-                              ? '🥇'
-                              : position == 2
-                                  ? '🥈'
-                                  : '🥉')
-                          : '#$position',
+                      '#$position',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: position <= 3 ? 14 : 11,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -561,10 +555,6 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Text(
-              _chartService.getGenreEmoji(genre),
-              style: const TextStyle(fontSize: 20),
             ),
           ],
         ),
@@ -670,16 +660,10 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       ),
                     ),
                     child: Text(
-                      position <= 3
-                          ? (position == 1
-                              ? '🥇'
-                              : position == 2
-                                  ? '🥈'
-                                  : '🥉')
-                          : '#$position',
+                      '#$position',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: position <= 3 ? 12 : 10,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -704,7 +688,6 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Text('🎤', style: TextStyle(fontSize: 20)),
           ],
         ),
         subtitle: Column(
@@ -732,20 +715,15 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
 
   Widget _buildPositionBadge(int position) {
     Color badgeColor;
-    String emoji;
 
     if (position == 1) {
       badgeColor = Colors.amber;
-      emoji = '🥇';
     } else if (position == 2) {
       badgeColor = Colors.grey[300]!;
-      emoji = '🥈';
     } else if (position == 3) {
       badgeColor = Colors.brown;
-      emoji = '🥉';
     } else {
       badgeColor = Colors.grey[600]!;
-      emoji = '';
     }
 
     return Container(
@@ -757,21 +735,13 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
         border: Border.all(color: badgeColor, width: 2),
       ),
       child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (emoji.isNotEmpty)
-              Text(emoji, style: const TextStyle(fontSize: 18))
-            else
-              Text(
-                '#$position',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
-              ),
-          ],
+        child: Text(
+          '#$position',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 14,
+          ),
         ),
       ),
     );

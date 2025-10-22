@@ -999,6 +999,7 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
         streams: song.last7DaysStreams,
         totalStreams: song.streams,
         genre: song.genre,
+        coverArtUrl: song.coverArtUrl || null,
         isNPC: song.isNPC || false,
       })),
     });
@@ -1035,6 +1036,7 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
           streams: song.regionStreams, // Region-specific streams
           totalStreams: song.streams, // Global total
           genre: song.genre,
+          coverArtUrl: song.coverArtUrl || null,
           isNPC: song.isNPC || false,
         })),
       });

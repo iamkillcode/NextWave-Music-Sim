@@ -2126,9 +2126,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
               try {
                 // Use secure server-side validation for admin stat updates
-                final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
-                    .httpsCallable('secureStatUpdate');
-                
+                final callable =
+                    FirebaseFunctions.instanceFor(region: 'us-central1')
+                        .httpsCallable('secureStatUpdate');
+
                 final result = await callable.call({
                   'playerId': player['id'], // Specify which player to update
                   'updates': {
@@ -2211,12 +2212,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     .collection('players')
                     .doc(player['id'])
                     .update(sanitizeForFirestore({
-                  'currentMoney': 5000,
-                  'fame': 0,
-                  'level': 0,
-                  'loyalFanbase': 0,
-                  'songs': [],
-                }));
+                      'currentMoney': 5000,
+                      'fame': 0,
+                      'level': 0,
+                      'loyalFanbase': 0,
+                      'songs': [],
+                    }));
 
                 _safePopNavigator(); // Close loading dialog
                 if (mounted) {
@@ -2464,10 +2465,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               .collection('gameSettings')
                               .doc('globalTime')
                               .update(sanitizeForFirestore({
-                            'realWorldStartDate':
-                                Timestamp.fromDate(adjustedRealWorldStart),
-                            'lastUpdated': FieldValue.serverTimestamp(),
-                          }));
+                                'realWorldStartDate':
+                                    Timestamp.fromDate(adjustedRealWorldStart),
+                                'lastUpdated': FieldValue.serverTimestamp(),
+                              }));
 
                           final newDate = DateTime(
                             currentDate.year,
