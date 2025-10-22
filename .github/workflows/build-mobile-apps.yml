@@ -46,9 +46,14 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
-            echo "✅ google-services.json decoded successfully"
+          if [ -n "$GOOGLE_SERVICES_JSON" ] && [ "$GOOGLE_SERVICES_JSON" != "null" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json 2>/dev/null || {
+              echo "⚠️ Failed to decode GOOGLE_SERVICES_JSON, using placeholder"
+              echo '{"project_info":{"project_number":"","project_id":"nextwave-placeholder"}}' > android/app/google-services.json
+            }
+            if [ -f android/app/google-services.json ]; then
+              echo "✅ google-services.json created successfully"
+            fi
           else
             echo "⚠️ GOOGLE_SERVICES_JSON secret not found, using placeholder"
             echo '{"project_info":{"project_number":"","project_id":"nextwave-placeholder"}}' > android/app/google-services.json
@@ -105,9 +110,49 @@ jobs:
         env:
           GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
-          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
-            echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
-            echo "✅ GoogleService-Info.plist decoded successfully"
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ] && [ "$GOOGLE_SERVICE_INFO_PLIST" != "null" ]; then
+            echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 -d > ios/Runner/GoogleService-Info.plist 2>/dev/null || {
+              echo "⚠️ Failed to decode GOOGLE_SERVICE_INFO_PLIST, using placeholder"
+              cat > ios/Runner/GoogleService-Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CLIENT_ID</key>
+            <string>placeholder</string>
+            <key>REVERSED_CLIENT_ID</key>
+            <string>com.googleusercontent.apps.placeholder</string>
+            <key>API_KEY</key>
+            <string>placeholder</string>
+            <key>GCM_SENDER_ID</key>
+            <string>000000000000</string>
+            <key>PLIST_VERSION</key>
+            <string>1</string>
+            <key>BUNDLE_ID</key>
+            <string>com.nextwave.musicgame</string>
+            <key>PROJECT_ID</key>
+            <string>nextwave-placeholder</string>
+            <key>STORAGE_BUCKET</key>
+            <string>nextwave-placeholder.appspot.com</string>
+            <key>IS_ADS_ENABLED</key>
+            <false/>
+            <key>IS_ANALYTICS_ENABLED</key>
+            <false/>
+            <key>IS_APPINVITE_ENABLED</key>
+            <false/>
+            <key>IS_GCM_ENABLED</key>
+            <true/>
+            <key>IS_SIGNIN_ENABLED</key>
+            <true/>
+            <key>GOOGLE_APP_ID</key>
+            <string>1:000000000000:ios:0000000000000000000000</string>
+          </dict>
+          </plist>
+          EOF
+            }
+            if [ -f ios/Runner/GoogleService-Info.plist ]; then
+              echo "✅ GoogleService-Info.plist created successfully"
+            fi
           else
             echo "⚠️ GOOGLE_SERVICE_INFO_PLIST secret not found, using placeholder"
             cat > ios/Runner/GoogleService-Info.plist << 'EOF'
