@@ -6,6 +6,8 @@ import '../models/published_song.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../models/multiplayer_player.dart';
 import '../models/artist_stats.dart';
+import '../models/song.dart';
+import '../models/album.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -18,6 +20,11 @@ class FirebaseService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'], // Minimal scopes to avoid People API dependency
   );
+
+  // Lightweight in-memory cache for cross-player ArtistStats lookups
+  final Map<String, ArtistStats> _artistStatsCache = {};
+  final Map<String, DateTime> _artistStatsCacheTime = {};
+  final Duration _artistStatsCacheTTL = const Duration(minutes: 5);
 
   // Collections
   CollectionReference get _songsCollection => _firestore.collection('songs');
@@ -81,6 +88,9 @@ class FirebaseService {
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
+    // Clear caches on sign out to avoid stale data bleed between sessions
+    _artistStatsCache.clear();
+    _artistStatsCacheTime.clear();
   }
 
   // Player Methods
@@ -253,6 +263,178 @@ class FirebaseService {
       print('Error getting player: $e');
     }
     return null;
+  }
+
+  /// Load another player's ArtistStats, including songs and albums arrays
+  /// Returns null if player not found or on failure
+  Future<ArtistStats?> getArtistStatsForPlayer(String playerId) async {
+    try {
+      // Serve from cache if fresh
+      final cached = _artistStatsCache[playerId];
+      final ts = _artistStatsCacheTime[playerId];
+      if (cached != null && ts != null) {
+        if (DateTime.now().difference(ts) <= _artistStatsCacheTTL) {
+          return cached;
+        }
+      }
+
+      final doc = await _playersCollection.doc(playerId).get().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => throw Exception('Player load timeout'),
+          );
+
+      if (!doc.exists) return null;
+
+      final data = doc.data() as Map<String, dynamic>;
+
+      // Deserialize songs
+      List<Song> loadedSongs = [];
+      if (data['songs'] != null) {
+        try {
+          final songsList = data['songs'] as List<dynamic>;
+          loadedSongs = songsList
+              .map((songData) => Song.fromJson(
+                  Map<String, dynamic>.from(songData as Map)))
+              .toList();
+        } catch (e) {
+          print('⚠️ Error parsing songs for $playerId: $e');
+        }
+      }
+
+      // If no songs array (migrated), try subcollection fallback
+      if (loadedSongs.isEmpty) {
+        try {
+          final snap = await _playersCollection
+              .doc(playerId)
+              .collection('songs')
+              .get();
+      loadedSongs = snap.docs
+        .map((d) => Song.fromJson(
+          Map<String, dynamic>.from(d.data() as Map)))
+              .toList();
+          if (loadedSongs.isNotEmpty) {
+            print('ℹ️ Loaded ${loadedSongs.length} songs from subcollection for $playerId');
+          }
+        } catch (e) {
+          print('⚠️ Error loading songs subcollection for $playerId: $e');
+        }
+      }
+
+      // Deserialize albums
+      List<Album> loadedAlbums = [];
+      if (data['albums'] != null) {
+        try {
+          final albumsList = data['albums'] as List<dynamic>;
+          loadedAlbums = albumsList
+              .map((albumData) =>
+                  Album.fromJson(Map<String, dynamic>.from(albumData as Map)))
+              .toList();
+        } catch (e) {
+          print('⚠️ Error parsing albums for $playerId: $e');
+        }
+      }
+
+      // If no albums array (migrated), try subcollection fallback
+      if (loadedAlbums.isEmpty) {
+        try {
+          final snap = await _playersCollection
+              .doc(playerId)
+              .collection('albums')
+              .get();
+      loadedAlbums = snap.docs
+        .map((d) => Album.fromJson(
+          Map<String, dynamic>.from(d.data() as Map)))
+              .toList();
+          if (loadedAlbums.isNotEmpty) {
+            print('ℹ️ Loaded ${loadedAlbums.length} albums from subcollection for $playerId');
+          }
+        } catch (e) {
+          print('⚠️ Error loading albums subcollection for $playerId: $e');
+        }
+      }
+
+      // Deserialize regional fanbase
+      Map<String, int> loadedRegionalFanbase = {};
+      if (data['regionalFanbase'] != null) {
+        try {
+          final regionalData =
+              Map<String, dynamic>.from(data['regionalFanbase'] as Map);
+          loadedRegionalFanbase = regionalData.map(
+            (key, value) => MapEntry(key.toString(), safeParseInt(value)),
+          );
+        } catch (e) {
+          print('⚠️ Error parsing regionalFanbase for $playerId: $e');
+        }
+      }
+
+      // Genre system
+      final String primaryGenre = data['primaryGenre'] ?? 'Hip Hop';
+      Map<String, int> loadedGenreMastery = {};
+      if (data['genreMastery'] != null) {
+        try {
+          final masteryData = Map<String, dynamic>.from(data['genreMastery']);
+          loadedGenreMastery = masteryData.map(
+            (key, value) => MapEntry(key.toString(), safeParseInt(value)),
+          );
+        } catch (e) {
+          print('⚠️ Error parsing genreMastery for $playerId: $e');
+        }
+      }
+
+      List<String> loadedUnlockedGenres = [];
+      if (data['unlockedGenres'] != null) {
+        try {
+          loadedUnlockedGenres =
+              List<String>.from(data['unlockedGenres'] as List<dynamic>);
+        } catch (e) {
+          print('⚠️ Error parsing unlockedGenres for $playerId: $e');
+        }
+      } else {
+        loadedUnlockedGenres = [primaryGenre];
+        loadedGenreMastery[primaryGenre] = loadedGenreMastery[primaryGenre] ?? 0;
+      }
+
+      final stats = ArtistStats(
+        name: data['displayName'] ?? 'Unknown Artist',
+        fame: safeParseInt(data['currentFame'], fallback: 0),
+        money: safeParseInt(data['currentMoney'], fallback: 5000),
+        energy: safeParseInt(data['energy'], fallback: 100),
+        creativity: safeParseInt(data['inspirationLevel'], fallback: 0),
+        fanbase: safeParseInt(data['fanbase'], fallback: 100),
+        loyalFanbase: safeParseInt(data['loyalFanbase'], fallback: 0),
+        albumsSold: safeParseInt(data['albumsReleased'], fallback: 0),
+        songsWritten: safeParseInt(data['songsPublished'], fallback: 0),
+        concertsPerformed:
+            safeParseInt(data['concertsPerformed'], fallback: 0),
+        songwritingSkill: safeParseInt(data['songwritingSkill'], fallback: 10),
+        experience: safeParseInt(data['experience'], fallback: 0),
+        lyricsSkill: safeParseInt(data['lyricsSkill'], fallback: 10),
+        compositionSkill:
+            safeParseInt(data['compositionSkill'], fallback: 10),
+        inspirationLevel:
+            safeParseInt(data['inspirationLevel'], fallback: 0),
+        songs: loadedSongs,
+        albums: loadedAlbums,
+        currentRegion: data['homeRegion'] ?? 'usa',
+        age: safeParseInt(data['age'], fallback: 18),
+        careerStartDate:
+            (data['careerStartDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        regionalFanbase: loadedRegionalFanbase,
+        avatarUrl: data['avatarUrl'] as String?,
+        activeSideHustle: null, // not needed for read-only profile view
+        primaryGenre: primaryGenre,
+        genreMastery: loadedGenreMastery,
+        unlockedGenres: loadedUnlockedGenres,
+      );
+
+      // Store in cache
+      _artistStatsCache[playerId] = stats;
+      _artistStatsCacheTime[playerId] = DateTime.now();
+      return stats;
+    } catch (e) {
+      print('❌ Error loading ArtistStats for $playerId: $e');
+      return null;
+    }
   }
 
   // Password Reset

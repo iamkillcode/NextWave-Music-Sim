@@ -15,7 +15,16 @@ import '../services/unified_chart_service.dart';
 /// - Daily/Weekly Albums (Global/Regional)
 /// - Daily/Weekly Artists (Global/Regional)
 class UnifiedChartsScreen extends StatefulWidget {
-  const UnifiedChartsScreen({super.key});
+  final String? initialPeriod; // 'daily' | 'weekly'
+  final String? initialType;   // 'singles' | 'albums' | 'artists'
+  final String? initialRegion; // 'global' | region code
+
+  const UnifiedChartsScreen({
+    super.key,
+    this.initialPeriod,
+    this.initialType,
+    this.initialRegion,
+  });
 
   @override
   State<UnifiedChartsScreen> createState() => _UnifiedChartsScreenState();
@@ -39,6 +48,16 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
   void initState() {
     super.initState();
     _loadCurrentUser();
+    // Apply initial filters if provided (for deep-links)
+    if (widget.initialPeriod != null) {
+      _selectedPeriod = widget.initialPeriod!;
+    }
+    if (widget.initialType != null) {
+      _selectedType = widget.initialType!;
+    }
+    if (widget.initialRegion != null) {
+      _selectedRegion = widget.initialRegion!;
+    }
     _loadChartData();
   }
 
@@ -766,7 +785,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             ? 'Albums'
             : 'Artists';
 
-    return '$period $type Chart';
+    return '$period Spotlight $type'; // ✅ Changed: "Daily/Weekly Spotlight Singles/Albums/Artists"
   }
 
   Color _getThemeColor() {

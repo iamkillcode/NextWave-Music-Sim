@@ -4,6 +4,9 @@ import '../utils/firestore_sanitizer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
 import 'echox_comments_screen.dart';
+import '../services/firebase_service.dart';
+import 'tunify_screen.dart';
+import 'maple_music_screen.dart';
 
 class EchoPost {
   final String id;
@@ -385,52 +388,62 @@ class _EchoXScreenState extends State<EchoXScreen>
           // Author info
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isMyPost
-                        ? [const Color(0xFF00D9FF), const Color(0xFF7C3AED)]
-                        : [Colors.grey.shade700, Colors.grey.shade800],
+              // Make avatar tappable to view artist platforms
+              GestureDetector(
+                onTap: () => _showViewArtistOptions(post.authorId, post.authorName),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isMyPost
+                          ? [const Color(0xFF00D9FF), const Color(0xFF7C3AED)]
+                          : [Colors.grey.shade700, Colors.grey.shade800],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  child: const Icon(Icons.person, color: Colors.white, size: 24),
                 ),
-                child: const Icon(Icons.person, color: Colors.white, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          post.authorName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                child: GestureDetector(
+                  onTap: () => _showViewArtistOptions(post.authorId, post.authorName),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              post.authorName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                        if (isMyPost) ...[
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.verified,
-                            color: Color(0xFF00D9FF),
-                            size: 16,
-                          ),
+                          if (isMyPost) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.verified,
+                              color: Color(0xFF00D9FF),
+                              size: 16,
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    Text(
-                      _formatTimestamp(post.timestamp),
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
                       ),
-                    ),
-                  ],
+                      Text(
+                        _formatTimestamp(post.timestamp),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (showDelete && isMyPost)
@@ -438,6 +451,12 @@ class _EchoXScreenState extends State<EchoXScreen>
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () => _deletePost(post.id),
                 ),
+              // Quick action to open platforms
+              IconButton(
+                tooltip: 'View platforms',
+                icon: const Icon(Icons.open_in_new, color: Colors.white70),
+                onPressed: () => _showViewArtistOptions(post.authorId, post.authorName),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -773,5 +792,114 @@ class _EchoXScreenState extends State<EchoXScreen>
         ),
       );
     }
+  }
+
+  // Show options to view the author's platform pages and navigate after loading stats
+  void _showViewArtistOptions(String playerId, String authorName) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF16181C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        bool isLoading = false;
+        return StatefulBuilder(builder: (context, setModalState) {
+          Future<void> openFor(String platform) async {
+            if (isLoading) return;
+            setModalState(() => isLoading = true);
+            try {
+              final stats = await FirebaseService().getArtistStatsForPlayer(playerId);
+              if (stats == null) {
+                if (mounted) _showMessage('⚠️ Could not load $authorName\'s profile');
+                return;
+              }
+              if (!mounted) return;
+              Navigator.pop(context); // close sheet first
+              if (platform == 'tunify') {
+                // Open Tunify
+                // Read-only view: pass a no-op onStatsUpdated
+                // ignore: use_build_context_synchronously
+                Navigator.push(
+                  this.context,
+                  MaterialPageRoute(
+                    builder: (ctx) => TunifyScreen(
+                      artistStats: stats,
+                      onStatsUpdated: (s) {},
+                    ),
+                  ),
+                );
+              } else if (platform == 'maple') {
+                // ignore: use_build_context_synchronously
+                Navigator.push(
+                  this.context,
+                  MaterialPageRoute(
+                    builder: (ctx) => MapleMusicScreen(
+                      artistStats: stats,
+                      onStatsUpdated: (s) {},
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) _showMessage('❌ Failed to open: $e');
+            } finally {
+              setModalState(() => isLoading = false);
+            }
+          }
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'View $authorName',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Open on streaming platforms',
+                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.music_note, color: Color(0xFF1DB954)),
+                  title: const Text('Tunify', style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Spotify-style profile', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  trailing: isLoading
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.chevron_right, color: Colors.white70),
+                  onTap: () => openFor('tunify'),
+                ),
+                const Divider(color: Colors.white12, height: 1),
+                ListTile(
+                  leading: const Icon(Icons.album_rounded, color: Color(0xFFFC3C44)),
+                  title: const Text('Maple Music', style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Apple Music-style profile', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  trailing: isLoading
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.chevron_right, color: Colors.white70),
+                  onTap: () => openFor('maple'),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 }

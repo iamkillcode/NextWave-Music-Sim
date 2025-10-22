@@ -4,6 +4,7 @@ import '../models/song.dart';
 import 'tunify_screen.dart';
 import 'maple_music_screen.dart';
 import 'echox_screen.dart';
+import 'player_directory_screen.dart';
 
 class MediaHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
@@ -181,6 +182,25 @@ class MediaHubScreen extends StatelessWidget {
                           artistStats: artistStats,
                           onStatsUpdated: onStatsUpdated,
                         ),
+                      ),
+                    );
+                  },
+                ),
+                _buildAppIcon(
+                  context,
+                  name: 'Players',
+                  icon: Icons.people_rounded,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF00D9FF), Color(0xFF7C3AED)],
+                  ),
+                  badge: '',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PlayerDirectoryScreen(),
                       ),
                     );
                   },

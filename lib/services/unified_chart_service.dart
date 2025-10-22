@@ -169,7 +169,7 @@ class UnifiedChartService {
                   regionalStreams.containsKey(region)) {
                 // For regional charts, we need to calculate regional daily/weekly streams
                 // For now, use a proportional estimate based on total
-        final totalStreams = safeParseInt(songMap['totalStreams'], fallback: 0);
+        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
         final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
 
                 if (regionStreams > 0 && totalStreams > 0) {
@@ -192,7 +192,7 @@ class UnifiedChartService {
                 'genre': songMap['genre'] ?? 'Unknown',
                 'quality': safeParseInt(songMap['quality'], fallback: 0),
                 'periodStreams': streamCount,
-                'totalStreams': safeParseInt(songMap['totalStreams'], fallback: 0),
+                'totalStreams': safeParseInt(songMap['streams'], fallback: 0), // ✅ Fixed: use 'streams' not 'totalStreams'
                 'likes': safeParseInt(songMap['likes'], fallback: 0),
                 'releaseDate': songMap['releaseDate'],
                 'state': songState,
@@ -234,7 +234,7 @@ class UnifiedChartService {
                   songMap['regionalStreams'] as Map<dynamic, dynamic>?;
               if (regionalStreams != null &&
                   regionalStreams.containsKey(region)) {
-        final totalStreams = safeParseInt(songMap['totalStreams'], fallback: 0);
+        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
         final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
 
                 if (regionStreams > 0 && totalStreams > 0) {
@@ -256,7 +256,7 @@ class UnifiedChartService {
                 'genre': songMap['genre'] ?? 'Unknown',
                 'quality': safeParseInt(songMap['quality'], fallback: 0),
                 'periodStreams': streamCount,
-                'totalStreams': safeParseInt(songMap['totalStreams'], fallback: 0),
+                'totalStreams': safeParseInt(songMap['streams'], fallback: 0), // ✅ Fixed: use 'streams' not 'totalStreams'
                 'likes': 0, // NPCs don't have likes
                 'releaseDate': songMap['releaseDate'],
                 'state': 'released',
@@ -399,7 +399,7 @@ class UnifiedChartService {
                   songMap['regionalStreams'] as Map<dynamic, dynamic>?;
               if (regionalStreams != null &&
                   regionalStreams.containsKey(region)) {
-        final totalStreams = safeParseInt(songMap['totalStreams'], fallback: 0);
+        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
         final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
 
                 if (regionStreams > 0 && totalStreams > 0) {
@@ -468,7 +468,7 @@ class UnifiedChartService {
                 songMap['regionalStreams'] as Map<dynamic, dynamic>?;
             if (regionalStreams != null &&
                 regionalStreams.containsKey(region)) {
-        final totalStreams = safeParseInt(songMap['totalStreams'], fallback: 0);
+        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
         final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
 
               if (regionStreams > 0 && totalStreams > 0) {

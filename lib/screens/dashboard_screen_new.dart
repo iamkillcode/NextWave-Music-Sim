@@ -16,14 +16,15 @@ import '../services/song_name_generator.dart';
 import '../models/pending_practice.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
-import 'media_hub_screen.dart';
 import 'studios_list_screen.dart';
 import 'activity_hub_screen.dart';
+import 'media_hub_screen.dart';
 import 'release_manager_screen.dart';
 import '../utils/firebase_status.dart';
 import '../utils/firestore_sanitizer.dart';
 import 'settings_screen.dart';
 import 'notifications_screen.dart';
+import 'the_scoop_screen.dart';
 import '../services/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -311,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final data = doc.data()!;
         print('✅ Profile loaded: ${data['displayName']}');
 
-        // Load songs from Firebase
+  // Load songs from Firebase
         List<Song> loadedSongs = [];
         if (data['songs'] != null) {
           try {
@@ -325,6 +326,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             print('✅ Loaded ${loadedSongs.length} songs from Firebase');
           } catch (e) {
             print('⚠️ Error loading songs: $e');
+          }
+        }
+
+        // Migration fallback: if songs array missing, load from subcollection
+        if (loadedSongs.isEmpty) {
+          try {
+            final songsSnap = await FirebaseFirestore.instance
+                .collection('players')
+                .doc(user.uid)
+                .collection('songs')
+                .get();
+            loadedSongs = songsSnap.docs
+                .map((d) => Song.fromJson(
+                    Map<String, dynamic>.from(d.data() as Map)))
+                .toList();
+            if (loadedSongs.isNotEmpty) {
+              print('ℹ️ Loaded ${loadedSongs.length} songs from subcollection');
+            }
+          } catch (e) {
+            print('⚠️ Fallback subcollection songs load failed: $e');
           }
         }
 
@@ -384,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           loadedGenreMastery[primaryGenre] = 0;
         }
 
-        // Load albums (EPs and Albums)
+    // Load albums (EPs and Albums)
   List<Album> loadedAlbums = [];
   if (data['albums'] != null) {
           try {
@@ -397,6 +418,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             print('✅ Loaded ${loadedAlbums.length} albums/EPs');
           } catch (e) {
             print('⚠️ Error loading albums: $e');
+          }
+        }
+
+        // Migration fallback: if albums array missing, load from subcollection
+        if (loadedAlbums.isEmpty) {
+          try {
+            final albumsSnap = await FirebaseFirestore.instance
+                .collection('players')
+                .doc(user.uid)
+                .collection('albums')
+                .get();
+            loadedAlbums = albumsSnap.docs
+                .map((d) => Album.fromJson(
+                    Map<String, dynamic>.from(d.data() as Map)))
+                .toList();
+            if (loadedAlbums.isNotEmpty) {
+              print('ℹ️ Loaded ${loadedAlbums.length} albums from subcollection');
+            }
+          } catch (e) {
+            print('⚠️ Fallback subcollection albums load failed: $e');
           }
         }
 
@@ -497,7 +538,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .doc(user.uid)
         .snapshots()
         .listen(
-      (snapshot) {
+      (snapshot) async {
         if (!snapshot.exists || !mounted) return;
 
         final data = snapshot.data()!;
@@ -522,6 +563,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         }
 
+        // Migration fallback: if songs array missing in snapshot, load from subcollection
+        if (loadedSongs.isEmpty) {
+          try {
+            final songsSnap = await FirebaseFirestore.instance
+                .collection('players')
+                .doc(user.uid)
+                .collection('songs')
+                .get();
+            loadedSongs = songsSnap.docs
+                .map((d) => Song.fromJson(
+                    Map<String, dynamic>.from(d.data() as Map)))
+                .toList();
+            if (loadedSongs.isNotEmpty) {
+              print('ℹ️ [RT] Loaded ${loadedSongs.length} songs from subcollection');
+            }
+          } catch (e) {
+            print('⚠️ [RT] Fallback songs subcollection load failed: $e');
+          }
+        }
+
         // Load albums from the update
         List<Album> loadedAlbums = [];
         if (data['albums'] != null) {
@@ -533,6 +594,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .toList();
           } catch (e) {
             print('⚠️ Error loading albums in real-time update: $e');
+          }
+        }
+
+        // Migration fallback: if albums array missing in snapshot, load from subcollection
+        if (loadedAlbums.isEmpty) {
+          try {
+            final albumsSnap = await FirebaseFirestore.instance
+                .collection('players')
+                .doc(user.uid)
+                .collection('albums')
+                .get();
+            loadedAlbums = albumsSnap.docs
+                .map((d) => Album.fromJson(
+                    Map<String, dynamic>.from(d.data() as Map)))
+                .toList();
+            if (loadedAlbums.isNotEmpty) {
+              print('ℹ️ [RT] Loaded ${loadedAlbums.length} albums from subcollection');
+            }
+          } catch (e) {
+            print('⚠️ [RT] Fallback albums subcollection load failed: $e');
           }
         }
 
@@ -3353,6 +3434,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           );
         } else if (index == 3) {
+          // The Scoop tab -> Music News Feed
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TheScoopScreen(),
+            ),
+          );
+        } else if (index == 4) {
           // Media tab -> All Media Platforms
           Navigator.push(
             context,
@@ -3368,7 +3457,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           );
-        } else if (index == 4) {
+        } else if (index == 5) {
           // World tab -> World Map
           Navigator.push(
             context,
@@ -3400,6 +3489,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Music'),
         BottomNavigationBarItem(
+          icon: Icon(Icons.newspaper),
+          label: 'The Scoop',
+        ),
+        BottomNavigationBarItem(
           icon: Icon(Icons.camera_alt_rounded),
           label: 'Media',
         ),
@@ -3409,7 +3502,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _getNavItemName(int index) {
-    const names = ['Home', 'Activity', 'Music', 'Media', 'World'];
+  const names = ['Home', 'Activity', 'Music', 'The Scoop', 'Media', 'World'];
     return names[index];
   }
 
