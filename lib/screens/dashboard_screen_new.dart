@@ -1192,13 +1192,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
+            // Cap daily energy restore at 100, but allow energy to exceed 100 from gifts/purchases
+            final restoredEnergy = artistStats.energy < 100 ? 100 : artistStats.energy;
             artistStats = artistStats.copyWith(
-              energy: 100,
+              energy: restoredEnergy,
               clearSideHustle: sideHustleExpired,
             );
           });
 
-          _showMessage('☀️ New day! Energy fully restored to 100');
+          if (artistStats.energy < 100) {
+            _showMessage('☀️ New day! Energy restored to 100');
+          } else {
+            _showMessage('☀️ New day! You still have ${artistStats.energy} energy');
+          }
           
           if (sideHustleExpired) {
             _addNotification(
@@ -1213,13 +1219,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Your daily streams, royalties, and fanbase have been updated by the server!',
             icon: Icons.cloud_done,
           );
+          
+          final energyMessage = artistStats.energy < 100
+              ? 'A new day has begun! Your energy has been restored to 100.'
+              : 'A new day has begun! Your current energy: ${artistStats.energy}';
+          
           _addNotification(
-            'Energy Restored',
-            'A new day has begun! Your energy has been fully restored to 100.',
+            'Energy Update',
+            energyMessage,
             icon: Icons.wb_sunny,
           );
           print(
-            '✅ Energy restored to 100 - Game Date: ${_gameTimeService.formatGameDate(newGameDate)}',
+            '✅ Energy restored - Game Date: ${_gameTimeService.formatGameDate(newGameDate)}',
           );
 
           // Check for completed practice programs

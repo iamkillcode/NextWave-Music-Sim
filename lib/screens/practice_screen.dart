@@ -299,7 +299,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '${widget.artistStats.energy}/100',
+                          '${widget.artistStats.energy}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,

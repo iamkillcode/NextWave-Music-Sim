@@ -487,7 +487,7 @@ class AdminService {
     {
       'id': 'energy',
       'name': '⚡ Energy',
-      'description': 'Restore energy (max 100)',
+      'description': 'Restore energy (can exceed 100)',
       'defaultAmount': 50,
       'icon': '⚡',
     },

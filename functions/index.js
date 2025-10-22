@@ -3635,7 +3635,8 @@ exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
 
       case 'energy':
         const energyAmount = amount || 50;
-        updates.energy = Math.min((recipientData.energy || 0) + energyAmount, 100);
+        // Allow energy to go above 100 from gifts/purchases
+        updates.energy = (recipientData.energy || 0) + energyAmount;
         giftDescription = `${energyAmount} Energy`;
         break;
 
