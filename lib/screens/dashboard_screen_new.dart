@@ -109,10 +109,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Check for Firebase notifications (gifts from admin, etc.)
     _loadFirebaseNotifications();
-    
+
     // Initialize notification service
     _notificationService.initialize();
-    
+
     // Load unread count
     _loadUnreadNotificationCount();
 
@@ -255,24 +255,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         print('⚠️ No user signed in, waiting for authentication...');
-        
+
         // Wait a bit for Firebase to initialize after hot restart
         await Future.delayed(const Duration(seconds: 2));
         final retryUser = FirebaseAuth.instance.currentUser;
-        
+
         if (retryUser == null) {
           print('❌ Still no user after waiting, using demo stats');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Not signed in. Pull down to refresh when ready.'),
+                content:
+                    Text('Not signed in. Pull down to refresh when ready.'),
                 duration: Duration(seconds: 4),
               ),
             );
           }
           return;
         }
-        
+
         print('✅ User authenticated after waiting: ${retryUser.uid}');
         return _loadUserProfileForUser(retryUser);
       }
@@ -313,7 +314,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final data = doc.data()!;
         print('✅ Profile loaded: ${data['displayName']}');
 
-  // Load songs from Firebase
+        // Load songs from Firebase
         List<Song> loadedSongs = [];
         if (data['songs'] != null) {
           try {
@@ -339,8 +340,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .collection('songs')
                 .get();
             loadedSongs = songsSnap.docs
-                .map((d) => Song.fromJson(
-                    Map<String, dynamic>.from(d.data() as Map)))
+                .map((d) =>
+                    Song.fromJson(Map<String, dynamic>.from(d.data() as Map)))
                 .toList();
             if (loadedSongs.isNotEmpty) {
               print('ℹ️ Loaded ${loadedSongs.length} songs from subcollection');
@@ -406,12 +407,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           loadedGenreMastery[primaryGenre] = 0;
         }
 
-    // Load albums (EPs and Albums)
-  List<Album> loadedAlbums = [];
-  if (data['albums'] != null) {
+        // Load albums (EPs and Albums)
+        List<Album> loadedAlbums = [];
+        if (data['albums'] != null) {
           try {
-      final albumsList = List<Map<String, dynamic>>.from(
-        (data['albums'] as List<dynamic>));
+            final albumsList = List<Map<String, dynamic>>.from(
+                (data['albums'] as List<dynamic>));
             loadedAlbums = albumsList
                 .map((albumData) =>
                     Album.fromJson(Map<String, dynamic>.from(albumData)))
@@ -431,11 +432,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .collection('albums')
                 .get();
             loadedAlbums = albumsSnap.docs
-                .map((d) => Album.fromJson(
-                    Map<String, dynamic>.from(d.data() as Map)))
+                .map((d) =>
+                    Album.fromJson(Map<String, dynamic>.from(d.data() as Map)))
                 .toList();
             if (loadedAlbums.isNotEmpty) {
-              print('ℹ️ Loaded ${loadedAlbums.length} albums from subcollection');
+              print(
+                  'ℹ️ Loaded ${loadedAlbums.length} albums from subcollection');
             }
           } catch (e) {
             print('⚠️ Fallback subcollection albums load failed: $e');
@@ -449,17 +451,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             money: safeParseInt(data['currentMoney'], fallback: 5000),
             energy: 100, // Always start with full energy
             creativity: safeParseInt(data['inspirationLevel'], fallback: 0),
-            fanbase: math.max(
-                100, safeParseInt(data['fanbase'] ?? data['level'], fallback: 100)),
+            fanbase: math.max(100,
+                safeParseInt(data['fanbase'] ?? data['level'], fallback: 100)),
             loyalFanbase: safeParseInt(data['loyalFanbase'], fallback: 0),
             albumsSold: safeParseInt(data['albumsReleased'], fallback: 0),
             songsWritten: safeParseInt(data['songsPublished'], fallback: 0),
-            concertsPerformed: safeParseInt(data['concertsPerformed'], fallback: 0),
-            songwritingSkill: safeParseInt(data['songwritingSkill'], fallback: 10),
+            concertsPerformed:
+                safeParseInt(data['concertsPerformed'], fallback: 0),
+            songwritingSkill:
+                safeParseInt(data['songwritingSkill'], fallback: 10),
             experience: safeParseInt(data['experience'], fallback: 0),
             lyricsSkill: safeParseInt(data['lyricsSkill'], fallback: 10),
-            compositionSkill: safeParseInt(data['compositionSkill'], fallback: 10),
-            inspirationLevel: safeParseInt(data['inspirationLevel'], fallback: 0),
+            compositionSkill:
+                safeParseInt(data['compositionSkill'], fallback: 10),
+            inspirationLevel:
+                safeParseInt(data['inspirationLevel'], fallback: 0),
             songs: loadedSongs,
             albums: loadedAlbums,
             currentRegion: data['homeRegion'] ?? 'usa',
@@ -502,7 +508,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       print('❌ Error loading profile: $e');
       print('💡 Retrying profile load in 3 seconds...');
-      
+
       // Show error to user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -511,7 +517,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             duration: const Duration(seconds: 3),
           ),
         );
-        
+
         // Retry loading after a delay
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
@@ -573,11 +579,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .collection('songs')
                 .get();
             loadedSongs = songsSnap.docs
-                .map((d) => Song.fromJson(
-                    Map<String, dynamic>.from(d.data() as Map)))
+                .map((d) =>
+                    Song.fromJson(Map<String, dynamic>.from(d.data() as Map)))
                 .toList();
             if (loadedSongs.isNotEmpty) {
-              print('ℹ️ [RT] Loaded ${loadedSongs.length} songs from subcollection');
+              print(
+                  'ℹ️ [RT] Loaded ${loadedSongs.length} songs from subcollection');
             }
           } catch (e) {
             print('⚠️ [RT] Fallback songs subcollection load failed: $e');
@@ -607,11 +614,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .collection('albums')
                 .get();
             loadedAlbums = albumsSnap.docs
-                .map((d) => Album.fromJson(
-                    Map<String, dynamic>.from(d.data() as Map)))
+                .map((d) =>
+                    Album.fromJson(Map<String, dynamic>.from(d.data() as Map)))
                 .toList();
             if (loadedAlbums.isNotEmpty) {
-              print('ℹ️ [RT] Loaded ${loadedAlbums.length} albums from subcollection');
+              print(
+                  'ℹ️ [RT] Loaded ${loadedAlbums.length} albums from subcollection');
             }
           } catch (e) {
             print('⚠️ [RT] Fallback albums subcollection load failed: $e');
@@ -667,30 +675,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           artistStats = ArtistStats(
             name: data['displayName'] ?? artistStats.name,
-      fame: safeParseInt(data['currentFame'], fallback: artistStats.fame),
-      money: safeParseInt(data['currentMoney'], fallback: artistStats.money),
-      energy: safeParseInt(data['energy'], fallback: artistStats.energy),
-      creativity:
-        safeParseInt(data['inspirationLevel'], fallback: artistStats.creativity),
-      fanbase: safeParseInt(data['fanbase'], fallback: artistStats.fanbase),
-      loyalFanbase:
-        safeParseInt(data['loyalFanbase'], fallback: artistStats.loyalFanbase),
-      albumsSold:
-        safeParseInt(data['albumsReleased'], fallback: artistStats.albumsSold),
-      songsWritten:
-        safeParseInt(data['songsPublished'], fallback: artistStats.songsWritten),
-      concertsPerformed: safeParseInt(data['concertsPerformed'],
-        fallback: artistStats.concertsPerformed),
-      songwritingSkill: safeParseInt(data['songwritingSkill'],
-        fallback: artistStats.songwritingSkill),
-      experience:
-        safeParseInt(data['experience'], fallback: artistStats.experience),
-      lyricsSkill: safeParseInt(data['lyricsSkill'],
-        fallback: artistStats.lyricsSkill),
-      compositionSkill: safeParseInt(data['compositionSkill'],
-        fallback: artistStats.compositionSkill),
-      inspirationLevel: safeParseInt(data['inspirationLevel'],
-        fallback: artistStats.inspirationLevel),
+            fame: safeParseInt(data['currentFame'], fallback: artistStats.fame),
+            money:
+                safeParseInt(data['currentMoney'], fallback: artistStats.money),
+            energy: safeParseInt(data['energy'], fallback: artistStats.energy),
+            creativity: safeParseInt(data['inspirationLevel'],
+                fallback: artistStats.creativity),
+            fanbase:
+                safeParseInt(data['fanbase'], fallback: artistStats.fanbase),
+            loyalFanbase: safeParseInt(data['loyalFanbase'],
+                fallback: artistStats.loyalFanbase),
+            albumsSold: safeParseInt(data['albumsReleased'],
+                fallback: artistStats.albumsSold),
+            songsWritten: safeParseInt(data['songsPublished'],
+                fallback: artistStats.songsWritten),
+            concertsPerformed: safeParseInt(data['concertsPerformed'],
+                fallback: artistStats.concertsPerformed),
+            songwritingSkill: safeParseInt(data['songwritingSkill'],
+                fallback: artistStats.songwritingSkill),
+            experience: safeParseInt(data['experience'],
+                fallback: artistStats.experience),
+            lyricsSkill: safeParseInt(data['lyricsSkill'],
+                fallback: artistStats.lyricsSkill),
+            compositionSkill: safeParseInt(data['compositionSkill'],
+                fallback: artistStats.compositionSkill),
+            inspirationLevel: safeParseInt(data['inspirationLevel'],
+                fallback: artistStats.inspirationLevel),
             songs: loadedSongs,
             albums: loadedAlbums,
             currentRegion: data['homeRegion'] ?? artistStats.currentRegion,
@@ -772,7 +782,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             // Mark as read after showing
             change.doc.reference.update({'read': true});
-            
+
             // Update unread count
             _loadUnreadNotificationCount();
           }
@@ -1060,8 +1070,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .collection('players')
           .doc(user.uid)
           .update(sanitizeForFirestore({
-        'pendingPractices': sanitizedPractices,
-      }));
+            'pendingPractices': sanitizedPractices,
+          }));
 
       print('✅ Saved ${pendingPractices.length} pending practices');
     } catch (e) {
@@ -1087,7 +1097,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         switch (practice.practiceType) {
           case 'songwriting':
             artistStats = artistStats.copyWith(
-              songwritingSkill: artistStats.songwritingSkill + practice.skillGain,
+              songwritingSkill:
+                  artistStats.songwritingSkill + practice.skillGain,
               experience: artistStats.experience + practice.xpGain,
             );
             break;
@@ -1099,13 +1110,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             break;
           case 'composition':
             artistStats = artistStats.copyWith(
-              compositionSkill: artistStats.compositionSkill + practice.skillGain,
+              compositionSkill:
+                  artistStats.compositionSkill + practice.skillGain,
               experience: artistStats.experience + practice.xpGain,
             );
             break;
           case 'inspiration':
             artistStats = artistStats.copyWith(
-              inspirationLevel: artistStats.inspirationLevel + practice.skillGain,
+              inspirationLevel:
+                  artistStats.inspirationLevel + practice.skillGain,
               experience: artistStats.experience + practice.xpGain,
             );
             break;
@@ -1193,7 +1206,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
             // Cap daily energy restore at 100, but allow energy to exceed 100 from gifts/purchases
-            final restoredEnergy = artistStats.energy < 100 ? 100 : artistStats.energy;
+            final restoredEnergy =
+                artistStats.energy < 100 ? 100 : artistStats.energy;
             artistStats = artistStats.copyWith(
               energy: restoredEnergy,
               clearSideHustle: sideHustleExpired,
@@ -1203,9 +1217,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (artistStats.energy < 100) {
             _showMessage('☀️ New day! Energy restored to 100');
           } else {
-            _showMessage('☀️ New day! You still have ${artistStats.energy} energy');
+            _showMessage(
+                '☀️ New day! You still have ${artistStats.energy} energy');
           }
-          
+
           if (sideHustleExpired) {
             _addNotification(
               'Contract Ended',
@@ -1213,17 +1228,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.work_off,
             );
           }
-          
+
           _addNotification(
             'New Day Stats',
             'Your daily streams, royalties, and fanbase have been updated by the server!',
             icon: Icons.cloud_done,
           );
-          
+
           final energyMessage = artistStats.energy < 100
               ? 'A new day has begun! Your energy has been restored to 100.'
               : 'A new day has begun! Your current energy: ${artistStats.energy}';
-          
+
           _addNotification(
             'Energy Update',
             energyMessage,
@@ -1420,7 +1435,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (artistStats.name == "Loading...")
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Color(0xFFFF6B9D), Color(0xFFE94560)],
@@ -1433,7 +1449,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1448,7 +1465,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                        icon: const Icon(Icons.refresh,
+                            color: Colors.white, size: 20),
                         onPressed: _handleRefresh,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
@@ -3169,7 +3187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _getNavItemName(int index) {
-  const names = ['Home', 'Activity', 'Music', 'The Scoop', 'Media', 'World'];
+    const names = ['Home', 'Activity', 'Music', 'The Scoop', 'Media', 'World'];
     return names[index];
   }
 

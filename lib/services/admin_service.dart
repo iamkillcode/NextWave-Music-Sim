@@ -35,10 +35,11 @@ class AdminService {
       const adminUserIds = [
         'xjJFuMCEKMZwkI8uIP34Jl2bfQA3', // Primary admin
       ];
-      
+
       // Try Cloud Function first
       try {
-        final result = await _functions.httpsCallable('checkAdminStatus').call();
+        final result =
+            await _functions.httpsCallable('checkAdminStatus').call();
         final isAdmin = result.data['isAdmin'] ?? false;
 
         // Cache result
@@ -48,7 +49,7 @@ class AdminService {
         return isAdmin;
       } catch (e) {
         print('Cloud Function error (expected if not deployed): $e');
-        
+
         // FALLBACK: Check hardcoded list if Cloud Function fails
         // This happens when functions aren't deployed yet
         if (adminUserIds.contains(user.uid)) {
@@ -57,10 +58,11 @@ class AdminService {
           _cachedUserId = user.uid;
           return true;
         }
-        
+
         // Also check Firestore admin collection as backup
         try {
-          final adminDoc = await _firestore.collection('admins').doc(user.uid).get();
+          final adminDoc =
+              await _firestore.collection('admins').doc(user.uid).get();
           if (adminDoc.exists && adminDoc.data()?['isAdmin'] == true) {
             print('✅ Admin access granted via Firestore (UID: ${user.uid})');
             _isAdminCached = true;
@@ -71,19 +73,18 @@ class AdminService {
           print('Firestore check error: $firestoreError');
         }
       }
-      
+
       // Not an admin
       _isAdminCached = false;
       _cachedUserId = user.uid;
       return false;
-      
     } catch (e) {
       print('Error checking admin status: $e');
-      
+
       // Clear cache on error
       _isAdminCached = null;
       _cachedUserId = null;
-      
+
       return false;
     }
   }
@@ -325,14 +326,16 @@ class AdminService {
       // 2. Send individual notification to each player
       // This is done via Cloud Function to avoid client-side limitations
       try {
-        final callable = _functions.httpsCallable('sendGlobalNotificationToPlayers');
+        final callable =
+            _functions.httpsCallable('sendGlobalNotificationToPlayers');
         await callable.call({
           'title': title,
           'message': message,
         });
         print('✅ Global notification distributed to all players');
       } catch (e) {
-        print('⚠️ Cloud Function not available, notification saved to system_notifications only: $e');
+        print(
+            '⚠️ Cloud Function not available, notification saved to system_notifications only: $e');
       }
 
       return true;
