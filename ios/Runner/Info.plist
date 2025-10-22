@@ -45,7 +45,19 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
-		<key>UIStatusBarHidden</key>
-		<false/>
+	<key>UIStatusBarHidden</key>
+	<false/>
+	<!-- Allow loading images from any domain (required for Firebase Storage, user avatars, etc.) -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
 	</dict>
+	<!-- Photo library usage description for image picker -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>NextWave needs access to your photo library to upload cover art and profile pictures.</string>
+	<!-- Camera usage description for image picker -->
+	<key>NSCameraUsageDescription</key>
+	<string>NextWave needs access to your camera to take photos for cover art and profile pictures.</string>
+</dict>
 </plist>
