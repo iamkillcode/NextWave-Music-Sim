@@ -48,6 +48,10 @@ class RemoteConfigService {
         'daily_energy': 100,
         'energy_per_song': 10,
         'base_streaming_rate': 0.005, // $ per stream
+        
+        // Energy restoration fix
+        'enable_energy_restore_fix': true, // Fix for energy not restoring after one day
+        'energy_restore_amount': 100, // Amount to restore daily
 
         // Game balance - Fame & Growth
         'fame_unlock_threshold': 50,
@@ -172,6 +176,12 @@ class RemoteConfigService {
   int get energyPerSong => _getInt('energy_per_song', defaultValue: 10);
   double get baseStreamingRate =>
       _getDouble('base_streaming_rate', defaultValue: 0.005);
+
+  // Energy restoration fix
+  bool get enableEnergyRestoreFix =>
+      _getBool('enable_energy_restore_fix', defaultValue: true);
+  int get energyRestoreAmount =>
+      _getInt('energy_restore_amount', defaultValue: 100);
 
   // =============================================================================
   // GAME BALANCE - FAME & GROWTH

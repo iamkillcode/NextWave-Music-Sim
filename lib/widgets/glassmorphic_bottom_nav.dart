@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 
 /// Glassmorphic Bottom Navigation Bar - iOS 26 Style
-/// 
+///
 /// Provides a frosted glass effect with blur and transparency
 /// for a modern, premium feel consistent across all screens.
 class GlassmorphicBottomNav extends StatelessWidget {
@@ -46,7 +46,8 @@ class GlassmorphicBottomNav extends StatelessWidget {
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.transparent,
               elevation: 0,
-              selectedItemColor: selectedItemColor ?? const Color(0xFF00D9FF), // Cyan
+              selectedItemColor:
+                  selectedItemColor ?? const Color(0xFF00D9FF), // Cyan
               unselectedItemColor: unselectedItemColor ?? Colors.white54,
               selectedLabelStyle: const TextStyle(
                 fontWeight: FontWeight.w600,
