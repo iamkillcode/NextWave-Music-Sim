@@ -155,9 +155,11 @@ class UnifiedChartService {
             // Get appropriate stream count based on period
             int streamCount = 0;
             if (period == 'daily') {
-              streamCount = safeParseInt(songMap['lastDayStreams'], fallback: 0);
+              streamCount =
+                  safeParseInt(songMap['lastDayStreams'], fallback: 0);
             } else if (period == 'weekly') {
-              streamCount = safeParseInt(songMap['last7DaysStreams'], fallback: 0);
+              streamCount =
+                  safeParseInt(songMap['last7DaysStreams'], fallback: 0);
             }
 
             // Handle regional vs global
@@ -169,8 +171,10 @@ class UnifiedChartService {
                   regionalStreams.containsKey(region)) {
                 // For regional charts, we need to calculate regional daily/weekly streams
                 // For now, use a proportional estimate based on total
-        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
-        final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
+                final totalStreams = safeParseInt(songMap['streams'],
+                    fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
+                final regionStreams =
+                    safeParseInt(regionalStreams[region], fallback: 0);
 
                 if (regionStreams > 0 && totalStreams > 0) {
                   // Calculate regional proportion of recent streams
@@ -192,7 +196,8 @@ class UnifiedChartService {
                 'genre': songMap['genre'] ?? 'Unknown',
                 'quality': safeParseInt(songMap['quality'], fallback: 0),
                 'periodStreams': streamCount,
-                'totalStreams': safeParseInt(songMap['streams'], fallback: 0), // ✅ Fixed: use 'streams' not 'totalStreams'
+                'totalStreams': safeParseInt(songMap['streams'],
+                    fallback: 0), // ✅ Fixed: use 'streams' not 'totalStreams'
                 'likes': safeParseInt(songMap['likes'], fallback: 0),
                 'releaseDate': songMap['releaseDate'],
                 'state': songState,
@@ -221,11 +226,16 @@ class UnifiedChartService {
 
             // Get appropriate stream count based on period
             int streamCount = 0;
-              if (period == 'daily') {
+            if (period == 'daily') {
               // NPCs use lastDayStreams if available, or estimate from last7DaysStreams
-              streamCount = safeParseInt(songMap['lastDayStreams'], fallback: ((safeParseInt(songMap['last7DaysStreams'], fallback: 0) / 7).round()));
+              streamCount = safeParseInt(songMap['lastDayStreams'],
+                  fallback:
+                      ((safeParseInt(songMap['last7DaysStreams'], fallback: 0) /
+                              7)
+                          .round()));
             } else if (period == 'weekly') {
-              streamCount = safeParseInt(songMap['last7DaysStreams'], fallback: 0);
+              streamCount =
+                  safeParseInt(songMap['last7DaysStreams'], fallback: 0);
             }
 
             // Handle regional filtering for NPCs
@@ -234,8 +244,10 @@ class UnifiedChartService {
                   songMap['regionalStreams'] as Map<dynamic, dynamic>?;
               if (regionalStreams != null &&
                   regionalStreams.containsKey(region)) {
-        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
-        final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
+                final totalStreams = safeParseInt(songMap['streams'],
+                    fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
+                final regionStreams =
+                    safeParseInt(regionalStreams[region], fallback: 0);
 
                 if (regionStreams > 0 && totalStreams > 0) {
                   final regionProportion = regionStreams / totalStreams;
@@ -256,7 +268,8 @@ class UnifiedChartService {
                 'genre': songMap['genre'] ?? 'Unknown',
                 'quality': safeParseInt(songMap['quality'], fallback: 0),
                 'periodStreams': streamCount,
-                'totalStreams': safeParseInt(songMap['streams'], fallback: 0), // ✅ Fixed: use 'streams' not 'totalStreams'
+                'totalStreams': safeParseInt(songMap['streams'],
+                    fallback: 0), // ✅ Fixed: use 'streams' not 'totalStreams'
                 'likes': 0, // NPCs don't have likes
                 'releaseDate': songMap['releaseDate'],
                 'state': 'released',
@@ -390,7 +403,8 @@ class UnifiedChartService {
             if (period == 'daily') {
               songPeriodStreams = songMap['lastDayStreams'] as int? ?? 0;
             } else if (period == 'weekly') {
-              songPeriodStreams = safeParseInt(songMap['last7DaysStreams'], fallback: 0);
+              songPeriodStreams =
+                  safeParseInt(songMap['last7DaysStreams'], fallback: 0);
             }
 
             // Handle regional filtering
@@ -399,8 +413,10 @@ class UnifiedChartService {
                   songMap['regionalStreams'] as Map<dynamic, dynamic>?;
               if (regionalStreams != null &&
                   regionalStreams.containsKey(region)) {
-        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
-        final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
+                final totalStreams = safeParseInt(songMap['streams'],
+                    fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
+                final regionStreams =
+                    safeParseInt(regionalStreams[region], fallback: 0);
 
                 if (regionStreams > 0 && totalStreams > 0) {
                   final regionProportion = regionStreams / totalStreams;
@@ -457,9 +473,14 @@ class UnifiedChartService {
           // Get period streams
           int songPeriodStreams = 0;
           if (period == 'daily') {
-            songPeriodStreams = safeParseInt(songMap['lastDayStreams'], fallback: ((safeParseInt(songMap['last7DaysStreams'], fallback: 0) / 7).round()));
+            songPeriodStreams = safeParseInt(songMap['lastDayStreams'],
+                fallback:
+                    ((safeParseInt(songMap['last7DaysStreams'], fallback: 0) /
+                            7)
+                        .round()));
           } else if (period == 'weekly') {
-            songPeriodStreams = safeParseInt(songMap['last7DaysStreams'], fallback: 0);
+            songPeriodStreams =
+                safeParseInt(songMap['last7DaysStreams'], fallback: 0);
           }
 
           // Handle regional filtering
@@ -468,8 +489,10 @@ class UnifiedChartService {
                 songMap['regionalStreams'] as Map<dynamic, dynamic>?;
             if (regionalStreams != null &&
                 regionalStreams.containsKey(region)) {
-        final totalStreams = safeParseInt(songMap['streams'], fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
-        final regionStreams = safeParseInt(regionalStreams[region], fallback: 0);
+              final totalStreams = safeParseInt(songMap['streams'],
+                  fallback: 0); // ✅ Fixed: use 'streams' not 'totalStreams'
+              final regionStreams =
+                  safeParseInt(regionalStreams[region], fallback: 0);
 
               if (regionStreams > 0 && totalStreams > 0) {
                 final regionProportion = regionStreams / totalStreams;

@@ -26,7 +26,10 @@ import '../utils/genres.dart';
 import 'settings_screen.dart';
 import 'notifications_screen.dart';
 import 'the_scoop_screen.dart';
+import 'unified_charts_screen.dart';
 import '../services/notification_service.dart';
+import 'dart:ui';
+import '../widgets/glassmorphic_bottom_nav.dart';
 
 class DashboardScreen extends StatefulWidget {
   final dynamic initialStats;
@@ -2230,6 +2233,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                     customCostText: 'EPs/Albums',
                   ),
+                  _buildActionCard(
+                    'Spotlight',
+                    Icons.bar_chart_rounded,
+                    const Color(0xFF4CAF50),
+                    energyCost: -1,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UnifiedChartsScreen(),
+                        ),
+                      );
+                    },
+                    customCostText: 'Charts',
+                  ),
+                  _buildActionCard(
+                    'The Scoop',
+                    Icons.newspaper_rounded,
+                    const Color(0xFFFF9800),
+                    energyCost: -1,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TheScoopScreen(),
+                        ),
+                      );
+                    },
+                    customCostText: 'News',
+                  ),
                 ],
               );
             },
@@ -3071,7 +3104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
+    return GlassmorphicBottomNav(
       currentIndex: _selectedIndex,
       onTap: (index) {
         setState(() {
@@ -3162,10 +3195,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _showMessage('${_getNavItemName(index)} selected!');
         }
       },
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: const Color(0xFF21262D),
-      selectedItemColor: const Color(0xFF00D9FF), // Cyan
-      unselectedItemColor: Colors.white54,
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
         BottomNavigationBarItem(
