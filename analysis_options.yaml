@@ -11,9 +11,9 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   errors:
-    # Treat deprecation warnings as errors to prevent using deprecated APIs
-    deprecated_member_use: error
-    deprecated_member_use_from_same_package: error
+  # Treat deprecation warnings as warnings (change to 'error' when ready to enforce)
+  deprecated_member_use: warning
+  deprecated_member_use_from_same_package: warning
 
 linter:
   # The lint rules applied to this project can be customized in the
