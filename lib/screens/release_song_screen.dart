@@ -911,8 +911,8 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               surface: Color(0xFF21262D),
               onSurface: Colors.white,
             ),
-            dialogTheme: DialogThemeData(
-              backgroundColor: const Color(0xFF21262D),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Color(0xFF21262D),
             ),
           ),
           child: child!,
@@ -1038,9 +1038,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             .artistStats.money, // No immediate payment - royalties paid daily
         fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
         fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
-    loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
-      .clamp(0, 1e12)
-      .toInt(),
+        loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
+            .clamp(0, 1e12)
+            .toInt(),
         regionalFanbase: updatedRegionalFanbase,
         songs: widget.artistStats.songs
             .map((s) => s.id == updatedSong.id ? updatedSong : s)

@@ -7,12 +7,12 @@ class NextWaveTheme {
   // ════════════════════════════════════════════════════════════════
   // 🎨 COLOR PALETTE - Classic Retro-Modern Hybrid
   // ════════════════════════════════════════════════════════════════
-  
+
   // Base Colors
   static const Color backgroundDark = Color(0xFF0B0D17); // Midnight navy
   static const Color surfaceDark = Color(0xFF161B22);
   static const Color surfaceMedium = Color(0xFF1C2128);
-  
+
   // Accent Colors - Neon/Electric
   static const Color electricGold = Color(0xFFFFD966);
   static const Color neonCyan = Color(0xFF00E5FF);
@@ -20,56 +20,56 @@ class NextWaveTheme {
   static const Color neonPurple = Color(0xFFBB86FC);
   static const Color successGreen = Color(0xFF00E676);
   static const Color warningOrange = Color(0xFFFF9800);
-  
+
   // Text Colors
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB0B0B0);
   static const Color textTertiary = Color(0xFF808080);
-  
+
   // ════════════════════════════════════════════════════════════════
   // 🎨 GRADIENTS
   // ════════════════════════════════════════════════════════════════
-  
+
   static const LinearGradient goldGradient = LinearGradient(
     colors: [Color(0xFFFFD966), Color(0xFFFFA000)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient cyanGradient = LinearGradient(
     colors: [Color(0xFF00E5FF), Color(0xFF00B8D4)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient purpleBlueGradient = LinearGradient(
     colors: [Color(0xFFBB86FC), Color(0xFF6200EA)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient crimsonGradient = LinearGradient(
     colors: [Color(0xFFFF5252), Color(0xFFD32F2F)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   static const LinearGradient backgroundGradient = LinearGradient(
     colors: [Color(0xFF0B0D17), Color(0xFF1A1D2E)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
-  
+
   static const LinearGradient greenGradient = LinearGradient(
     colors: [Color(0xFF00E676), Color(0xFF00C853)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  
+
   // ════════════════════════════════════════════════════════════════
   // 📝 TYPOGRAPHY
   // ════════════════════════════════════════════════════════════════
-  
+
   static TextTheme get textTheme {
     return TextTheme(
       // Headings - Orbitron (futuristic, bold)
@@ -91,7 +91,7 @@ class NextWaveTheme {
         color: textPrimary,
         letterSpacing: 1.0,
       ),
-      
+
       // Titles - Exo 2 (modern, clean)
       headlineLarge: GoogleFonts.exo2(
         fontSize: 22,
@@ -108,7 +108,7 @@ class NextWaveTheme {
         fontWeight: FontWeight.w600,
         color: textPrimary,
       ),
-      
+
       // Body - Poppins (readable, friendly)
       bodyLarge: GoogleFonts.poppins(
         fontSize: 16,
@@ -125,7 +125,7 @@ class NextWaveTheme {
         fontWeight: FontWeight.w400,
         color: textTertiary,
       ),
-      
+
       // Labels
       labelLarge: GoogleFonts.montserrat(
         fontSize: 14,
@@ -147,16 +147,16 @@ class NextWaveTheme {
       ),
     );
   }
-  
+
   // ════════════════════════════════════════════════════════════════
   // 🎨 THEME DATA
   // ════════════════════════════════════════════════════════════════
-  
+
   static ThemeData get theme {
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: backgroundDark,
-      
+
       // Color Scheme
       colorScheme: const ColorScheme.dark(
         primary: electricGold,
@@ -168,16 +168,16 @@ class NextWaveTheme {
         onSecondary: Color(0xFF000000),
         onSurface: textPrimary,
       ),
-      
+
       // Typography
       textTheme: textTheme,
-      
+
       // Card Theme
-      cardTheme: CardThemeData(
+      cardTheme: const CardThemeData(
         color: surfaceDark,
         elevation: 0,
       ),
-      
+
       // AppBar Theme
       appBarTheme: AppBarTheme(
         backgroundColor: surfaceDark,
@@ -189,7 +189,7 @@ class NextWaveTheme {
           color: textPrimary,
         ),
       ),
-      
+
       // Button Themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -207,7 +207,7 @@ class NextWaveTheme {
           ),
         ),
       ),
-      
+
       // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -229,11 +229,11 @@ class NextWaveTheme {
       ),
     );
   }
-  
+
   // ════════════════════════════════════════════════════════════════
   // ✨ BOX DECORATIONS
   // ════════════════════════════════════════════════════════════════
-  
+
   static BoxDecoration glowBox({
     required Color glowColor,
     double glowRadius = 20,
@@ -251,7 +251,7 @@ class NextWaveTheme {
       ],
     );
   }
-  
+
   static BoxDecoration cardDecoration({
     Color? color,
     Gradient? gradient,
@@ -268,15 +268,15 @@ class NextWaveTheme {
       ),
     );
   }
-  
+
   // ════════════════════════════════════════════════════════════════
   // 🎬 ANIMATION DURATIONS
   // ════════════════════════════════════════════════════════════════
-  
+
   static const Duration fastDuration = Duration(milliseconds: 150);
   static const Duration normalDuration = Duration(milliseconds: 250);
   static const Duration slowDuration = Duration(milliseconds: 400);
-  
+
   static const Curve bounceCurve = Curves.easeOutBack;
   static const Curve smoothCurve = Curves.easeInOut;
 }
