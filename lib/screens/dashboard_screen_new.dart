@@ -1210,18 +1210,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           setState(() {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
-            
+
             // Use Remote Config for energy restoration
             final int energyRestoreAmount = _remoteConfig.energyRestoreAmount;
             final bool enableFix = _remoteConfig.enableEnergyRestoreFix;
-            
+
             // Apply energy restoration based on Remote Config
             final restoredEnergy = enableFix
                 ? (artistStats.energy < energyRestoreAmount
                     ? energyRestoreAmount
                     : artistStats.energy)
                 : 100; // Legacy behavior if fix is disabled
-            
+
             artistStats = artistStats.copyWith(
               energy: restoredEnergy,
               clearSideHustle: sideHustleExpired,

@@ -48,9 +48,10 @@ class RemoteConfigService {
         'daily_energy': 100,
         'energy_per_song': 10,
         'base_streaming_rate': 0.005, // $ per stream
-        
+
         // Energy restoration fix
-        'enable_energy_restore_fix': true, // Fix for energy not restoring after one day
+        'enable_energy_restore_fix':
+            true, // Fix for energy not restoring after one day
         'energy_restore_amount': 100, // Amount to restore daily
 
         // Game balance - Fame & Growth

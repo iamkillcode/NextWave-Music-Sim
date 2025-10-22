@@ -694,7 +694,17 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${entry['songCount'] ?? entry['releasedSongs'] ?? 0} songs • ${_chartService.formatStreams(entry['fanbase'] ?? 0)} fans',
+              () {
+                final songCount = entry['songCount'] ?? entry['releasedSongs'] ?? 0;
+                final fanbase = entry['fanbase'] ?? 0;
+                
+                // Only show fans if > 0
+                if (fanbase > 0) {
+                  return '$songCount songs • ${_chartService.formatStreams(fanbase)} fans';
+                } else {
+                  return '$songCount songs';
+                }
+              }(),
               style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 4),
