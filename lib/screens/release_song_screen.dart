@@ -910,7 +910,10 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
               onPrimary: Colors.white,
               surface: Color(0xFF21262D),
               onSurface: Colors.white,
-            ), dialogTheme: DialogThemeData(backgroundColor: const Color(0xFF21262D)),
+            ),
+            dialogTheme: const DialogThemeData(
+              backgroundColor: Color(0xFF21262D),
+            ),
           ),
           child: child!,
         );

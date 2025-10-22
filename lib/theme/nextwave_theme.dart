@@ -173,16 +173,9 @@ class NextWaveTheme {
       textTheme: textTheme,
       
       // Card Theme
-      cardTheme: CardThemeData(
+      cardTheme: const CardThemeData(
         color: surfaceDark,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: neonCyan.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
       ),
       
       // AppBar Theme

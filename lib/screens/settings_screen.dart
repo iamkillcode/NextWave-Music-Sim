@@ -1342,7 +1342,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeThumbColor: const Color(0xFF00D9FF),
+          thumbColor: WidgetStateProperty.resolveWith<Color>(
+            (states) => states.contains(WidgetState.selected)
+                ? const Color(0xFF00D9FF)
+                : Colors.grey,
+          ),
         ),
       ],
     );
