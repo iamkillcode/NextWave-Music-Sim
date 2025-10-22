@@ -6,8 +6,6 @@ import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../theme/nextwave_theme.dart';
-import '../widgets/arcade/glow_button.dart';
-import '../widgets/arcade/neon_card.dart';
 
 class ViralWaveScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -33,6 +31,10 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   // Custom promotion settings
   int _promoDays = 7; // Default 7 days
   double _budgetMultiplier = 1.0; // 1.0 = base cost, 2.0 = double cost/effect
+  
+  // Anti-exploit constants
+  static const int maxConcurrentPromosPerItem = 3; // Max 3 active promos on same song/EP/album
+  static const int maxDailyBufferPerSong = 50000; // Cap daily streams boost per song
 
   final Map<String, Map<String, dynamic>> _promotionTypes = {
     'song': {
@@ -163,6 +165,39 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                                 _getValidationMessage(_selectedPromotionType),
                                 style: const TextStyle(
                                   color: Color(0xFFFF453A),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
+                    // Show warning if selected item has max concurrent promos
+                    if (_selectedPromotionType == 'song' && _selectedSong != null && _hasMaxConcurrentPromos(_selectedSong!))
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD60A).withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFFFFD60A).withOpacity(0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber,
+                              color: Color(0xFFFFD60A),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Maximum concurrent promotions reached for "${_selectedSong!.title}". Wait for current promos to complete.',
+                                style: const TextStyle(
+                                  color: Color(0xFFFFD60A),
                                   fontSize: 13,
                                 ),
                               ),
@@ -412,15 +447,36 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   Widget _buildActiveCampaignsSection() {
-    // Get all songs with active promotions
-    final activeCampaigns = widget.artistStats.songs.where((song) {
+    // Get all songs/EPs/Albums with active promotions
+    final activeSongs = widget.artistStats.songs.where((song) {
       return song.promoBuffer != null && 
              song.promoBuffer! > 0 && 
              song.promoEndDate != null &&
              song.promoEndDate!.isAfter(widget.currentGameDate);
     }).toList();
 
-    if (activeCampaigns.isEmpty) {
+    // Find promoted albums/EPs by checking if their songs have active promos
+    final promotedAlbums = <Album>[];
+    for (final album in widget.artistStats.albums) {
+      if (album.state == AlbumState.released) {
+        final albumSongsWithPromo = activeSongs.where((s) => album.songIds.contains(s.id)).toList();
+        // If all album songs have the same promo end date, it's an album/EP campaign
+        if (albumSongsWithPromo.isNotEmpty && albumSongsWithPromo.length == album.songIds.length) {
+          final endDate = albumSongsWithPromo.first.promoEndDate;
+          if (albumSongsWithPromo.every((s) => s.promoEndDate == endDate)) {
+            promotedAlbums.add(album);
+          }
+        }
+      }
+    }
+
+    // Get songs that are NOT part of an album campaign
+    final promotedAlbumSongIds = promotedAlbums.expand((a) => a.songIds).toSet();
+    final standaloneSongs = activeSongs.where((s) => !promotedAlbumSongIds.contains(s.id)).toList();
+
+    final totalCampaigns = promotedAlbums.length + standaloneSongs.length;
+
+    if (totalCampaigns == 0) {
       return const SizedBox.shrink();
     }
 
@@ -447,7 +503,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${activeCampaigns.length} running',
+                '$totalCampaigns running',
                 style: const TextStyle(
                   color: Color(0xFF00D9FF),
                   fontSize: 12,
@@ -458,9 +514,86 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ...activeCampaigns.map((song) {
+        
+        // Show promoted albums/EPs
+        ...promotedAlbums.map<Widget>((album) {
+          final firstSong = widget.artistStats.songs.firstWhere((s) => s.id == album.songIds.first);
+          final daysRemaining = firstSong.promoEndDate!.difference(widget.currentGameDate).inDays;
+          final totalDailyBuffer = album.songIds.fold<int>(0, (sum, songId) {
+            final song = widget.artistStats.songs.firstWhere((s) => s.id == songId);
+            return sum + (song.promoBuffer ?? 0);
+          });
+          
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161B22),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: album.type == AlbumType.ep 
+                  ? const Color(0xFFFFD60A).withOpacity(0.3)
+                  : const Color(0xFFFF6B9D).withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      album.type == AlbumType.ep ? '💿' : '💽',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            album.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${album.type == AlbumType.ep ? "EP" : "Album"} Campaign • ${album.songIds.length} songs',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '${daysRemaining}d left',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '+${NumberFormat('#,###').format(totalDailyBuffer)}/day total',
+                  style: TextStyle(
+                    color: album.type == AlbumType.ep ? const Color(0xFFFFD60A) : const Color(0xFFFF6B9D),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+
+        // Show standalone song campaigns
+        ...standaloneSongs.map<Widget>((song) {
           final daysRemaining = song.promoEndDate!.difference(widget.currentGameDate).inDays;
-          final progress = 1.0 - (daysRemaining / 30.0).clamp(0.0, 1.0);
           
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -525,16 +658,6 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: Colors.white.withOpacity(0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00D9FF)),
-                    minHeight: 4,
-                  ),
-                ),
               ],
             ),
           );
@@ -551,7 +674,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       childAspectRatio: 1.1,
-      children: _promotionTypes.entries.map((entry) {
+      children: _promotionTypes.entries.map<Widget>((entry) {
         final isSelected = _selectedPromotionType == entry.key;
         final data = entry.value;
         final isAvailable = _isPromotionTypeAvailable(entry.key);
@@ -640,7 +763,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ...songs.map((song) {
+        ...songs.map<Widget>((song) {
           final isSelected = _selectedSong?.id == song.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -735,14 +858,14 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               ),
             ),
           );
-        }),
+        }).toList(),
       ],
     );
   }
 
   Widget _buildEPSelector() {
     final releasedEPs = widget.artistStats.albums
-        .where((album) => album.type == 'EP' && album.state == 'released')
+        .where((album) => album.type == AlbumType.ep && album.state == AlbumState.released)
         .toList();
 
     return Column(
@@ -757,7 +880,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ...releasedEPs.map((ep) {
+        ...releasedEPs.map<Widget>((ep) {
           final isSelected = _selectedAlbum?.id == ep.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -852,14 +975,14 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               ),
             ),
           );
-        }),
+        }).toList(),
       ],
     );
   }
 
   Widget _buildAlbumSelector() {
     final releasedAlbums = widget.artistStats.albums
-        .where((album) => album.type == 'Album' && album.state == 'released')
+        .where((album) => album.type == AlbumType.album && album.state == AlbumState.released)
         .toList();
 
     return Column(
@@ -874,7 +997,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        ...releasedAlbums.map((album) {
+        ...releasedAlbums.map<Widget>((album) {
           final isSelected = _selectedAlbum?.id == album.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -969,7 +1092,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               ),
             ),
           );
-        }),
+        }).toList(),
       ],
     );
   }
@@ -1214,16 +1337,56 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
     // For song promotion, need to select a song
     if (_selectedPromotionType == 'song') {
-      return _selectedSong != null;
+      if (_selectedSong == null) return false;
+      
+      // Check if song already has max concurrent promos
+      if (_hasMaxConcurrentPromos(_selectedSong!)) {
+        return false;
+      }
+    } else if (_selectedAlbum != null) {
+      // Check if any song in album has max concurrent promos
+      final albumSongs = widget.artistStats.songs
+          .where((s) => _selectedAlbum!.songIds.contains(s.id))
+          .toList();
+      
+      if (albumSongs.any((s) => _hasMaxConcurrentPromos(s))) {
+        return false;
+      }
     }
 
     return true;
+  }
+  
+  // Check if a song already has maximum concurrent promotions
+  bool _hasMaxConcurrentPromos(Song song) {
+    if (song.promoBuffer == null || song.promoBuffer! <= 0) return false;
+    if (song.promoEndDate == null || song.promoEndDate!.isBefore(widget.currentGameDate)) return false;
+    
+    // For now, we'll use buffer size as a proxy for number of concurrent promos
+    // This is approximate but prevents extreme stacking
+    final estimatedPromoCount = (song.promoBuffer! / 1000).ceil();
+    return estimatedPromoCount >= maxConcurrentPromosPerItem;
   }
 
   String _getButtonText(bool canPromote) {
     if (!_isPromotionTypeAvailable(_selectedPromotionType)) {
       return 'Requirements Not Met';
     }
+    
+    // Check for max concurrent promos
+    if (_selectedPromotionType == 'song' && _selectedSong != null) {
+      if (_hasMaxConcurrentPromos(_selectedSong!)) {
+        return 'Max Promos Active';
+      }
+    } else if (_selectedAlbum != null) {
+      final albumSongs = widget.artistStats.songs
+          .where((s) => _selectedAlbum!.songIds.contains(s.id))
+          .toList();
+      if (albumSongs.any((s) => _hasMaxConcurrentPromos(s))) {
+        return 'Max Promos Active';
+      }
+    }
+    
     if (!_canLaunchCampaign()) {
       return _selectedPromotionType == 'song'
           ? 'Select a Song'
@@ -1295,9 +1458,16 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
         (s) => s.id == _selectedSong!.id,
       );
       if (songIndex != -1) {
-        updatedSongs[songIndex] = updatedSongs[songIndex].copyWith(
-          promoBuffer: dailyBuffer,
-          promoEndDate: promoEndDate,
+        final existingSong = updatedSongs[songIndex];
+        // ADD to existing promo buffer instead of replacing, but CAP at maxDailyBufferPerSong
+        final newBuffer = ((existingSong.promoBuffer ?? 0) + dailyBuffer).clamp(0, maxDailyBufferPerSong);
+        final newEndDate = (existingSong.promoEndDate != null && existingSong.promoEndDate!.isAfter(promoEndDate))
+            ? existingSong.promoEndDate
+            : promoEndDate;
+        
+        updatedSongs[songIndex] = existingSong.copyWith(
+          promoBuffer: newBuffer,
+          promoEndDate: newEndDate,
         );
       }
     } else if (_selectedPromotionType == 'ep' && _selectedAlbum != null) {
@@ -1309,9 +1479,15 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           .round();
       updatedSongs = updatedSongs.map((song) {
         if (epSongIds.contains(song.id)) {
+          // ADD to existing promo buffer for each song, but CAP at maxDailyBufferPerSong
+          final newBuffer = ((song.promoBuffer ?? 0) + songBuffer).clamp(0, maxDailyBufferPerSong);
+          final newEndDate = (song.promoEndDate != null && song.promoEndDate!.isAfter(promoEndDate))
+              ? song.promoEndDate
+              : promoEndDate;
+          
           return song.copyWith(
-            promoBuffer: songBuffer,
-            promoEndDate: promoEndDate,
+            promoBuffer: newBuffer,
+            promoEndDate: newEndDate,
           );
         }
         return song;
@@ -1325,9 +1501,15 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           .round();
       updatedSongs = updatedSongs.map((song) {
         if (albumSongIds.contains(song.id)) {
+          // ADD to existing promo buffer for each song, but CAP at maxDailyBufferPerSong
+          final newBuffer = ((song.promoBuffer ?? 0) + songBuffer).clamp(0, maxDailyBufferPerSong);
+          final newEndDate = (song.promoEndDate != null && song.promoEndDate!.isAfter(promoEndDate))
+              ? song.promoEndDate
+              : promoEndDate;
+          
           return song.copyWith(
-            promoBuffer: songBuffer,
-            promoEndDate: promoEndDate,
+            promoBuffer: newBuffer,
+            promoEndDate: newEndDate,
           );
         }
         return song;

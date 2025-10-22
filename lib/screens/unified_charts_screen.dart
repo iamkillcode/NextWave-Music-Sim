@@ -294,7 +294,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedRegion,
+                  initialValue: _selectedRegion,
                   style: const TextStyle(color: Colors.white, fontSize: 16),
                   dropdownColor: Colors.grey[850],
                   decoration: InputDecoration(

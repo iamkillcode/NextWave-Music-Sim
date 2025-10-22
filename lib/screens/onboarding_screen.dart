@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_screen_new.dart';
 import '../models/artist_stats.dart';
 import '../services/game_time_service.dart';
+import '../utils/genres.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final User user;
@@ -27,18 +28,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _selectedAge = 18;
   bool _isLoading = false;
 
-  // Available options
-  final List<String> _genres = [
-    'R&B',
-    'Hip Hop',
-    'Rap',
-    'Trap',
-    'Drill',
-    'Afrobeat',
-    'Country',
-    'Jazz',
-    'Reggae',
-  ];
+  // Available options - genres centralized
+  final List<String> _genres = Genres.all;
 
   final Map<String, Map<String, String>> _regions = {
     'usa': {'name': 'United States', 'flag': '🇺🇸'},

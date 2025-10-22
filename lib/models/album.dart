@@ -1,4 +1,5 @@
 /// Represents an Album or EP - a collection of songs released together
+library;
 import '../utils/firestore_sanitizer.dart';
 class Album {
   final String id;

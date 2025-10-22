@@ -64,6 +64,8 @@ lib/firebase_options.dart
 # Firebase service account keys (if any)
 serviceAccountKey.json
 *-service-account.json
+*-firebase-adminsdk-*.json
+functions/*-firebase-adminsdk-*.json
 
 # Environment files with secrets
 .env

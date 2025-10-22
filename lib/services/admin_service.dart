@@ -32,7 +32,7 @@ class AdminService {
       // TEMPORARY FALLBACK: Check hardcoded admin list locally
       // This provides admin access until Cloud Functions are deployed
       // TODO: Remove this fallback after deploying Cloud Functions
-      const ADMIN_USER_IDS = [
+      const adminUserIds = [
         'xjJFuMCEKMZwkI8uIP34Jl2bfQA3', // Primary admin
       ];
       
@@ -51,7 +51,7 @@ class AdminService {
         
         // FALLBACK: Check hardcoded list if Cloud Function fails
         // This happens when functions aren't deployed yet
-        if (ADMIN_USER_IDS.contains(user.uid)) {
+        if (adminUserIds.contains(user.uid)) {
           print('✅ Admin access granted via local fallback (UID: ${user.uid})');
           _isAdminCached = true;
           _cachedUserId = user.uid;

@@ -8,6 +8,7 @@ import '../models/artist_stats.dart';
 import '../services/admin_service.dart';
 import 'admin_dashboard_screen.dart';
 import '../utils/firestore_sanitizer.dart';
+import '../utils/genres.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -35,6 +36,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isAdmin = false;
   String? _currentGender;
   bool _hasSetGender = false;
+  String? _currentGenre;
+  bool _hasResetGenre = false;
 
   final TextEditingController _artistNameController = TextEditingController();
   bool _isCheckingName = false;
@@ -73,11 +76,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _avatarUrl = data['avatarUrl'];
             _currentGender = data['gender'] as String?;
             _hasSetGender = data['gender'] != null;
+            _currentGenre = data['primaryGenre'] as String?;
+            _hasResetGenre = data['hasResetGenre'] ?? false;
           });
         }
       }
     } catch (e) {
       print('Error loading settings: $e');
+    }
+  }
+
+  Future<void> _resetGenre(String newGenre) async {
+    if (_hasResetGenre) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ You can only reset your genre once'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId != null) {
+        // Reset genre mastery for the new genre
+        await _firestore.collection('players').doc(userId).update(
+          sanitizeForFirestore({
+            'primaryGenre': newGenre,
+            'hasResetGenre': true,
+            'genreMastery': {newGenre: 0},
+            'unlockedGenres': [newGenre],
+          }),
+        );
+
+        setState(() {
+          _currentGenre = newGenre;
+          _hasResetGenre = true;
+        });
+
+        // Update artist stats
+        final updatedStats = widget.artistStats.copyWith(
+          primaryGenre: newGenre,
+          genreMastery: {newGenre: 0},
+          unlockedGenres: [newGenre],
+        );
+        widget.onStatsUpdated(updatedStats);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Primary genre reset to: $newGenre'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error resetting genre: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -563,6 +626,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
           ],
 
+          // Genre Reset Section (show if not reset yet or to display current genre)
+          _buildSectionHeader('Music Genre'),
+          _buildGenreResetCard(),
+          const SizedBox(height: 24),
+
           // Artist Name Section
           _buildSectionHeader('Artist Identity'),
           _buildArtistNameCard(),
@@ -759,6 +827,229 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 8),
           _buildGenderButton(
               null, 'Prefer not to say', Icons.lock_outline, Colors.white60),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenreResetCard() {
+    final genres = Genres.all;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.music_note, color: Color(0xFF9D4EDD), size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Primary Genre',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_currentGenre != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF9D4EDD).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF9D4EDD)),
+              ),
+              child: Text(
+                'Current: $_currentGenre',
+                style: const TextStyle(
+                  color: Color(0xFF9D4EDD),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          if (!_hasResetGenre) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD60A).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFD60A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline,
+                          color: Color(0xFFFFD60A), size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'One-Time Genre Reset Available!',
+                        style: TextStyle(
+                          color: Color(0xFFFFD60A),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You can reset your primary genre once. This will reset your genre mastery and unlocked genres.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select a new genre:',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: genres.map((genre) {
+                return InkWell(
+                  onTap: () => _showGenreResetConfirmation(genre),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: genre == _currentGenre
+                          ? const Color(0xFF9D4EDD).withOpacity(0.3)
+                          : const Color(0xFF0D1117),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: genre == _currentGenre
+                            ? const Color(0xFF9D4EDD)
+                            : Colors.white24,
+                      ),
+                    ),
+                    child: Text(
+                      genre,
+                      style: TextStyle(
+                        color: genre == _currentGenre
+                            ? const Color(0xFF9D4EDD)
+                            : Colors.white,
+                        fontSize: 13,
+                        fontWeight: genre == _currentGenre
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ] else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline,
+                      color: Colors.white54, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You have already used your one-time genre reset.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showGenreResetConfirmation(String newGenre) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          '⚠️ Confirm Genre Reset',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reset your primary genre to $newGenre?',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'This will:',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '• Reset your genre mastery to 0',
+              style: TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+            const Text(
+              '• Unlock only this genre',
+              style: TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+            const Text(
+              '• Cannot be undone (one-time only)',
+              style: TextStyle(color: Color(0xFFFF6B9D), fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _resetGenre(newGenre);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF9D4EDD),
+            ),
+            child: const Text('Confirm Reset'),
+          ),
         ],
       ),
     );
@@ -1051,7 +1342,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color(0xFF00D9FF),
+          activeThumbColor: const Color(0xFF00D9FF),
         ),
       ],
     );

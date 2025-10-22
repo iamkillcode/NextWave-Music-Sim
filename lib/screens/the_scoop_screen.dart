@@ -156,26 +156,14 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                 SliverToBoxAdapter(child: _buildInfoCard(
                   title: 'Highest Debut',
                   imageUrl: _highestDebut!['coverArtUrl'],
-                  headline: '"' +
-                      ((_highestDebut!['title'] ?? 'Untitled') as String) +
-                      '" by ' +
-                      ((_highestDebut!['artist'] ?? 'Unknown') as String) +
-                      ' debuts at #' +
-                      ((_highestDebut!['position'] ?? 0).toString()) +
-                      ' on this week\'s chart.',
+                  headline: '"${(_highestDebut!['title'] ?? 'Untitled') as String}" by ${(_highestDebut!['artist'] ?? 'Unknown') as String} debuts at #${_highestDebut!['position'] ?? 0} on this week\'s chart.',
                   onTap: () => _openSongDetails(_highestDebut!),
                 )),
               if (_biggestMover != null)
                 SliverToBoxAdapter(child: _buildInfoCard(
                   title: 'Biggest Mover',
                   imageUrl: _biggestMover!['coverArtUrl'],
-                  headline: '"' +
-                      ((_biggestMover!['title'] ?? 'Untitled') as String) +
-                      '" by ' +
-                      ((_biggestMover!['artist'] ?? 'Unknown') as String) +
-                      ' jumps ' +
-                      (((_biggestMover!['movement'] ?? 0) as int).abs().toString()) +
-                      ' spots to #' + ((_biggestMover!['position'] ?? 0).toString()) + '.',
+                  headline: '"${(_biggestMover!['title'] ?? 'Untitled') as String}" by ${(_biggestMover!['artist'] ?? 'Unknown') as String} jumps ${((_biggestMover!['movement'] ?? 0) as int).abs()} spots to #${_biggestMover!['position'] ?? 0}.',
                   onTap: () => _openSongDetails(_biggestMover!),
                 )),
               SliverToBoxAdapter(child: _buildSectionDivider()),

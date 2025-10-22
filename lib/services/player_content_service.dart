@@ -27,7 +27,7 @@ class PlayerContentService {
     try {
       final doc = await _firestore.collection('players').doc(playerId).get();
       if (!doc.exists) return [];
-      final data = doc.data() as Map<String, dynamic>?;
+      final data = doc.data();
       if (data == null) return [];
       if (data['songs'] != null && data['songs'] is List) {
         final list = List<dynamic>.from(data['songs'] as List);
@@ -58,7 +58,7 @@ class PlayerContentService {
     try {
       final doc = await _firestore.collection('players').doc(playerId).get();
       if (!doc.exists) return [];
-      final data = doc.data() as Map<String, dynamic>?;
+      final data = doc.data();
       if (data == null) return [];
       if (data['albums'] != null && data['albums'] is List) {
         final list = List<dynamic>.from(data['albums'] as List);
