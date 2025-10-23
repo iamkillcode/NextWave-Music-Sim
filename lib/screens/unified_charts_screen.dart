@@ -9,6 +9,9 @@ import '../services/unified_chart_service.dart';
 /// - Period filter: Daily / Weekly
 /// - Type filter: Singles / Albums / Artists
 /// - Region filter: Global / Specific Region
+/// - Mobile responsive design
+/// - Trending indicators (up/down/same arrows)
+/// - Weeks on chart display
 ///
 /// Chart Combinations:
 /// - Daily/Weekly Singles (Global/Regional)
@@ -43,6 +46,31 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
   bool _isLoading = true;
   String? _error;
   String? _currentUserId;
+
+  // Responsive sizing helper
+  double _getResponsiveSize(BuildContext context, double baseSize) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) {
+      return baseSize * 0.85; // Small phones
+    } else if (width < 600) {
+      return baseSize; // Normal phones
+    } else if (width < 900) {
+      return baseSize * 1.1; // Tablets
+    } else {
+      return baseSize * 1.2; // Desktop
+    }
+  }
+
+  double _getResponsivePadding(BuildContext context, double basePadding) {
+    final width = MediaQuery.of(context).size.width;
+    if (width < 360) {
+      return basePadding * 0.7;
+    } else if (width < 600) {
+      return basePadding;
+    } else {
+      return basePadding * 1.2;
+    }
+  }
 
   @override
   void initState() {
@@ -458,10 +486,18 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
 
   Widget _buildSongCard(Map<String, dynamic> entry, int position) {
     final isUserSong = entry['artistId'] == _currentUserId;
-    final genre = entry['genre'] as String? ?? 'Unknown';
+    final movement = entry['movement'] as int? ?? 0;
+    final lastWeekPosition = entry['lastWeekPosition'] as int?;
+    final weeksOnChart = entry['weeksOnChart'] as int? ?? 0;
+
+    // Responsive sizing
+    final coverSize = _getResponsiveSize(context, 56.0);
+    final titleFontSize = _getResponsiveSize(context, 16.0);
+    final subtitleFontSize = _getResponsiveSize(context, 14.0);
+    final padding = _getResponsivePadding(context, 12.0);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: _getResponsivePadding(context, 12.0)),
       color: isUserSong ? Colors.green[900] : Colors.grey[850],
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -470,15 +506,15 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             : BorderSide.none,
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
+        contentPadding: EdgeInsets.all(padding),
         leading: (() {
           final coverUrl = entry['coverArtUrl'] as String?;
           if (coverUrl != null && coverUrl.isNotEmpty) {
             return Stack(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: coverSize,
+                  height: coverSize,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white24, width: 1),
@@ -490,7 +526,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         color: Colors.grey[800],
-                        child: const Center(
+                        child: Center(
                           child: SizedBox(
                             width: 20,
                             height: 20,
@@ -511,8 +547,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   top: 2,
                   left: 2,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.75),
                       borderRadius: BorderRadius.circular(4),
@@ -531,7 +566,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       '#$position',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 11,
+                        fontSize: _getResponsiveSize(context, 11.0),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -547,8 +582,8 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             Expanded(
               child: Text(
                 entry['title'] ?? 'Untitled',
-                style: const TextStyle(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontSize: titleFontSize,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -556,6 +591,9 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            // Trending indicator
+            if (_selectedPeriod == 'weekly' && lastWeekPosition != null)
+              _buildTrendingIndicator(movement, lastWeekPosition),
           ],
         ),
         subtitle: Column(
@@ -563,9 +601,12 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           children: [
             Text(
               entry['artist'] ?? 'Unknown Artist',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: subtitleFontSize,
+              ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Row(
               children: [
                 Text(
@@ -573,28 +614,111 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   style: TextStyle(
                     color: _getStreamColor(),
                     fontWeight: FontWeight.bold,
+                    fontSize: _getResponsiveSize(context, 12.0),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Text(
                   '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: _getResponsiveSize(context, 11.0),
+                  ),
                 ),
               ],
             ),
+            // Weeks on chart (for weekly charts only)
+            if (_selectedPeriod == 'weekly' && weeksOnChart > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  weeksOnChart == 1
+                      ? 'New Entry'
+                      : '$weeksOnChart weeks on chart',
+                  style: TextStyle(
+                    color: weeksOnChart == 1 ? Colors.green : Colors.cyan,
+                    fontSize: _getResponsiveSize(context, 10.0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
           ],
         ),
-        trailing:
-            isUserSong ? const Icon(Icons.star, color: Colors.amber) : null,
+        trailing: isUserSong
+            ? Icon(Icons.star,
+                color: Colors.amber, size: _getResponsiveSize(context, 24.0))
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildTrendingIndicator(int movement, int lastWeekPosition) {
+    IconData icon;
+    Color color;
+    String tooltip;
+
+    if (movement > 0) {
+      // Moved up
+      icon = Icons.arrow_upward;
+      color = Colors.green;
+      tooltip = 'Up $movement from #$lastWeekPosition';
+    } else if (movement < 0) {
+      // Moved down
+      icon = Icons.arrow_downward;
+      color = Colors.red;
+      tooltip = 'Down ${movement.abs()} from #$lastWeekPosition';
+    } else {
+      // No change
+      icon = Icons.remove;
+      color = Colors.grey;
+      tooltip = 'No change (#$lastWeekPosition)';
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 14),
+            if (movement != 0)
+              Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Text(
+                  '${movement.abs()}',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildArtistCard(Map<String, dynamic> entry, int position) {
     final isCurrentUser = entry['artistId'] == _currentUserId;
+    final movement = entry['movement'] as int? ?? 0;
+    final lastWeekPosition = entry['lastWeekPosition'] as int?;
+    final weeksOnChart = entry['weeksOnChart'] as int? ?? 0;
+
+    // Responsive sizing
+    final avatarSize = _getResponsiveSize(context, 56.0);
+    final titleFontSize = _getResponsiveSize(context, 16.0);
+    final subtitleFontSize = _getResponsiveSize(context, 14.0);
+    final padding = _getResponsivePadding(context, 12.0);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: _getResponsivePadding(context, 12.0)),
       color: isCurrentUser ? Colors.green[900] : Colors.grey[850],
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -603,15 +727,15 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             : BorderSide.none,
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
+        contentPadding: EdgeInsets.all(padding),
         leading: (() {
           final avatar = entry['avatarUrl'] as String?;
           if (avatar != null && avatar.isNotEmpty) {
             return Stack(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: avatarSize,
+                  height: avatarSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white24, width: 1),
@@ -622,7 +746,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
                         color: Colors.grey[800],
-                        child: const Center(
+                        child: Center(
                           child: SizedBox(
                             width: 20,
                             height: 20,
@@ -643,8 +767,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   bottom: 0,
                   right: 0,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.75),
                       borderRadius: BorderRadius.circular(4),
@@ -663,7 +786,7 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       '#$position',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: _getResponsiveSize(context, 10.0),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -679,8 +802,8 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
             Expanded(
               child: Text(
                 entry['artistName'] ?? 'Unknown Artist',
-                style: const TextStyle(
-                  fontSize: 16,
+                style: TextStyle(
+                  fontSize: titleFontSize,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -688,38 +811,63 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            // Trending indicator for weekly charts
+            if (_selectedPeriod == 'weekly' && lastWeekPosition != null)
+              _buildTrendingIndicator(movement, lastWeekPosition),
           ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              () {
-                final songCount =
-                    entry['songCount'] ?? entry['releasedSongs'] ?? 0;
-                final fanbase = entry['fanbase'] ?? 0;
-
-                // Only show fans if > 0
-                if (fanbase > 0) {
-                  return '$songCount songs • ${_chartService.formatStreams(fanbase)} fans';
-                } else {
-                  return '$songCount songs';
-                }
-              }(),
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_chartService.formatStreams(entry['streams'] ?? entry['periodStreams'] ?? 0)} streams ($_selectedPeriod)',
+              '${entry['songCount'] ?? 0} ${(entry['songCount'] ?? 0) == 1 ? 'song' : 'songs'}',
               style: TextStyle(
-                color: _getStreamColor(),
-                fontWeight: FontWeight.bold,
+                color: Colors.white70,
+                fontSize: subtitleFontSize,
               ),
             ),
+            SizedBox(height: 4),
+            Row(
+              children: [
+                Text(
+                  '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams',
+                  style: TextStyle(
+                    color: _getStreamColor(),
+                    fontWeight: FontWeight.bold,
+                    fontSize: _getResponsiveSize(context, 12.0),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: _getResponsiveSize(context, 11.0),
+                  ),
+                ),
+              ],
+            ),
+            // Weeks on chart (for weekly charts only)
+            if (_selectedPeriod == 'weekly' && weeksOnChart > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  weeksOnChart == 1
+                      ? 'New Entry'
+                      : '$weeksOnChart weeks on chart',
+                  style: TextStyle(
+                    color: weeksOnChart == 1 ? Colors.green : Colors.cyan,
+                    fontSize: _getResponsiveSize(context, 10.0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
           ],
         ),
-        trailing:
-            isCurrentUser ? const Icon(Icons.star, color: Colors.amber) : null,
+        trailing: isCurrentUser
+            ? Icon(Icons.star,
+                color: Colors.amber, size: _getResponsiveSize(context, 24.0))
+            : null,
       ),
     );
   }

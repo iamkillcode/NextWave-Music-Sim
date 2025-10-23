@@ -130,7 +130,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(height: 24),
 
             // Stream Analytics & Debugging Section
-            _buildSectionHeader('Stream Analytics & Debugging', Icons.trending_up),
+            _buildSectionHeader(
+                'Stream Analytics & Debugging', Icons.trending_up),
             _buildStreamAnalyticsCard(),
             const SizedBox(height: 24),
 
@@ -2988,13 +2989,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
               final playerId = playerIdController.text.trim();
               final songId = songIdController.text.trim();
-              
+
               if (playerId.isEmpty || songId.isEmpty) {
                 _showError('Error', 'Please enter both Player ID and Song ID');
                 return;
@@ -3019,8 +3021,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     try {
       // Fetch player data
-      final playerDoc = await _firestore.collection('players').doc(playerId).get();
-      
+      final playerDoc =
+          await _firestore.collection('players').doc(playerId).get();
+
       if (!playerDoc.exists) {
         _safePopNavigator();
         _showError('Error', 'Player not found');
@@ -3029,7 +3032,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       final playerData = playerDoc.data()!;
       final songs = List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
-      
+
       // Find the specific song
       final song = songs.firstWhere(
         (s) => s['id'] == songId,
@@ -3149,7 +3152,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close', style: TextStyle(color: Color(0xFF00D9FF))),
+              child: const Text('Close',
+                  style: TextStyle(color: Color(0xFF00D9FF))),
             ),
           ],
         ),
@@ -3175,31 +3179,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         const SizedBox(height: 8),
         ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(bottom: 4, left: 8),
-          child: Text(
-            item,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              height: 1.4,
-            ),
-          ),
-        )),
+              padding: const EdgeInsets.only(bottom: 4, left: 8),
+              child: Text(
+                item,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            )),
       ],
     );
   }
 
-  String _calculateEstimatedStreams(Map<String, dynamic> song, Map<String, dynamic> playerData) {
+  String _calculateEstimatedStreams(
+      Map<String, dynamic> song, Map<String, dynamic> playerData) {
     try {
       final currentStreams = (song['lastDayStreams'] ?? 0) as int;
       final quality = (song['quality'] ?? 50) as int;
       final fame = (playerData['fame'] ?? 0) as int;
-      
+
       // Simplified estimation
       final growthFactor = 1 + (quality / 200.0);
       final fameFactor = 1 + (fame / 1000.0);
       final estimated = (currentStreams * growthFactor * fameFactor).round();
-      
+
       return '~${estimated.toString()} streams (${((growthFactor - 1) * 100).toStringAsFixed(1)}% growth)';
     } catch (e) {
       return 'Unable to calculate (missing data)';
@@ -3211,13 +3216,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     try {
       final playersSnapshot = await _firestore.collection('players').get();
-      
+
       List<Map<String, dynamic>> allSongs = [];
-      
+
       for (var doc in playersSnapshot.docs) {
         final playerData = doc.data();
-        final songs = List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
-        
+        final songs =
+            List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
+
         for (var song in songs) {
           if (song['state'] == 'released') {
             allSongs.add({
@@ -3233,12 +3239,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           }
         }
       }
-      
+
       // Sort by last day streams
-      allSongs.sort((a, b) => (b['lastDayStreams'] as int).compareTo(a['lastDayStreams'] as int));
-      
+      allSongs.sort((a, b) =>
+          (b['lastDayStreams'] as int).compareTo(a['lastDayStreams'] as int));
+
       final topSongs = allSongs.take(20).toList();
-      
+
       _safePopNavigator();
 
       showDialog(
@@ -3269,9 +3276,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     color: const Color(0xFF0D1117),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: index < 3 
-                        ? const Color(0xFF00D9FF).withOpacity(0.5)
-                        : Colors.white10,
+                      color: index < 3
+                          ? const Color(0xFF00D9FF).withOpacity(0.5)
+                          : Colors.white10,
                     ),
                   ),
                   child: Row(
@@ -3280,18 +3287,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: index < 3 
-                            ? const Color(0xFF00D9FF).withOpacity(0.2)
-                            : Colors.white10,
+                          color: index < 3
+                              ? const Color(0xFF00D9FF).withOpacity(0.2)
+                              : Colors.white10,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Center(
                           child: Text(
                             '${index + 1}',
                             style: TextStyle(
-                              color: index < 3 
-                                ? const Color(0xFF00D9FF)
-                                : Colors.white60,
+                              color: index < 3
+                                  ? const Color(0xFF00D9FF)
+                                  : Colors.white60,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -3344,10 +3351,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white60, size: 20),
+                        icon: const Icon(Icons.search,
+                            color: Colors.white60, size: 20),
                         onPressed: () {
                           Navigator.pop(context);
-                          _analyzeStreamCalculation(song['playerId'], song['songId']);
+                          _analyzeStreamCalculation(
+                              song['playerId'], song['songId']);
                         },
                         tooltip: 'Analyze',
                       ),
@@ -3360,7 +3369,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close', style: TextStyle(color: Color(0xFF00D9FF))),
+              child: const Text('Close',
+                  style: TextStyle(color: Color(0xFF00D9FF))),
             ),
           ],
         ),
@@ -3425,12 +3435,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white60)),
           ),
           ElevatedButton(
             onPressed: () async {
               final playerId = playerIdController.text.trim();
-              
+
               if (playerId.isEmpty) {
                 _showError('Error', 'Please enter a Player ID');
                 return;
@@ -3454,8 +3465,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _showLoadingDialog('Loading player songs...');
 
     try {
-      final playerDoc = await _firestore.collection('players').doc(playerId).get();
-      
+      final playerDoc =
+          await _firestore.collection('players').doc(playerId).get();
+
       if (!playerDoc.exists) {
         _safePopNavigator();
         _showError('Error', 'Player not found');
@@ -3464,13 +3476,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       final playerData = playerDoc.data()!;
       final songs = List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
-      
+
       // Sort by streams
       songs.sort((a, b) => (b['streams'] ?? 0).compareTo(a['streams'] ?? 0));
-      
-      final totalStreams = songs.fold<int>(0, (sum, song) => sum + ((song['streams'] ?? 0) as int));
+
+      final totalStreams = songs.fold<int>(
+          0, (sum, song) => sum + ((song['streams'] ?? 0) as int));
       final releasedSongs = songs.where((s) => s['state'] == 'released').length;
-      
+
       _safePopNavigator();
 
       showDialog(
@@ -3507,17 +3520,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildPlayerStat('Songs', songs.length.toString()),
-                          _buildPlayerStat('Released', releasedSongs.toString()),
-                          _buildPlayerStat('Total Streams', totalStreams.toString()),
+                          _buildPlayerStat(
+                              'Released', releasedSongs.toString()),
+                          _buildPlayerStat(
+                              'Total Streams', totalStreams.toString()),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildPlayerStat('Fame', playerData['fame']?.toString() ?? '0'),
-                          _buildPlayerStat('Fanbase', playerData['fanbase']?.toString() ?? '0'),
-                          _buildPlayerStat('Money', '\$${playerData['currentMoney']?.toString() ?? '0'}'),
+                          _buildPlayerStat(
+                              'Fame', playerData['fame']?.toString() ?? '0'),
+                          _buildPlayerStat('Fanbase',
+                              playerData['fanbase']?.toString() ?? '0'),
+                          _buildPlayerStat('Money',
+                              '\$${playerData['currentMoney']?.toString() ?? '0'}'),
                         ],
                       ),
                     ],
@@ -3540,7 +3558,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     itemBuilder: (context, index) {
                       final song = songs[index];
                       final isReleased = song['state'] == 'released';
-                      
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
@@ -3548,9 +3566,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           color: const Color(0xFF0D1117),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isReleased 
-                              ? Colors.green.withOpacity(0.3)
-                              : Colors.white10,
+                            color: isReleased
+                                ? Colors.green.withOpacity(0.3)
+                                : Colors.white10,
                           ),
                         ),
                         child: Row(
@@ -3590,10 +3608,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                             if (isReleased)
                               IconButton(
-                                icon: const Icon(Icons.analytics, color: Colors.white60, size: 20),
+                                icon: const Icon(Icons.analytics,
+                                    color: Colors.white60, size: 20),
                                 onPressed: () {
                                   Navigator.pop(context);
-                                  _analyzeStreamCalculation(playerId, song['id']);
+                                  _analyzeStreamCalculation(
+                                      playerId, song['id']);
                                 },
                                 tooltip: 'Analyze',
                               ),
@@ -3609,7 +3629,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close', style: TextStyle(color: Color(0xFF00D9FF))),
+              child: const Text('Close',
+                  style: TextStyle(color: Color(0xFF00D9FF))),
             ),
           ],
         ),
