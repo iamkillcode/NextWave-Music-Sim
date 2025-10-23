@@ -695,9 +695,10 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
           children: [
             Text(
               () {
-                final songCount = entry['songCount'] ?? entry['releasedSongs'] ?? 0;
+                final songCount =
+                    entry['songCount'] ?? entry['releasedSongs'] ?? 0;
                 final fanbase = entry['fanbase'] ?? 0;
-                
+
                 // Only show fans if > 0
                 if (fanbase > 0) {
                   return '$songCount songs • ${_chartService.formatStreams(fanbase)} fans';

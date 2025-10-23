@@ -1758,7 +1758,8 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
           case 'songwritingSkill':
           case 'lyricsSkill':
           case 'compositionSkill':
-            if (!validateStatChange(oldValue, newValue, stat, 10)) {
+            // Allow up to 30 points per save (accounts for practice sessions, writing multiple songs, daily progression)
+            if (!validateStatChange(oldValue, newValue, stat, 30)) {
               throw new functions.https.HttpsError('invalid-argument', `Invalid skill change`);
             }
             validatedUpdates[stat] = Math.max(0, Math.min(100, newValue));
