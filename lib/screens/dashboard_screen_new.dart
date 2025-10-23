@@ -1212,10 +1212,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // GUARANTEED ENERGY RESTORATION - Direct implementation
             // Energies below 100 restore to 100, energies 100+ stay the same
             final int currentEnergy = artistStats.energy;
-            final int restoredEnergy = currentEnergy < 100 ? 100 : currentEnergy;
+            final int restoredEnergy =
+                currentEnergy < 100 ? 100 : currentEnergy;
 
-            print(
-                '🔋 Energy restoration: $currentEnergy → $restoredEnergy');
+            print('🔋 Energy restoration: $currentEnergy → $restoredEnergy');
 
             artistStats = artistStats.copyWith(
               energy: restoredEnergy,

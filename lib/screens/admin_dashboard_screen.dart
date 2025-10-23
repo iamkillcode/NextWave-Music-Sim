@@ -129,6 +129,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _buildQuickActionsCard(),
             const SizedBox(height: 24),
 
+            // Stream Analytics & Debugging Section
+            _buildSectionHeader('Stream Analytics & Debugging', Icons.trending_up),
+            _buildStreamAnalyticsCard(),
+            const SizedBox(height: 24),
+
             // Admin Management Section
             _buildSectionHeader(
                 'Admin Management', Icons.supervised_user_circle),
@@ -433,6 +438,68 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStreamAnalyticsCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF00D9FF).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.trending_up, color: Color(0xFF00D9FF)),
+              const SizedBox(width: 8),
+              const Text(
+                'Real-Time Stream Debugger',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Enter a song ID to see real-time stream calculations and debug why it\'s getting specific stream counts.',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildActionButton(
+            icon: Icons.search,
+            label: 'Debug Song Streams',
+            description: 'Analyze stream calculation for any song',
+            color: const Color(0xFF00D9FF),
+            onPressed: _showStreamDebugDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.analytics,
+            label: 'View Top Streaming Songs',
+            description: 'See songs with highest daily streams',
+            color: Colors.purple,
+            onPressed: _showTopStreamingSongs,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.person,
+            label: 'Debug Player Streams',
+            description: 'View all streams for a specific player',
+            color: Colors.green,
+            onPressed: _showPlayerStreamsDebug,
+          ),
+        ],
       ),
     );
   }
@@ -2833,6 +2900,749 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
+
+  // ════════════════════════════════════════════════════════════════
+  // 📊 STREAM ANALYTICS & DEBUGGING METHODS
+  // ════════════════════════════════════════════════════════════════
+
+  Future<void> _showStreamDebugDialog() async {
+    final TextEditingController songIdController = TextEditingController();
+    final TextEditingController playerIdController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: Row(
+          children: [
+            const Icon(Icons.search, color: Color(0xFF00D9FF)),
+            const SizedBox(width: 8),
+            const Text(
+              'Debug Song Streams',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter song and player details to see real-time stream calculations:',
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: playerIdController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Player ID (User ID)',
+                  labelStyle: const TextStyle(color: Colors.white60),
+                  hintText: 'Enter player/user ID',
+                  hintStyle: const TextStyle(color: Colors.white30),
+                  filled: true,
+                  fillColor: const Color(0xFF0D1117),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white10),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: songIdController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Song ID',
+                  labelStyle: const TextStyle(color: Colors.white60),
+                  hintText: 'Enter song ID to analyze',
+                  hintStyle: const TextStyle(color: Colors.white30),
+                  filled: true,
+                  fillColor: const Color(0xFF0D1117),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white10),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final playerId = playerIdController.text.trim();
+              final songId = songIdController.text.trim();
+              
+              if (playerId.isEmpty || songId.isEmpty) {
+                _showError('Error', 'Please enter both Player ID and Song ID');
+                return;
+              }
+
+              Navigator.pop(context);
+              await _analyzeStreamCalculation(playerId, songId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00D9FF),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Analyze'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _analyzeStreamCalculation(String playerId, String songId) async {
+    _showLoadingDialog('Analyzing stream calculation...');
+
+    try {
+      // Fetch player data
+      final playerDoc = await _firestore.collection('players').doc(playerId).get();
+      
+      if (!playerDoc.exists) {
+        _safePopNavigator();
+        _showError('Error', 'Player not found');
+        return;
+      }
+
+      final playerData = playerDoc.data()!;
+      final songs = List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
+      
+      // Find the specific song
+      final song = songs.firstWhere(
+        (s) => s['id'] == songId,
+        orElse: () => {},
+      );
+
+      if (song.isEmpty) {
+        _safePopNavigator();
+        _showError('Error', 'Song not found for this player');
+        return;
+      }
+
+      _safePopNavigator();
+
+      // Show detailed analysis dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: Row(
+            children: [
+              const Icon(Icons.analytics, color: Color(0xFF00D9FF)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Stream Analysis: ${song['title'] ?? 'Unknown'}',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildAnalysisSection('📌 SONG DETAILS', [
+                  'Song ID: $songId',
+                  'Title: ${song['title'] ?? 'N/A'}',
+                  'Artist: ${playerData['artistName'] ?? 'Unknown'}',
+                  'Genre: ${song['genre'] ?? 'N/A'}',
+                  'State: ${song['state'] ?? 'N/A'}',
+                  'Release Date: ${song['releaseDate'] ?? 'Not released'}',
+                ]),
+                const SizedBox(height: 16),
+                _buildAnalysisSection('📊 CURRENT STREAM DATA', [
+                  'Total Streams: ${song['streams'] ?? 0}',
+                  'Last Day Streams: ${song['lastDayStreams'] ?? 0}',
+                  'Last 7 Days: ${song['last7DaysStreams'] ?? 0}',
+                  'Peak Daily: ${song['peakDailyStreams'] ?? 0}',
+                  'Days on Chart: ${song['daysOnChart'] ?? 0}',
+                ]),
+                const SizedBox(height: 16),
+                _buildAnalysisSection('🎯 QUALITY MULTIPLIERS', [
+                  'Quality Score: ${song['quality'] ?? 0}/100',
+                  'Creativity: ${song['creativity'] ?? 0}',
+                  'Songwriting Skill: ${playerData['songwritingSkill'] ?? 0}',
+                  'Lyrics Skill: ${playerData['lyricsSkill'] ?? 0}',
+                  'Composition Skill: ${playerData['compositionSkill'] ?? 0}',
+                ]),
+                const SizedBox(height: 16),
+                _buildAnalysisSection('🌟 FAME & PLATFORM', [
+                  'Artist Fame: ${playerData['fame'] ?? 0}',
+                  'Fanbase: ${playerData['fanbase'] ?? 0}',
+                  'Platform: ${song['platform'] ?? 'N/A'}',
+                  'Studio: ${song['studioUsed'] ?? 'N/A'}',
+                ]),
+                const SizedBox(height: 16),
+                _buildAnalysisSection('🔧 STREAM CALCULATION FORMULA', [
+                  'Base Streams = Fame × Quality × Platform Multiplier',
+                  'Daily Growth = Previous Streams × (1 + Quality/100)',
+                  'Decay Factor = Streams × 0.85 (if no new release)',
+                  '',
+                  '📌 Estimated Next Day Streams:',
+                  _calculateEstimatedStreams(song, playerData),
+                ]),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.lightbulb, color: Colors.amber, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'TIPS TO INCREASE STREAMS:',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '• Increase artist fame (EchoX posts, releases)\n'
+                        '• Improve song quality (better studio, skills)\n'
+                        '• Unlock better platforms (Tunify, Maple)\n'
+                        '• Release consistently to maintain momentum\n'
+                        '• Build fanbase through engagement',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF00D9FF))),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _safePopNavigator();
+      _showError('Error', 'Failed to analyze streams: $e');
+    }
+  }
+
+  Widget _buildAnalysisSection(String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF00D9FF),
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...items.map((item) => Padding(
+          padding: const EdgeInsets.only(bottom: 4, left: 8),
+          child: Text(
+            item,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        )),
+      ],
+    );
+  }
+
+  String _calculateEstimatedStreams(Map<String, dynamic> song, Map<String, dynamic> playerData) {
+    try {
+      final currentStreams = (song['lastDayStreams'] ?? 0) as int;
+      final quality = (song['quality'] ?? 50) as int;
+      final fame = (playerData['fame'] ?? 0) as int;
+      
+      // Simplified estimation
+      final growthFactor = 1 + (quality / 200.0);
+      final fameFactor = 1 + (fame / 1000.0);
+      final estimated = (currentStreams * growthFactor * fameFactor).round();
+      
+      return '~${estimated.toString()} streams (${((growthFactor - 1) * 100).toStringAsFixed(1)}% growth)';
+    } catch (e) {
+      return 'Unable to calculate (missing data)';
+    }
+  }
+
+  Future<void> _showTopStreamingSongs() async {
+    _showLoadingDialog('Loading top streaming songs...');
+
+    try {
+      final playersSnapshot = await _firestore.collection('players').get();
+      
+      List<Map<String, dynamic>> allSongs = [];
+      
+      for (var doc in playersSnapshot.docs) {
+        final playerData = doc.data();
+        final songs = List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
+        
+        for (var song in songs) {
+          if (song['state'] == 'released') {
+            allSongs.add({
+              'title': song['title'] ?? 'Unknown',
+              'artistName': playerData['artistName'] ?? 'Unknown',
+              'playerId': doc.id,
+              'songId': song['id'],
+              'streams': song['streams'] ?? 0,
+              'lastDayStreams': song['lastDayStreams'] ?? 0,
+              'genre': song['genre'] ?? 'Unknown',
+              'quality': song['quality'] ?? 0,
+            });
+          }
+        }
+      }
+      
+      // Sort by last day streams
+      allSongs.sort((a, b) => (b['lastDayStreams'] as int).compareTo(a['lastDayStreams'] as int));
+      
+      final topSongs = allSongs.take(20).toList();
+      
+      _safePopNavigator();
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: const Row(
+            children: [
+              Icon(Icons.analytics, color: Color(0xFF00D9FF)),
+              SizedBox(width: 8),
+              Text(
+                'Top 20 Streaming Songs',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: topSongs.length,
+              itemBuilder: (context, index) {
+                final song = topSongs[index];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D1117),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: index < 3 
+                        ? const Color(0xFF00D9FF).withOpacity(0.5)
+                        : Colors.white10,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: index < 3 
+                            ? const Color(0xFF00D9FF).withOpacity(0.2)
+                            : Colors.white10,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: index < 3 
+                                ? const Color(0xFF00D9FF)
+                                : Colors.white60,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song['title'],
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${song['artistName']} • ${song['genre']}',
+                              style: const TextStyle(
+                                color: Colors.white60,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${song['lastDayStreams']}',
+                            style: const TextStyle(
+                              color: Color(0xFF00D9FF),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Text(
+                            'daily streams',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.search, color: Colors.white60, size: 20),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _analyzeStreamCalculation(song['playerId'], song['songId']);
+                        },
+                        tooltip: 'Analyze',
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF00D9FF))),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _safePopNavigator();
+      _showError('Error', 'Failed to load top songs: $e');
+    }
+  }
+
+  Future<void> _showPlayerStreamsDebug() async {
+    final TextEditingController playerIdController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Row(
+          children: [
+            Icon(Icons.person, color: Color(0xFF00D9FF)),
+            SizedBox(width: 8),
+            Text(
+              'Debug Player Streams',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter a player ID to view all their songs and stream data:',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: playerIdController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Player ID',
+                labelStyle: const TextStyle(color: Colors.white60),
+                hintText: 'Enter player/user ID',
+                hintStyle: const TextStyle(color: Colors.white30),
+                filled: true,
+                fillColor: const Color(0xFF0D1117),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.white10),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.white10),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFF00D9FF)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final playerId = playerIdController.text.trim();
+              
+              if (playerId.isEmpty) {
+                _showError('Error', 'Please enter a Player ID');
+                return;
+              }
+
+              Navigator.pop(context);
+              await _showPlayerSongsAnalysis(playerId);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00D9FF),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('View'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPlayerSongsAnalysis(String playerId) async {
+    _showLoadingDialog('Loading player songs...');
+
+    try {
+      final playerDoc = await _firestore.collection('players').doc(playerId).get();
+      
+      if (!playerDoc.exists) {
+        _safePopNavigator();
+        _showError('Error', 'Player not found');
+        return;
+      }
+
+      final playerData = playerDoc.data()!;
+      final songs = List<Map<String, dynamic>>.from(playerData['songs'] ?? []);
+      
+      // Sort by streams
+      songs.sort((a, b) => (b['streams'] ?? 0).compareTo(a['streams'] ?? 0));
+      
+      final totalStreams = songs.fold<int>(0, (sum, song) => sum + ((song['streams'] ?? 0) as int));
+      final releasedSongs = songs.where((s) => s['state'] == 'released').length;
+      
+      _safePopNavigator();
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: Row(
+            children: [
+              const Icon(Icons.person, color: Color(0xFF00D9FF)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${playerData['artistName'] ?? 'Unknown Artist'}',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00D9FF).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildPlayerStat('Songs', songs.length.toString()),
+                          _buildPlayerStat('Released', releasedSongs.toString()),
+                          _buildPlayerStat('Total Streams', totalStreams.toString()),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildPlayerStat('Fame', playerData['fame']?.toString() ?? '0'),
+                          _buildPlayerStat('Fanbase', playerData['fanbase']?.toString() ?? '0'),
+                          _buildPlayerStat('Money', '\$${playerData['currentMoney']?.toString() ?? '0'}'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'SONGS:',
+                  style: TextStyle(
+                    color: Color(0xFF00D9FF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: songs.length,
+                    itemBuilder: (context, index) {
+                      final song = songs[index];
+                      final isReleased = song['state'] == 'released';
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0D1117),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isReleased 
+                              ? Colors.green.withOpacity(0.3)
+                              : Colors.white10,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    song['title'] ?? 'Untitled',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${song['genre'] ?? 'Unknown'} • Q${song['quality'] ?? 0}',
+                                    style: const TextStyle(
+                                      color: Colors.white60,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  if (isReleased) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${song['streams'] ?? 0} streams (${song['lastDayStreams'] ?? 0}/day)',
+                                      style: const TextStyle(
+                                        color: Color(0xFF00D9FF),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (isReleased)
+                              IconButton(
+                                icon: const Icon(Icons.analytics, color: Colors.white60, size: 20),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _analyzeStreamCalculation(playerId, song['id']);
+                                },
+                                tooltip: 'Analyze',
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF00D9FF))),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _safePopNavigator();
+      _showError('Error', 'Failed to load player data: $e');
+    }
+  }
+
+  Widget _buildPlayerStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white60,
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
