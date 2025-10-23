@@ -1211,16 +1211,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
 
-            // Use Remote Config for energy restoration
+            // Use Remote Config for energy restoration with safe fallback
             final int energyRestoreAmount = _remoteConfig.energyRestoreAmount;
             final bool enableFix = _remoteConfig.enableEnergyRestoreFix;
 
-            // Apply energy restoration based on Remote Config
+            // CRITICAL: Always restore energy to at least 100 per day
+            // Remote Config allows adjustment but ensures minimum restoration
             final restoredEnergy = enableFix
                 ? (artistStats.energy < energyRestoreAmount
                     ? energyRestoreAmount
                     : artistStats.energy)
-                : 100; // Legacy behavior if fix is disabled
+                : 100; // Always restore to 100 minimum
+
+            print('🔋 Energy restoration: ${artistStats.energy} → $restoredEnergy (fix: $enableFix, amount: $energyRestoreAmount)');
 
             artistStats = artistStats.copyWith(
               energy: restoredEnergy,
