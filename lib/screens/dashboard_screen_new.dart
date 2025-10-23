@@ -30,7 +30,6 @@ import 'unified_charts_screen.dart';
 import '../services/notification_service.dart';
 import 'dart:ui';
 import '../widgets/glassmorphic_bottom_nav.dart';
-import '../services/remote_config_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final dynamic initialStats;
@@ -66,7 +65,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final StreamGrowthService _streamGrowthService = StreamGrowthService();
   final SideHustleService _sideHustleService = SideHustleService();
   final NotificationService _notificationService = NotificationService();
-  final RemoteConfigService _remoteConfig = RemoteConfigService();
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
   int _unreadNotificationCount = 0; // Track unread notification count
   String _timeUntilNextDay = ''; // Formatted time until next day
@@ -1211,19 +1209,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
 
-            // Use Remote Config for energy restoration with safe fallback
-            final int energyRestoreAmount = _remoteConfig.energyRestoreAmount;
-            final bool enableFix = _remoteConfig.enableEnergyRestoreFix;
+            // GUARANTEED ENERGY RESTORATION - Direct implementation
+            // Energies below 100 restore to 100, energies 100+ stay the same
+            final int currentEnergy = artistStats.energy;
+            final int restoredEnergy = currentEnergy < 100 ? 100 : currentEnergy;
 
-            // CRITICAL: Always restore energy to at least 100 per day
-            // Remote Config allows adjustment but ensures minimum restoration
-            final restoredEnergy = enableFix
-                ? (artistStats.energy < energyRestoreAmount
-                    ? energyRestoreAmount
-                    : artistStats.energy)
-                : 100; // Always restore to 100 minimum
-
-            print('🔋 Energy restoration: ${artistStats.energy} → $restoredEnergy (fix: $enableFix, amount: $energyRestoreAmount)');
+            print(
+                '🔋 Energy restoration: $currentEnergy → $restoredEnergy');
 
             artistStats = artistStats.copyWith(
               energy: restoredEnergy,
@@ -1232,9 +1224,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
 
           // Show appropriate message based on energy restoration
-          final energyRestoreAmount = _remoteConfig.energyRestoreAmount;
-          if (artistStats.energy < energyRestoreAmount) {
-            _showMessage('☀️ New day! Energy restored to $energyRestoreAmount');
+          if (artistStats.energy < 100) {
+            _showMessage('☀️ New day! Energy restored to 100');
           } else {
             _showMessage(
                 '☀️ New day! You still have ${artistStats.energy} energy');
