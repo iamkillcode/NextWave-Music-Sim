@@ -408,14 +408,29 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
     }
     
     if (songs.length === 0) {
-      // If no songs but side hustle expired, still return update
-      if (sideHustleExpired) {
-        return {
-          currentSideHustle: null,
-          sideHustlePaymentPerDay: 0,
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-        };
+      // Even without songs, restore energy and check side hustle
+      const updates = {};
+      
+      // ✅ ENERGY RESTORATION - Always restore energy, even without songs
+      const currentEnergy = playerData.energy || 100;
+      if (currentEnergy < 100) {
+        updates.energy = 100;
+        console.log(`🔋 ${playerData.displayName || playerId}: Energy restored ${currentEnergy} → 100 (no songs)`);
       }
+      
+      // Check side hustle expiration
+      if (sideHustleExpired) {
+        updates.currentSideHustle = null;
+        updates.sideHustlePaymentPerDay = 0;
+        console.log(`✅ Terminated expired side hustle for ${playerData.displayName || playerId} (no songs)`);
+      }
+      
+      // Only return updates if there's something to update
+      if (Object.keys(updates).length > 0) {
+        updates.lastUpdated = admin.firestore.FieldValue.serverTimestamp();
+        return updates;
+      }
+      
       return null;
     }
     
@@ -590,6 +605,13 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         if (famePenalty > 0) {
           console.log(`⚠️ ${playerData.displayName || playerId}: -${famePenalty} fame (inactivity)`);
         }
+      }
+      
+      // ✅ ENERGY RESTORATION - Restore energy to 100 if below 100
+      const currentEnergy = playerData.energy || 100;
+      if (currentEnergy < 100) {
+        updates.energy = 100;
+        console.log(`🔋 ${playerData.displayName || playerId}: Energy restored ${currentEnergy} → 100`);
       }
       
       // ✅ Terminate side hustle contract if expired

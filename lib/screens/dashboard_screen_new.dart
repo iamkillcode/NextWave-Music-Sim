@@ -48,6 +48,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _countdownTimer; // Timer for next day countdown
   Timer? _saveDebounceTimer; // Timer for debouncing saves
   Timer? _multiplayerStatsTimer; // Timer for multiplayer stats updates
+  DateTime?
+      _lastLocalUpdate; // Track recent local stat changes to prevent overwrites
   StreamSubscription<DocumentSnapshot>?
       _playerDataSubscription; // Real-time player data listener
   StreamSubscription<QuerySnapshot>?
@@ -88,7 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       artistStats = widget.initialStats as ArtistStats;
     } else {
       artistStats = ArtistStats(
-        name: "Loading...",
+        name: 'Loading...',
         fame: 0,
         money:
             5000, // Starting money - enough to get started with side hustles!
@@ -124,6 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Date-only system: Check for day changes every 5 minutes (much more efficient!)
     gameTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      print('⏰ Timer tick: Running _updateGameDate() check...');
       _updateGameDate();
     });
 
@@ -452,7 +455,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             name: data['displayName'] ?? 'Unknown Artist',
             fame: safeParseInt(data['currentFame'], fallback: 0),
             money: safeParseInt(data['currentMoney'], fallback: 5000),
-            energy: 100, // Always start with full energy
+            energy: safeParseInt(data['energy'],
+                fallback: 100), // Load actual energy from Firebase
             creativity: safeParseInt(data['inspirationLevel'], fallback: 0),
             fanbase: math.max(100,
                 safeParseInt(data['fanbase'] ?? data['level'], fallback: 100)),
@@ -550,6 +554,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .listen(
       (snapshot) async {
         if (!snapshot.exists || !mounted) return;
+
+        // Guard against overwriting recent local changes
+        if (_lastLocalUpdate != null &&
+            DateTime.now().difference(_lastLocalUpdate!) <
+                const Duration(seconds: 2)) {
+          print('⏸️ Ignoring stale Firebase update (local change pending)');
+          return;
+        }
 
         final data = snapshot.data()!;
         print('📡 Real-time update received for player stats');
@@ -1033,6 +1045,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _saveUserProfile();
   }
 
+  /// Immediate update for money/energy changes
+  /// Bypasses Cloud Function for faster updates and prevents real-time listener race conditions
+  Future<void> _immediateStatUpdate({
+    int? money,
+    int? energy,
+    String? context,
+  }) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final updates = <String, dynamic>{};
+      if (money != null) updates['currentMoney'] = money;
+      if (energy != null) updates['energy'] = energy;
+
+      if (updates.isEmpty) return;
+
+      // Mark that we just made a local update
+      _lastLocalUpdate = DateTime.now();
+
+      print('💾 Immediate stat update (${context ?? 'unknown'}): $updates');
+
+      await FirebaseFirestore.instance
+          .collection('players')
+          .doc(user.uid)
+          .update(updates);
+
+      print('✅ Stats saved immediately to Firebase');
+    } catch (e) {
+      print('❌ Error saving stats immediately: $e');
+    }
+  }
+
   // === PENDING PRACTICE MANAGEMENT ===
 
   /// Load pending practices from Firestore
@@ -1168,6 +1213,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Get the current game date from Firebase (date-only, no time component)
       final newGameDate = await _gameTimeService.getCurrentGameDate();
 
+      // 🔍 DEBUG: Log EVERY check to see what's happening
+      print('⏰ Timer fired: Checking for day change...');
+      print(
+          '   Current stored date: ${currentGameDate!.day}/${currentGameDate!.month}/${currentGameDate!.year}');
+      print(
+          '   New calculated date: ${newGameDate.day}/${newGameDate.month}/${newGameDate.year}');
+      print('   Days match: ${newGameDate.day == currentGameDate!.day}');
+      print('   Months match: ${newGameDate.month == currentGameDate!.month}');
+      print('   Years match: ${newGameDate.year == currentGameDate!.year}');
+
       // Check again if still mounted after async operation
       if (!mounted) return;
 
@@ -1179,9 +1234,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           '🌅 Day changed! Old: ${currentGameDate!.day} → New: ${newGameDate.day}',
         );
 
-        // ✅ RELOAD stats from Firebase (Cloud Function has updated streams/money/fanbase/fame)
-        print('🔄 Reloading player stats from server...');
-        await _loadUserProfile();
+        // Note: We DON'T reload the full profile here because:
+        // 1. Cloud Functions update streams/money/fame in Firebase
+        // 2. Real-time listener will pick those up automatically
+        // 3. We need to preserve current local state for energy restoration
+        // 4. Full reload would overwrite the energy we're about to restore
+
+        print(
+            '💡 Skipping profile reload - real-time listener will sync stats');
+
+        // ❌ REMOVED: await _loadUserProfile();
+        // The real-time listener handles syncing Firebase changes automatically
+        // Reloading here causes race conditions with energy restoration
 
         // ❌ REMOVED: Client-side stream calculation (_applyDailyStreamGrowth)
         // ALL progression stats are now server-authoritative (full Option A implementation)
@@ -1205,17 +1269,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Replenish energy for the new day (only if still mounted)
         if (mounted) {
+          // GUARANTEED ENERGY RESTORATION - Direct implementation
+          // Energies below 100 restore to 100, energies 100+ stay the same
+          final int currentEnergy = artistStats.energy;
+          final int restoredEnergy = currentEnergy < 100 ? 100 : currentEnergy;
+
+          print('🔋 Energy restoration starting...');
+          print('   Current energy: $currentEnergy');
+          print('   Will restore to: $restoredEnergy');
+          print('   Restoration needed: ${currentEnergy < 100}');
+
+          // Mark this as a local update to prevent real-time listener from overwriting
+          _lastLocalUpdate = DateTime.now();
+          print('   Marked local update at: $_lastLocalUpdate');
+
           setState(() {
             currentGameDate = newGameDate;
             _lastEnergyReplenishDay = newGameDate.day;
-
-            // GUARANTEED ENERGY RESTORATION - Direct implementation
-            // Energies below 100 restore to 100, energies 100+ stay the same
-            final int currentEnergy = artistStats.energy;
-            final int restoredEnergy =
-                currentEnergy < 100 ? 100 : currentEnergy;
-
-            print('🔋 Energy restoration: $currentEnergy → $restoredEnergy');
 
             artistStats = artistStats.copyWith(
               energy: restoredEnergy,
@@ -1223,12 +1293,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
             );
           });
 
+          print('   ✅ State updated!');
+          print(
+              '   New currentGameDate: ${currentGameDate!.day}/${currentGameDate!.month}/${currentGameDate!.year}');
+          print('   Energy in artistStats: ${artistStats.energy}');
+
+          // Save restored energy to Firebase immediately
+          try {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              await FirebaseFirestore.instance
+                  .collection('players')
+                  .doc(user.uid)
+                  .update({'energy': restoredEnergy});
+              print('✅ Energy saved to Firebase: $restoredEnergy');
+            }
+          } catch (e) {
+            print('❌ Error saving energy to Firebase: $e');
+          }
+
           // Show appropriate message based on energy restoration
-          if (artistStats.energy < 100) {
+          if (currentEnergy < 100) {
             _showMessage('☀️ New day! Energy restored to 100');
           } else {
-            _showMessage(
-                '☀️ New day! You still have ${artistStats.energy} energy');
+            _showMessage('☀️ New day! You still have $restoredEnergy energy');
           }
 
           if (sideHustleExpired) {
@@ -1245,9 +1333,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icons.cloud_done,
           );
 
-          final energyMessage = artistStats.energy < 100
+          final energyMessage = currentEnergy < 100
               ? 'A new day has begun! Your energy has been restored to 100.'
-              : 'A new day has begun! Your current energy: ${artistStats.energy}';
+              : 'A new day has begun! Your current energy: $restoredEnergy';
 
           _addNotification(
             'Energy Update',
@@ -1442,7 +1530,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             children: [
               // Show loading banner if profile not loaded
-              if (artistStats.name == "Loading...")
+              if (artistStats.name == 'Loading...')
                 Container(
                   width: double.infinity,
                   padding:
@@ -2207,9 +2295,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             artistStats: artistStats,
                             onStatsUpdated: (updatedStats) {
                               setState(() {
+                                _lastLocalUpdate = DateTime.now();
                                 artistStats = updatedStats;
                               });
-                              _debouncedSave(); // ✅ Save after recording songs
+                              // Immediate save for money/energy changes
+                              _immediateStatUpdate(
+                                money: updatedStats.money,
+                                energy: updatedStats.energy,
+                                context: 'Studio',
+                              );
                             },
                           ),
                         ),
@@ -2230,9 +2324,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             artistStats: artistStats,
                             onStatsUpdated: (updatedStats) {
                               setState(() {
+                                _lastLocalUpdate = DateTime.now();
                                 artistStats = updatedStats;
                               });
-                              _debouncedSave(); // ✅ Save after releasing albums
+                              // Immediate save for money/energy changes
+                              _immediateStatUpdate(
+                                money: updatedStats.money,
+                                energy: updatedStats.energy,
+                                context: 'Release Manager',
+                              );
                             },
                           ),
                         ),
@@ -3020,15 +3120,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _getSongQualityRating(double quality) {
-    if (quality >= 90) return "Legendary";
-    if (quality >= 80) return "Masterpiece";
-    if (quality >= 70) return "Excellent";
-    if (quality >= 60) return "Great";
-    if (quality >= 50) return "Good";
-    if (quality >= 40) return "Decent";
-    if (quality >= 30) return "Average";
-    if (quality >= 20) return "Poor";
-    return "Terrible";
+    if (quality >= 90) return 'Legendary';
+    if (quality >= 80) return 'Masterpiece';
+    if (quality >= 70) return 'Excellent';
+    if (quality >= 60) return 'Great';
+    if (quality >= 50) return 'Good';
+    if (quality >= 40) return 'Decent';
+    if (quality >= 30) return 'Average';
+    if (quality >= 20) return 'Poor';
+    return 'Terrible';
   }
 
   void _createCustomSong(String title, String genre, int effort) {
@@ -3069,6 +3169,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     setState(() {
+      _lastLocalUpdate = DateTime.now();
       // Update main stats
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - energyCost,
@@ -3099,7 +3200,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     });
 
-    _debouncedSave(); // Save after writing song
+    // Immediate save for energy change
+    _immediateStatUpdate(
+      energy: artistStats.energy,
+      context: 'Write Song (-$energyCost⚡)',
+    );
 
     // Show success message with song details and skill gains
     final qualityText = _getSongQualityRating(songQuality);
@@ -3126,9 +3231,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 artistStats: artistStats,
                 onStatsUpdated: (updatedStats) {
                   setState(() {
+                    _lastLocalUpdate = DateTime.now();
                     artistStats = updatedStats;
                   });
-                  _debouncedSave(); // Save stats to Firestore (debounced)
+                  // Immediate save for money/energy changes (prevents real-time listener race condition)
+                  _immediateStatUpdate(
+                    money: updatedStats.money,
+                    energy: updatedStats.energy,
+                    context: 'Activity Hub',
+                  );
                 },
                 currentGameDate: currentGameDate ?? DateTime.now(),
                 pendingPractices: pendingPractices,

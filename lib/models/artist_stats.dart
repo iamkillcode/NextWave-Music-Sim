@@ -142,11 +142,11 @@ class ArtistStats {
   }
 
   /// Calculate current age based on career start and in-game time
-  /// 
+  ///
   /// This accounts for the passage of in-game years since career start.
   /// Example: If you start at 18 in Jan 2020, and it's now Jan 2025 (in-game),
   /// your character would be 23 years old.
-  /// 
+  ///
   /// IMPORTANT: careerStartDate must be set to the GAME-WORLD date, not real-world date!
   int getCurrentAge(DateTime currentGameDate) {
     if (careerStartDate == null) return age;
@@ -161,21 +161,21 @@ class ArtistStats {
         fame + (money / 100).round() + fanbase + (albumsSold * 10);
 
     // Exponential tier thresholds
-    if (totalPoints < 100) return "Street Busker"; // Tier 1
-    if (totalPoints < 300) return "Open Mic Regular"; // Tier 2
-    if (totalPoints < 600) return "Local Talent"; // Tier 3
-    if (totalPoints < 1000) return "Underground Artist"; // Tier 4
-    if (totalPoints < 1600) return "Rising Star"; // Tier 5
-    if (totalPoints < 2500) return "Breakthrough Act"; // Tier 6
-    if (totalPoints < 4000) return "Chart Regular"; // Tier 7
-    if (totalPoints < 6500) return "Radio Favorite"; // Tier 8
-    if (totalPoints < 10000) return "Platinum Artist"; // Tier 9
-    if (totalPoints < 15000) return "Award Winner"; // Tier 10
-    if (totalPoints < 22000) return "Global Star"; // Tier 11
-    if (totalPoints < 32000) return "Superstar"; // Tier 12
-    if (totalPoints < 45000) return "Icon"; // Tier 13
-    if (totalPoints < 65000) return "Living Legend"; // Tier 14
-    return "Hall of Fame"; // Tier 15
+    if (totalPoints < 100) return 'Street Busker'; // Tier 1
+    if (totalPoints < 300) return 'Open Mic Regular'; // Tier 2
+    if (totalPoints < 600) return 'Local Talent'; // Tier 3
+    if (totalPoints < 1000) return 'Underground Artist'; // Tier 4
+    if (totalPoints < 1600) return 'Rising Star'; // Tier 5
+    if (totalPoints < 2500) return 'Breakthrough Act'; // Tier 6
+    if (totalPoints < 4000) return 'Chart Regular'; // Tier 7
+    if (totalPoints < 6500) return 'Radio Favorite'; // Tier 8
+    if (totalPoints < 10000) return 'Platinum Artist'; // Tier 9
+    if (totalPoints < 15000) return 'Award Winner'; // Tier 10
+    if (totalPoints < 22000) return 'Global Star'; // Tier 11
+    if (totalPoints < 32000) return 'Superstar'; // Tier 12
+    if (totalPoints < 45000) return 'Icon'; // Tier 13
+    if (totalPoints < 65000) return 'Living Legend'; // Tier 14
+    return 'Hall of Fame'; // Tier 15
   }
 
   // Get career tier number (1-15)
@@ -202,10 +202,10 @@ class ArtistStats {
 
   // Get next career milestone
   String get nextMilestone {
-    if (albumsSold == 0) return "Release your first album!";
-    if (concertsPerformed < 5) return "Perform 5 concerts!";
-    if (fanbase < 100) return "Reach 100K fans!";
-    if (fame < 200) return "Become more famous!";
+    if (albumsSold == 0) return 'Release your first album!';
+    if (concertsPerformed < 5) return 'Perform 5 concerts!';
+    if (fanbase < 100) return 'Reach 100K fans!';
+    if (fame < 200) return 'Become more famous!';
     return "You're doing great! Keep growing!";
   }
 
@@ -268,13 +268,13 @@ class ArtistStats {
 
   /// Record label interest tier
   String get recordLabelInterest {
-    if (fame < 50) return "None";
-    if (fame < 100) return "Indie Labels Watching";
-    if (fame < 150) return "Small Label Interest";
-    if (fame < 200) return "Major Label Scouting";
-    if (fame < 300) return "Multiple Offers";
-    if (fame < 400) return "Bidding War";
-    return "Dream Contract Available";
+    if (fame < 50) return 'None';
+    if (fame < 100) return 'Indie Labels Watching';
+    if (fame < 150) return 'Small Label Interest';
+    if (fame < 200) return 'Major Label Scouting';
+    if (fame < 300) return 'Multiple Offers';
+    if (fame < 400) return 'Bidding War';
+    return 'Dream Contract Available';
   }
 
   /// Check if record labels are interested
@@ -304,16 +304,16 @@ class ArtistStats {
 
   /// Get fame tier name for UI display
   String get fameTier {
-    if (fame < 10) return "Unknown";
-    if (fame < 25) return "Local Scene";
-    if (fame < 50) return "City Famous";
-    if (fame < 100) return "Regional Star";
-    if (fame < 150) return "National Celebrity";
-    if (fame < 200) return "Chart Topper";
-    if (fame < 300) return "International Star";
-    if (fame < 400) return "Global Icon";
-    if (fame < 500) return "Living Legend";
-    return "Hall of Fame";
+    if (fame < 10) return 'Unknown';
+    if (fame < 25) return 'Local Scene';
+    if (fame < 50) return 'City Famous';
+    if (fame < 100) return 'Regional Star';
+    if (fame < 150) return 'National Celebrity';
+    if (fame < 200) return 'Chart Topper';
+    if (fame < 300) return 'International Star';
+    if (fame < 400) return 'Global Icon';
+    if (fame < 500) return 'Living Legend';
+    return 'Hall of Fame';
   }
 
   // Calculate song quality based on player skills and genre
@@ -469,15 +469,15 @@ class ArtistStats {
 
   // Get song quality rating text
   String getSongQualityRating(double quality) {
-    if (quality >= 90) return "Legendary";
-    if (quality >= 80) return "Masterpiece";
-    if (quality >= 70) return "Excellent";
-    if (quality >= 60) return "Great";
-    if (quality >= 50) return "Good";
-    if (quality >= 40) return "Decent";
-    if (quality >= 30) return "Average";
-    if (quality >= 20) return "Poor";
-    return "Terrible";
+    if (quality >= 90) return 'Legendary';
+    if (quality >= 80) return 'Masterpiece';
+    if (quality >= 70) return 'Excellent';
+    if (quality >= 60) return 'Great';
+    if (quality >= 50) return 'Good';
+    if (quality >= 40) return 'Decent';
+    if (quality >= 30) return 'Average';
+    if (quality >= 20) return 'Poor';
+    return 'Terrible';
   }
 
   // Calculate genre mastery gain from writing a song
@@ -509,15 +509,15 @@ class ArtistStats {
   // Get mastery level description
   String getGenreMasteryLevel(String genre) {
     int mastery = genreMastery[genre] ?? 0;
-    if (mastery >= 90) return "Master";
-    if (mastery >= 80) return "Expert";
-    if (mastery >= 70) return "Advanced";
-    if (mastery >= 60) return "Proficient";
-    if (mastery >= 50) return "Skilled";
-    if (mastery >= 40) return "Competent";
-    if (mastery >= 30) return "Intermediate";
-    if (mastery >= 20) return "Learning";
-    if (mastery >= 10) return "Novice";
-    return "Beginner";
+    if (mastery >= 90) return 'Master';
+    if (mastery >= 80) return 'Expert';
+    if (mastery >= 70) return 'Advanced';
+    if (mastery >= 60) return 'Proficient';
+    if (mastery >= 50) return 'Skilled';
+    if (mastery >= 40) return 'Competent';
+    if (mastery >= 30) return 'Intermediate';
+    if (mastery >= 20) return 'Learning';
+    if (mastery >= 10) return 'Novice';
+    return 'Beginner';
   }
 }

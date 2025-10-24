@@ -162,13 +162,13 @@ class Song {
       'streamingPlatforms': streamingPlatforms,
       'coverArtUrl': coverArtUrl,
       'viralityScore': viralityScore,
-  'peakDailyStreams': peakDailyStreams,
-  'daysOnChart': daysOnChart,
-  'lastDayStreams': lastDayStreams,
-  'last7DaysStreams': last7DaysStreams,
+      'peakDailyStreams': peakDailyStreams,
+      'daysOnChart': daysOnChart,
+      'lastDayStreams': lastDayStreams,
+      'last7DaysStreams': last7DaysStreams,
       'regionalStreams': regionalStreams,
       'isAlbum': isAlbum,
-  'lastStreamUpdateDate': lastStreamUpdateDate?.toIso8601String(),
+      'lastStreamUpdateDate': lastStreamUpdateDate?.toIso8601String(),
       'albumId': albumId,
       'releaseType': releaseType,
       'promoBuffer': promoBuffer,
@@ -182,7 +182,7 @@ class Song {
       id: json['id'] as String,
       title: json['title'] as String,
       genre: json['genre'] as String,
-  quality: safeParseInt(json['quality'], fallback: 0),
+      quality: safeParseInt(json['quality'], fallback: 0),
       createdDate: DateTime.parse(json['createdDate'] as String),
       state: SongState.values.firstWhere(
         (e) => e.name == json['state'],
@@ -195,8 +195,8 @@ class Song {
       releasedDate: json['releasedDate'] != null
           ? DateTime.parse(json['releasedDate'] as String)
           : null,
-  streams: safeParseInt(json['streams'], fallback: 0),
-  likes: safeParseInt(json['likes'], fallback: 0),
+      streams: safeParseInt(json['streams'], fallback: 0),
+      likes: safeParseInt(json['likes'], fallback: 0),
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? {}),
       coverArtStyle: json['coverArtStyle'] as String?,
       coverArtColor: json['coverArtColor'] as String?,
@@ -204,11 +204,11 @@ class Song {
         json['streamingPlatforms'] as List? ?? [],
       ),
       coverArtUrl: json['coverArtUrl'] as String?,
-  viralityScore: safeParseDouble(json['viralityScore'], fallback: 0.5),
-  peakDailyStreams: safeParseInt(json['peakDailyStreams'], fallback: 0),
-  daysOnChart: safeParseInt(json['daysOnChart'], fallback: 0),
-  lastDayStreams: safeParseInt(json['lastDayStreams'], fallback: 0),
-  last7DaysStreams: safeParseInt(json['last7DaysStreams'], fallback: 0),
+      viralityScore: safeParseDouble(json['viralityScore'], fallback: 0.5),
+      peakDailyStreams: safeParseInt(json['peakDailyStreams'], fallback: 0),
+      daysOnChart: safeParseInt(json['daysOnChart'], fallback: 0),
+      lastDayStreams: safeParseInt(json['lastDayStreams'], fallback: 0),
+      last7DaysStreams: safeParseInt(json['last7DaysStreams'], fallback: 0),
       isAlbum: json['isAlbum'] as bool? ?? false,
       lastStreamUpdateDate: json['lastStreamUpdateDate'] != null
           ? DateTime.parse(json['lastStreamUpdateDate'] as String)
@@ -280,15 +280,15 @@ class Song {
   // Get quality rating
   String get qualityRating {
     final q = finalQuality;
-    if (q >= 90) return "Legendary";
-    if (q >= 80) return "Masterpiece";
-    if (q >= 70) return "Excellent";
-    if (q >= 60) return "Great";
-    if (q >= 50) return "Good";
-    if (q >= 40) return "Decent";
-    if (q >= 30) return "Average";
-    if (q >= 20) return "Poor";
-    return "Terrible";
+    if (q >= 90) return 'Legendary';
+    if (q >= 80) return 'Masterpiece';
+    if (q >= 70) return 'Excellent';
+    if (q >= 60) return 'Great';
+    if (q >= 50) return 'Good';
+    if (q >= 40) return 'Decent';
+    if (q >= 30) return 'Average';
+    if (q >= 20) return 'Poor';
+    return 'Terrible';
   }
 
   // Calculate estimated streams based on quality and global population

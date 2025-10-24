@@ -10,9 +10,8 @@ class GameTimeService {
   /// Initialize the global game time system in Firestore
   Future<void> initializeGameTime() async {
     try {
-      final gameSettingsRef = _firestore
-          .collection('gameSettings')
-          .doc('globalTime');
+      final gameSettingsRef =
+          _firestore.collection('gameSettings').doc('globalTime');
       final doc = await gameSettingsRef.get();
 
       if (!doc.exists) {
@@ -46,24 +45,22 @@ class GameTimeService {
   /// Pure date-only system: 1 real hour = 1 game day
   Future<DateTime> getCurrentGameDate() async {
     try {
-      final gameSettingsRef = _firestore
-          .collection('gameSettings')
-          .doc('globalTime');
+      final gameSettingsRef =
+          _firestore.collection('gameSettings').doc('globalTime');
       final doc = await gameSettingsRef.get();
 
       if (doc.exists) {
         final data = doc.data()!;
-        final realWorldStartDate = (data['realWorldStartDate'] as Timestamp)
-            .toDate();
-        final gameWorldStartDate = (data['gameWorldStartDate'] as Timestamp)
-            .toDate();
+        final realWorldStartDate =
+            (data['realWorldStartDate'] as Timestamp).toDate();
+        final gameWorldStartDate =
+            (data['gameWorldStartDate'] as Timestamp).toDate();
         // hoursPerDay is now implicit: always 1 real hour = 1 game day
 
         // CRITICAL: Use Firebase server time, not device time
         // This ensures all users calculate from the exact same moment
-        final serverTimeRef = _firestore
-            .collection('serverTime')
-            .doc('current');
+        final serverTimeRef =
+            _firestore.collection('serverTime').doc('current');
         await serverTimeRef.set({'timestamp': FieldValue.serverTimestamp()});
         final serverTimeDoc = await serverTimeRef.get();
         final serverTimestamp =
@@ -88,6 +85,16 @@ class GameTimeService {
           calculatedDate.month,
           calculatedDate.day,
         );
+
+        // 🔍 DEBUG: Log the calculation
+        print('🕐 GameTimeService.getCurrentGameDate():');
+        print('   Real start: $realWorldStartDate');
+        print('   Game start: $gameWorldStartDate');
+        print('   Server now: $now');
+        print('   Hours elapsed: $realHoursElapsed');
+        print('   Game days elapsed: $gameDaysElapsed');
+        print(
+            '   Calculated game date: ${currentGameDate.day}/${currentGameDate.month}/${currentGameDate.year}');
 
         return currentGameDate;
       } else {

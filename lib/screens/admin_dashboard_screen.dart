@@ -65,6 +65,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final admins = await _adminService.getAdminList();
       final logs = await _adminService.getErrorLogs(limit: 10);
 
+      // Check if widget is still mounted before calling setState
+      if (!mounted) return;
+
       setState(() {
         _gameStats = stats;
         _admins = admins;

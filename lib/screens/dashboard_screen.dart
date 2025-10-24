@@ -19,7 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     // Initialize with starting stats for a new artist
     artistStats = ArtistStats(
-      name: "Manuel Gandalf",
+      name: 'Manuel Gandalf',
       fame: 20,
       money: 31600000, // $31.6M
       energy: 100,
@@ -64,9 +64,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         songsWritten: artistStats.songsWritten + 1,
         money: artistStats.money + 100,
       );
-      _showMessage("📝 You wrote an amazing song! +100 coins");
+      _showMessage('📝 You wrote an amazing song! +100 coins');
     } else {
-      _showMessage("❌ Not enough energy or creativity to write a song!");
+      _showMessage('❌ Not enough energy or creativity to write a song!');
     }
   }
 
@@ -80,14 +80,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         fanbase: artistStats.fanbase + 5,
         concertsPerformed: artistStats.concertsPerformed + 1,
       );
-      _showMessage("🎤 Amazing concert! +$earnings coins, +5 fans!");
+      _showMessage('🎤 Amazing concert! +$earnings coins, +5 fans!');
     } else {
-      _showMessage("❌ Not enough energy or fans for a concert!");
+      _showMessage('❌ Not enough energy or fans for a concert!');
     }
   }
 
   void _recordAlbum() {
-    if (artistStats.energy >= 50 && artistStats.money >= 500 && artistStats.songsWritten >= 5) {
+    if (artistStats.energy >= 50 &&
+        artistStats.money >= 500 &&
+        artistStats.songsWritten >= 5) {
       artistStats = artistStats.copyWith(
         energy: artistStats.energy - 50,
         money: artistStats.money - 500 + 2000,
@@ -95,9 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         fanbase: artistStats.fanbase + 20,
         albumsSold: artistStats.albumsSold + 1,
       );
-      _showMessage("💿 Album released! +1500 net coins, +20 fans!");
+      _showMessage('💿 Album released! +1500 net coins, +20 fans!');
     } else {
-      _showMessage("❌ Need more energy, money, or songs to record an album!");
+      _showMessage('❌ Need more energy, money, or songs to record an album!');
     }
   }
 
@@ -105,7 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     artistStats = artistStats.copyWith(
       energy: (artistStats.energy + 40).clamp(0, 100),
     );
-    _showMessage("😴 You feel refreshed! +40 energy");
+    _showMessage('😴 You feel refreshed! +40 energy');
   }
 
   void _practice() {
@@ -114,9 +116,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         energy: artistStats.energy - 15,
         creativity: artistStats.creativity + 20,
       );
-      _showMessage("🎸 Practice makes perfect! +20 creativity");
+      _showMessage('🎸 Practice makes perfect! +20 creativity');
     } else {
-      _showMessage("❌ Too tired to practice!");
+      _showMessage('❌ Too tired to practice!');
     }
   }
 
@@ -127,9 +129,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         fame: artistStats.fame + 10,
         fanbase: artistStats.fanbase + 8,
       );
-      _showMessage("📢 Great promotion! +10 fame, +8 fans");
+      _showMessage('📢 Great promotion! +10 fame, +8 fans');
     } else {
-      _showMessage("❌ Not enough money for promotion!");
+      _showMessage('❌ Not enough money for promotion!');
     }
   }
 
@@ -219,9 +221,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // Actions Section
             const Text(
               'What do you want to do?',
@@ -232,7 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Action Buttons Grid
             GridView.count(
               crossAxisCount: 2,
@@ -286,9 +288,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // Achievement Section
             Container(
               padding: const EdgeInsets.all(16),

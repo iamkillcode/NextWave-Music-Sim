@@ -42,16 +42,16 @@ class MultiplayerPlayer {
       displayName: data['displayName'] ?? '',
       email: data['email'] ?? '',
       gender: data['gender'] as String?,
-  totalStreams: safeParseInt(data['totalStreams'], fallback: 0),
-  totalLikes: safeParseInt(data['totalLikes'], fallback: 0),
-  songsPublished: safeParseInt(data['songsPublished'], fallback: 0),
-  currentMoney: safeParseInt(data['currentMoney'], fallback: 5000),
-  currentFame: safeParseInt(data['currentFame'], fallback: 0),
-  level: safeParseInt(data['level'], fallback: 1),
+      totalStreams: safeParseInt(data['totalStreams'], fallback: 0),
+      totalLikes: safeParseInt(data['totalLikes'], fallback: 0),
+      songsPublished: safeParseInt(data['songsPublished'], fallback: 0),
+      currentMoney: safeParseInt(data['currentMoney'], fallback: 5000),
+      currentFame: safeParseInt(data['currentFame'], fallback: 0),
+      level: safeParseInt(data['level'], fallback: 1),
       joinDate: (data['joinDate'] as Timestamp).toDate(),
       lastActive: (data['lastActive'] as Timestamp).toDate(),
-    achievements: Map<String, int>.from((data['achievements'] ?? {})
-      .map((k, v) => MapEntry(k.toString(), safeParseInt(v)))),
+      achievements: Map<String, int>.from((data['achievements'] ?? {})
+          .map((k, v) => MapEntry(k.toString(), safeParseInt(v)))),
       isOnline: data['isOnline'] ?? false,
     );
   }
@@ -116,12 +116,12 @@ class MultiplayerPlayer {
 
   // Get player rank based on performance
   String get rankTitle {
-    if (totalStreams > 1000000) return "Platinum Artist";
-    if (totalStreams > 500000) return "Gold Artist";
-    if (totalStreams > 100000) return "Rising Star";
-    if (totalStreams > 50000) return "Popular Artist";
-    if (totalStreams > 10000) return "Local Artist";
-    return "New Artist";
+    if (totalStreams > 1000000) return 'Platinum Artist';
+    if (totalStreams > 500000) return 'Gold Artist';
+    if (totalStreams > 100000) return 'Rising Star';
+    if (totalStreams > 50000) return 'Popular Artist';
+    if (totalStreams > 10000) return 'Local Artist';
+    return 'New Artist';
   }
 
   // Format money display

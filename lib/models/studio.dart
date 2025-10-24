@@ -11,12 +11,12 @@ enum StudioTier {
 }
 
 enum StudioAttitude {
-  welcoming,    // Eager to work with you
-  friendly,     // Happy to have you
-  neutral,      // Professional but distant
-  skeptical,    // Unsure about you
-  dismissive,   // Don't think you're ready
-  closed,       // Won't work with you
+  welcoming, // Eager to work with you
+  friendly, // Happy to have you
+  neutral, // Professional but distant
+  skeptical, // Unsure about you
+  dismissive, // Don't think you're ready
+  closed, // Won't work with you
 }
 
 class StudioRequirements {
@@ -78,17 +78,17 @@ class Studio {
 
   double getQualityBonus(String genre, bool useProducer) {
     double bonus = qualityRating / 100.0;
-    
+
     if (specialties.any((s) => s.toLowerCase() == genre.toLowerCase())) {
       bonus += 0.15;
     }
-    
+
     bonus += (reputation / 100.0) * 0.1;
-    
+
     if (useProducer && hasProducer) {
       bonus += (producerSkill / 100.0) * 0.2;
     }
-    
+
     return bonus.clamp(0.0, 1.0);
   }
 
@@ -96,7 +96,8 @@ class Studio {
   bool meetsRequirements(ArtistStats stats) {
     if (stats.fame < requirements.minFame) return false;
     if (stats.albumsSold < requirements.minAlbums) return false;
-    final releasedSongs = stats.songs.where((s) => s.state == SongState.released).length;
+    final releasedSongs =
+        stats.songs.where((s) => s.state == SongState.released).length;
     if (releasedSongs < requirements.minSongsReleased) return false;
     // TODO: Add label deal check when labels are implemented
     return true;
@@ -107,31 +108,40 @@ class Studio {
     // Budget studios are always welcoming
     if (tier == StudioTier.budget) return StudioAttitude.welcoming;
 
-    final releasedSongs = stats.songs.where((s) => s.state == SongState.released).length;
-    
+    final releasedSongs =
+        stats.songs.where((s) => s.state == SongState.released).length;
+
     // Calculate how well player matches studio expectations
-    final fameRatio = requirements.minFame > 0 ? stats.fame / requirements.minFame : stats.fame / 10.0;
-    final albumRatio = requirements.minAlbums > 0 ? stats.albumsSold / requirements.minAlbums : stats.albumsSold + 1.0;
-    final songRatio = requirements.minSongsReleased > 0 ? releasedSongs / requirements.minSongsReleased : releasedSongs + 1.0;
-    
+    final fameRatio = requirements.minFame > 0
+        ? stats.fame / requirements.minFame
+        : stats.fame / 10.0;
+    final albumRatio = requirements.minAlbums > 0
+        ? stats.albumsSold / requirements.minAlbums
+        : stats.albumsSold + 1.0;
+    final songRatio = requirements.minSongsReleased > 0
+        ? releasedSongs / requirements.minSongsReleased
+        : releasedSongs + 1.0;
+
     // Genre match bonus
     final genreMatch = stats.songs.any((s) => specialties.contains(s.genre));
     final genreBonus = genreMatch ? 0.3 : 0.0;
-    
+
     // Quality of work (average song quality)
-    final avgQuality = stats.songs.isNotEmpty 
-        ? stats.songs.map((s) => s.finalQuality).reduce((a, b) => a + b) / stats.songs.length 
+    final avgQuality = stats.songs.isNotEmpty
+        ? stats.songs.map((s) => s.finalQuality).reduce((a, b) => a + b) /
+            stats.songs.length
         : 50;
     final qualityBonus = (avgQuality - 50) / 100.0; // -0.5 to +0.5
-    
+
     // Overall score
-    final score = (fameRatio + albumRatio + songRatio) / 3.0 + genreBonus + qualityBonus;
-    
+    final score =
+        (fameRatio + albumRatio + songRatio) / 3.0 + genreBonus + qualityBonus;
+
     // Doesn't meet basic requirements
     if (!meetsRequirements(stats)) {
       return score < 0.3 ? StudioAttitude.closed : StudioAttitude.dismissive;
     }
-    
+
     // Determine attitude based on score
     if (score >= 2.0) return StudioAttitude.welcoming;
     if (score >= 1.5) return StudioAttitude.friendly;
@@ -148,7 +158,7 @@ class Studio {
       case StudioAttitude.friendly:
         return "😊 They're happy to have you here.";
       case StudioAttitude.neutral:
-        return "😐 Professional but not particularly impressed.";
+        return '😐 Professional but not particularly impressed.';
       case StudioAttitude.skeptical:
         return "🤨 They're unsure if you're ready for this level.";
       case StudioAttitude.dismissive:
@@ -177,9 +187,10 @@ class Studio {
   }
 
   // Apply attitude bonus/penalty to price
-  int getAdjustedPrice(bool useProducer, double regionMultiplier, StudioAttitude attitude) {
+  int getAdjustedPrice(
+      bool useProducer, double regionMultiplier, StudioAttitude attitude) {
     int baseCost = getTotalCost(useProducer, regionMultiplier);
-    
+
     switch (attitude) {
       case StudioAttitude.welcoming:
         return (baseCost * 0.9).round(); // 10% discount
@@ -222,7 +233,7 @@ class Studio {
   // Get connection benefit description
   String getConnectionBenefit() {
     if (!hasConnectionBenefits()) return '';
-    
+
     switch (tier) {
       case StudioTier.legendary:
         return '+5% chance for song to go viral, +50 bonus fans';
@@ -300,7 +311,8 @@ class Studio {
               minAlbums: 2,
               minSongsReleased: 5,
             ),
-            exclusiveNote: 'Doors open only to established artists. Your work here defines your legacy.',
+            exclusiveNote:
+                'Doors open only to established artists. Your work here defines your legacy.',
           ),
           Studio(
             id: 'record_plant',
@@ -320,7 +332,8 @@ class Studio {
               minAlbums: 2,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'Follow in the footsteps of hip-hop royalty. Selective about who records here.',
+            exclusiveNote:
+                'Follow in the footsteps of hip-hop royalty. Selective about who records here.',
           ),
           Studio(
             id: 'hitsville_usa',
@@ -340,7 +353,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'Motown\'s hallowed halls. Respect the legacy or don\'t come through.',
+            exclusiveNote:
+                'Motown\'s hallowed halls. Respect the legacy or don\'t come through.',
           ),
           Studio(
             id: 'atlantic_records',
@@ -360,7 +374,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 3,
             ),
-            exclusiveNote: 'Major label facility. They want artists with proven track records.',
+            exclusiveNote:
+                'Major label facility. They want artists with proven track records.',
           ),
           Studio(
             id: 'electric_lady',
@@ -509,7 +524,8 @@ class Studio {
               minAlbums: 3,
               minSongsReleased: 8,
             ),
-            exclusiveNote: 'The world\'s most prestigious studio. Reserved for true icons only.',
+            exclusiveNote:
+                'The world\'s most prestigious studio. Reserved for true icons only.',
           ),
           Studio(
             id: 'air_studios',
@@ -529,7 +545,8 @@ class Studio {
               minAlbums: 2,
               minSongsReleased: 6,
             ),
-            exclusiveNote: 'George Martin\'s legendary studio. Requires proven success and multiple platinum records.',
+            exclusiveNote:
+                'George Martin\'s legendary studio. Requires proven success and multiple platinum records.',
           ),
           Studio(
             id: 'maida_vale',
@@ -549,7 +566,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'BBC\'s prestigious facility. Requires established career and radio play.',
+            exclusiveNote:
+                'BBC\'s prestigious facility. Requires established career and radio play.',
           ),
           Studio(
             id: 'sarm_west',
@@ -563,13 +581,15 @@ class Studio {
             hasProducer: true,
             producerFee: 12000,
             producerSkill: 83,
-            description: 'Where Frankie Goes to Hollywood and Bob Marley recorded.',
+            description:
+                'Where Frankie Goes to Hollywood and Bob Marley recorded.',
             requirements: StudioRequirements(
               minFame: 55,
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'Historic studio with legendary legacy. Prefers artists with chart presence.',
+            exclusiveNote:
+                'Historic studio with legendary legacy. Prefers artists with chart presence.',
           ),
           Studio(
             id: 'tileyard',
@@ -676,7 +696,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 3,
             ),
-            exclusiveNote: 'Don Jazzy\'s elite label. Prefers artists with African or global streaming success.',
+            exclusiveNote:
+                'Don Jazzy\'s elite label. Prefers artists with African or global streaming success.',
           ),
           Studio(
             id: 'joburg_sound',
@@ -769,7 +790,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 3,
             ),
-            exclusiveNote: 'Leading European production hub. Seeks artists with chart potential.',
+            exclusiveNote:
+                'Leading European production hub. Seeks artists with chart potential.',
           ),
           Studio(
             id: 'hansa_studios',
@@ -789,7 +811,8 @@ class Studio {
               minAlbums: 2,
               minSongsReleased: 5,
             ),
-            exclusiveNote: 'Berlin\'s most iconic studio. Demands proven international presence.',
+            exclusiveNote:
+                'Berlin\'s most iconic studio. Demands proven international presence.',
           ),
           Studio(
             id: 'paris_studios',
@@ -823,7 +846,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 3,
             ),
-            exclusiveNote: 'France\'s historic facility. Values European chart success.',
+            exclusiveNote:
+                'France\'s historic facility. Values European chart success.',
           ),
           Studio(
             id: 'amsterdam_recording',
@@ -916,7 +940,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'Premier Japanese studio. Seeks artists with proven streaming numbers.',
+            exclusiveNote:
+                'Premier Japanese studio. Seeks artists with proven streaming numbers.',
           ),
           Studio(
             id: 'onkio_haus',
@@ -936,7 +961,8 @@ class Studio {
               minAlbums: 2,
               minSongsReleased: 6,
             ),
-            exclusiveNote: 'Japan\'s most elite studio. Reserved for international stars with Asian market presence.',
+            exclusiveNote:
+                'Japan\'s most elite studio. Reserved for international stars with Asian market presence.',
           ),
           Studio(
             id: 'seoul_music',
@@ -970,7 +996,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'K-pop powerhouse studio. Requires strong social media presence and fanbase.',
+            exclusiveNote:
+                'K-pop powerhouse studio. Requires strong social media presence and fanbase.',
           ),
           Studio(
             id: 'aomg_studio',
@@ -1091,7 +1118,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 3,
             ),
-            exclusiveNote: 'Latin music powerhouse. Seeks artists with Spanish-language or global appeal.',
+            exclusiveNote:
+                'Latin music powerhouse. Seeks artists with Spanish-language or global appeal.',
           ),
           Studio(
             id: 'sao_paulo_sound',
@@ -1198,7 +1226,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'Australia\'s top urban studio. Looks for artists with strong streaming performance.',
+            exclusiveNote:
+                'Australia\'s top urban studio. Looks for artists with strong streaming performance.',
           ),
           Studio(
             id: 'melbourne_records',
@@ -1249,7 +1278,8 @@ class Studio {
               minAlbums: 2,
               minSongsReleased: 6,
             ),
-            exclusiveNote: 'Drake\'s legendary OVO studios. Reserved for platinum-selling artists with major hits.',
+            exclusiveNote:
+                'Drake\'s legendary OVO studios. Reserved for platinum-selling artists with major hits.',
           ),
           Studio(
             id: 'noble_street',
@@ -1269,7 +1299,8 @@ class Studio {
               minAlbums: 1,
               minSongsReleased: 4,
             ),
-            exclusiveNote: 'Toronto\'s premier indie studio. Prefers artists with proven Canadian success.',
+            exclusiveNote:
+                'Toronto\'s premier indie studio. Prefers artists with proven Canadian success.',
           ),
           Studio(
             id: 'montreal_sound',
