@@ -42,6 +42,20 @@
       ]
     },
     {
+      "collectionGroup": "side_hustle_contracts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isAvailable",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "echox_posts",
       "queryScope": "COLLECTION",
       "fields": [

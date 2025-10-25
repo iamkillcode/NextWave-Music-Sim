@@ -1,6 +1,106 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+/// Normalize song snapshot entries (both modern `rankings` and legacy `entries`).
+///
+/// This is a pure helper so it can be unit-tested. It accepts the raw list
+/// from Firestore and returns a list of maps in the canonical shape the UI
+/// expects.
+List<Map<String, dynamic>> normalizeSongSnapshotEntries(
+  List<dynamic> rawList, {
+  int limit = 100,
+  String usedField = 'rankings',
+}) {
+  return rawList.take(limit).map((entry) {
+    final item = Map<String, dynamic>.from(entry as Map);
+
+    // Normalize legacy key names to the modern keys the UI expects
+    final position =
+        item['position'] ?? item['rank'] ?? item['rankPosition'] ?? 0;
+    final songId = item['songId'] ?? item['id'] ?? item['song_id'] ?? '';
+    final title =
+        item['title'] ?? item['songName'] ?? item['song_name'] ?? 'Untitled';
+    final artist = item['artist'] ??
+        item['artistName'] ??
+        item['artist_name'] ??
+        'Unknown Artist';
+    final artistId = item['artistId'] ?? item['artist_id'] ?? '';
+    final streams = item['streams'] ??
+        item['weeklyStreams'] ??
+        item['last7DaysStreams'] ??
+        0;
+    final totalStreams = item['totalStreams'] ?? item['total_streams'] ?? 0;
+    final coverArt =
+        item['coverArtUrl'] ?? item['coverArt'] ?? item['cover'] ?? null;
+    final movement = item['movement'] ?? item['movementValue'] ?? 0;
+    final lastWeekPosition =
+        item['lastWeekPosition'] ?? item['lastWeekPos'] ?? null;
+    final weeksOnChart = item['weeksOnChart'] ?? item['weeks'] ?? 1;
+
+    if (usedField == 'entries') {
+      // legacy snapshot - log for debugging
+      print('ℹ️ Using legacy snapshot format (entries) for song: $title');
+    }
+
+    return {
+      'position': position,
+      'songId': songId,
+      'title': title,
+      'artist': artist,
+      'artistId': artistId,
+      'genre': item['genre'] ?? 'Unknown',
+      'streams': streams, // Regional streams for this region
+      'totalStreams': totalStreams,
+      'coverArtUrl': coverArt,
+      'isNPC': item['isNPC'] ?? false,
+      'movement': movement, // Chart movement from last week
+      'lastWeekPosition': lastWeekPosition,
+      'weeksOnChart': weeksOnChart,
+    };
+  }).toList();
+}
+
+/// Normalize artist snapshot entries (modern and legacy shapes).
+List<Map<String, dynamic>> normalizeArtistSnapshotEntries(
+  List<dynamic> rawList, {
+  int limit = 100,
+  String usedField = 'rankings',
+}) {
+  return rawList.take(limit).map((entry) {
+    final item = Map<String, dynamic>.from(entry as Map);
+
+    final position = item['position'] ?? item['rank'] ?? 0;
+    final artistId = item['artistId'] ?? item['artist_id'] ?? '';
+    final artistName = item['artistName'] ??
+        item['artist_name'] ??
+        item['name'] ??
+        'Unknown Artist';
+    final streams = item['streams'] ?? item['weeklyStreams'] ?? 0;
+    final songCount = item['songCount'] ?? item['releasedSongs'] ?? 0;
+    final movement = item['movement'] ?? 0;
+    final lastWeekPosition =
+        item['lastWeekPosition'] ?? item['lastWeekPos'] ?? null;
+    final weeksOnChart = item['weeksOnChart'] ?? item['weeks'] ?? 1;
+
+    if (usedField == 'entries') {
+      print(
+          'ℹ️ Using legacy snapshot format (entries) for artist: $artistName');
+    }
+
+    return {
+      'position': position,
+      'artistId': artistId,
+      'artistName': artistName,
+      'streams': streams, // Regional total streams
+      'songCount': songCount,
+      'isNPC': item['isNPC'] ?? false,
+      'movement': movement,
+      'lastWeekPosition': lastWeekPosition,
+      'weeksOnChart': weeksOnChart,
+    };
+  }).toList();
+}
+
 /// Service for querying weekly leaderboard snapshots
 ///
 /// The Cloud Function generates weekly snapshots with proper regional rankings.
@@ -78,35 +178,38 @@ class LeaderboardSnapshotService {
 
       final doc = snapshot.docs.first;
       final data = doc.data();
-      final rankings = data['rankings'] as List<dynamic>?;
 
-      if (rankings == null) {
-        print('⚠️ No rankings in snapshot');
+      // Support both new and legacy snapshot formats. New snapshots use
+      // `rankings`, older/manual scripts used `entries` with different keys.
+      List<dynamic>? rawList = data['rankings'] as List<dynamic>?;
+      var usedField = 'rankings';
+      if (rawList == null) {
+        rawList = data['entries'] as List<dynamic>?;
+        usedField = 'entries';
+      }
+
+      if (rawList == null) {
+        print('⚠️ No rankings/entries in snapshot');
         return [];
       }
 
-      // Convert to list of maps with proper typing
-      final chartData = rankings.take(limit).map((entry) {
-        final item = Map<String, dynamic>.from(entry as Map);
-        return {
-          'position': item['position'] ?? 0,
-          'songId': item['songId'] ?? '',
-          'title': item['title'] ?? 'Untitled',
-          'artist': item['artist'] ?? 'Unknown Artist',
-          'artistId': item['artistId'] ?? '',
-          'genre': item['genre'] ?? 'Unknown',
-          'streams': item['streams'] ?? 0, // Regional streams for this region
-          'totalStreams': item['totalStreams'] ?? 0,
-          'coverArtUrl': item['coverArtUrl'],
-          'isNPC': item['isNPC'] ?? false,
-          'movement': item['movement'] ?? 0, // Chart movement from last week
-          'lastWeekPosition': item['lastWeekPosition'],
-          'weeksOnChart': item['weeksOnChart'] ?? 1,
-        };
-      }).toList();
+      // Normalize snapshot entries into the canonical shape
+      final chartData = normalizeSongSnapshotEntries(rawList,
+          limit: limit, usedField: usedField);
 
       print(
           '✅ Loaded ${chartData.length} songs from $region snapshot (week ${data['weekId']})');
+
+      // Debug: Print first 3 songs to verify movement data
+      if (chartData.isNotEmpty) {
+        print('🔍 Sample data from snapshot:');
+        for (var i = 0; i < chartData.length && i < 3; i++) {
+          final song = chartData[i];
+          print(
+              '  #${i + 1}: ${song['title']} - movement=${song['movement']}, lastWeek=${song['lastWeekPosition']}, weeksOnChart=${song['weeksOnChart']}');
+        }
+      }
+
       return chartData;
     } catch (e) {
       // Check if error is due to missing index (indexes are building)
@@ -158,28 +261,24 @@ class LeaderboardSnapshotService {
 
       final doc = snapshot.docs.first;
       final data = doc.data();
-      final rankings = data['rankings'] as List<dynamic>?;
 
-      if (rankings == null) {
-        print('⚠️ No rankings in snapshot');
+      // Support both new and legacy snapshot formats. New snapshots use
+      // `rankings`, older/manual scripts used `entries` with different keys.
+      List<dynamic>? rawList = data['rankings'] as List<dynamic>?;
+      var usedField = 'rankings';
+      if (rawList == null) {
+        rawList = data['entries'] as List<dynamic>?;
+        usedField = 'entries';
+      }
+
+      if (rawList == null) {
+        print('⚠️ No rankings/entries in snapshot');
         return [];
       }
 
-      // Convert to list of maps with proper typing
-      final chartData = rankings.take(limit).map((entry) {
-        final item = Map<String, dynamic>.from(entry as Map);
-        return {
-          'position': item['position'] ?? 0,
-          'artistId': item['artistId'] ?? '',
-          'artistName': item['artistName'] ?? 'Unknown Artist',
-          'streams': item['streams'] ?? 0, // Regional total streams
-          'songCount': item['songCount'] ?? 0,
-          'isNPC': item['isNPC'] ?? false,
-          'movement': item['movement'] ?? 0,
-          'lastWeekPosition': item['lastWeekPosition'],
-          'weeksOnChart': item['weeksOnChart'] ?? 1,
-        };
-      }).toList();
+      // Normalize snapshot entries into the canonical shape
+      final chartData = normalizeArtistSnapshotEntries(rawList,
+          limit: limit, usedField: usedField);
 
       print(
           '✅ Loaded ${chartData.length} artists from $region snapshot (week ${data['weekId']})');

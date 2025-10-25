@@ -185,17 +185,15 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
               Expanded(
                 child: SegmentedButton<String>(
                   style: ButtonStyle(
-                    backgroundColor: WidgetStateProperty.resolveWith<Color>((
-                      Set<WidgetState> states,
-                    ) {
+                    backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                        (Set<WidgetState> states) {
                       if (states.contains(WidgetState.selected)) {
                         return _getThemeColor().withOpacity(0.3);
                       }
                       return Colors.grey[800]!;
                     }),
-                    foregroundColor: WidgetStateProperty.resolveWith<Color>((
-                      Set<WidgetState> states,
-                    ) {
+                    foregroundColor: WidgetStateProperty.resolveWith<Color>(
+                        (Set<WidgetState> states) {
                       if (states.contains(WidgetState.selected)) {
                         return _getThemeColor();
                       }
@@ -488,217 +486,315 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
     final isUserSong = entry['artistId'] == _currentUserId;
     final movement = entry['movement'] as int? ?? 0;
     final lastWeekPosition = entry['lastWeekPosition'] as int?;
-    final weeksOnChart = entry['weeksOnChart'] as int? ?? 0;
 
     // Responsive sizing
     final coverSize = _getResponsiveSize(context, 56.0);
-    final titleFontSize = _getResponsiveSize(context, 16.0);
-    final subtitleFontSize = _getResponsiveSize(context, 14.0);
-    final padding = _getResponsivePadding(context, 12.0);
+    final titleFontSize = _getResponsiveSize(context, 15.0);
+    final artistFontSize = _getResponsiveSize(context, 13.0);
 
-    return Card(
-      margin: EdgeInsets.only(bottom: _getResponsivePadding(context, 12.0)),
-      color: isUserSong ? Colors.green[900] : Colors.grey[850],
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: EdgeInsets.only(bottom: _getResponsivePadding(context, 8.0)),
+      decoration: BoxDecoration(
+        color: isUserSong ? const Color(0xFF1B4D3E) : const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(12),
-        side: isUserSong
-            ? const BorderSide(color: Colors.green, width: 2)
-            : BorderSide.none,
+        border: isUserSong ? Border.all(color: Colors.green, width: 2) : null,
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(padding),
-        leading: (() {
-          final coverUrl = entry['coverArtUrl'] as String?;
-          if (coverUrl != null && coverUrl.isNotEmpty) {
-            return Stack(
-              children: [
-                Container(
-                  width: coverSize,
-                  height: coverSize,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white24, width: 1),
+      child: Padding(
+        padding: EdgeInsets.all(_getResponsivePadding(context, 12.0)),
+        child: Row(
+          children: [
+            // Position number with special styling for top 3
+            _buildPositionNumber(position),
+            SizedBox(width: _getResponsivePadding(context, 12.0)),
+
+            // Cover art
+            _buildCoverArt(entry, coverSize),
+            SizedBox(width: _getResponsivePadding(context, 12.0)),
+
+            // Song info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title with trending indicator
+                  Row(
+                    children: [
+                      if (_selectedPeriod == 'weekly') ...[
+                        _buildTrendingIndicator(movement, lastWeekPosition),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          entry['title'] ?? 'Untitled',
+                          style: TextStyle(
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isUserSong)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child:
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                        ),
+                    ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: coverUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: Colors.grey[800],
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white30,
-                            ),
+                  const SizedBox(height: 2),
+
+                  // Artist name
+                  Text(
+                    entry['artist'] ?? 'Unknown Artist',
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: artistFontSize,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Streams and stats
+                  Row(
+                    children: [
+                      Text(
+                        '${_chartService.formatStreams(entry['periodStreams'] ?? 0)}',
+                        style: TextStyle(
+                          color: _getStreamColor(),
+                          fontWeight: FontWeight.bold,
+                          fontSize: _getResponsiveSize(context, 13.0),
+                        ),
+                      ),
+                      Text(
+                        ' streams',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: _getResponsiveSize(context, 11.0),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white30,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: _getResponsiveSize(context, 11.0),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Weeks on chart badge
+                  if (_selectedPeriod == 'weekly' &&
+                      _getChartEntryText(entry).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _getChartEntryColor(entry).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: _getChartEntryColor(entry).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _getChartEntryText(entry),
+                          style: TextStyle(
+                            color: _getChartEntryColor(entry),
+                            fontSize: _getResponsiveSize(context, 10.0),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      errorWidget: (context, url, error) =>
-                          _buildPositionBadge(position),
                     ),
-                  ),
-                ),
-                // Position badge overlay
-                Positioned(
-                  top: 2,
-                  left: 2,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.75),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: position <= 3
-                            ? (position == 1
-                                ? Colors.amber
-                                : position == 2
-                                    ? Colors.grey[300]!
-                                    : Colors.brown)
-                            : Colors.white24,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      '#$position',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: _getResponsiveSize(context, 11.0),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-          return _buildPositionBadge(position);
-        }()),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                entry['title'] ?? 'Untitled',
-                style: TextStyle(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                ],
               ),
             ),
-            // Trending indicator
-            if (_selectedPeriod == 'weekly' && lastWeekPosition != null)
-              _buildTrendingIndicator(movement, lastWeekPosition),
           ],
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              entry['artist'] ?? 'Unknown Artist',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: subtitleFontSize,
-              ),
-            ),
-            SizedBox(height: 4),
-            Row(
-              children: [
-                Text(
-                  '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams',
-                  style: TextStyle(
-                    color: _getStreamColor(),
-                    fontWeight: FontWeight.bold,
-                    fontSize: _getResponsiveSize(context, 12.0),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: _getResponsiveSize(context, 11.0),
-                  ),
-                ),
-              ],
-            ),
-            // Weeks on chart (for weekly charts only)
-            if (_selectedPeriod == 'weekly' && weeksOnChart > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  weeksOnChart == 1
-                      ? 'New Entry'
-                      : '$weeksOnChart weeks on chart',
-                  style: TextStyle(
-                    color: weeksOnChart == 1 ? Colors.green : Colors.cyan,
-                    fontSize: _getResponsiveSize(context, 10.0),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        trailing: isUserSong
-            ? Icon(Icons.star,
-                color: Colors.amber, size: _getResponsiveSize(context, 24.0))
-            : null,
       ),
     );
   }
 
-  Widget _buildTrendingIndicator(int movement, int lastWeekPosition) {
-    IconData icon;
-    Color color;
-    String tooltip;
+  Widget _buildPositionNumber(int position) {
+    Color badgeColor;
+    Color textColor = Colors.white;
 
-    if (movement > 0) {
-      // Moved up
-      icon = Icons.arrow_upward;
-      color = Colors.green;
-      tooltip = 'Up $movement from #$lastWeekPosition';
-    } else if (movement < 0) {
-      // Moved down
-      icon = Icons.arrow_downward;
-      color = Colors.red;
-      tooltip = 'Down ${movement.abs()} from #$lastWeekPosition';
+    if (position == 1) {
+      badgeColor = const Color(0xFFFFD700); // Gold
+      textColor = Colors.black;
+    } else if (position == 2) {
+      badgeColor = const Color(0xFFC0C0C0); // Silver
+      textColor = Colors.black;
+    } else if (position == 3) {
+      badgeColor = const Color(0xFFCD7F32); // Bronze
+      textColor = Colors.white;
     } else {
-      // No change
-      icon = Icons.remove;
-      color = Colors.grey;
-      tooltip = 'No change (#$lastWeekPosition)';
+      badgeColor = Colors.transparent;
     }
+
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: badgeColor,
+        borderRadius: BorderRadius.circular(8),
+        border:
+            position <= 3 ? null : Border.all(color: Colors.white24, width: 1),
+      ),
+      child: Center(
+        child: Text(
+          '$position',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: textColor,
+            fontSize: position <= 3 ? 16 : 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCoverArt(Map<String, dynamic> entry, double size) {
+    final coverUrl = entry['coverArtUrl'] as String?;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: coverUrl != null && coverUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: coverUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Colors.grey[800],
+                  child: const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white30,
+                      ),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.grey[800],
+                  child: const Icon(Icons.music_note,
+                      color: Colors.white30, size: 24),
+                ),
+              )
+            : Container(
+                color: Colors.grey[800],
+                child: const Icon(Icons.music_note,
+                    color: Colors.white30, size: 24),
+              ),
+      ),
+    );
+  }
+
+  String _getChartEntryText(Map<String, dynamic> entry) {
+    final entryType = entry['entryType'] as String?;
+    final weeksOnChart = entry['weeksOnChart'] as int? ?? 0;
+
+    if (entryType == 'new') {
+      return 'New Entry';
+    } else if (entryType == 're-entry') {
+      return 'Re-Entry';
+    } else if (weeksOnChart > 0) {
+      return '$weeksOnChart ${weeksOnChart == 1 ? "week" : "weeks"} on chart';
+    }
+    return '';
+  }
+
+  Color _getChartEntryColor(Map<String, dynamic> entry) {
+    final entryType = entry['entryType'] as String?;
+    if (entryType == 'new') {
+      return Colors.green;
+    } else if (entryType == 're-entry') {
+      return Colors.amber;
+    }
+    return Colors.cyan;
+  }
+
+  Widget _buildTrendingIndicator(int movement, int? lastWeekPosition) {
+    if (movement == 0) {
+      // No change — show subtle dash
+      return Tooltip(
+        message: lastWeekPosition != null
+            ? 'No change (#$lastWeekPosition)'
+            : 'No change (no previous data)',
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Icon(
+            Icons.remove,
+            color: Colors.white38,
+            size: 12,
+          ),
+        ),
+      );
+    }
+
+    final isUp = movement > 0;
+    final color = isUp ? const Color(0xFF4CAF50) : const Color(0xFFEF5350);
+    final icon = isUp ? Icons.arrow_upward : Icons.arrow_downward;
+    final tooltip = lastWeekPosition != null
+        ? '${isUp ? 'Up' : 'Down'} ${movement.abs()} from #$lastWeekPosition'
+        : '${isUp ? 'Up' : 'Down'} ${movement.abs()} from previous week';
 
     return Tooltip(
       message: tooltip,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color, width: 1),
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(3),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 14),
-            if (movement != 0)
-              Padding(
-                padding: const EdgeInsets.only(left: 2),
-                child: Text(
-                  '${movement.abs()}',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 2),
+            Text(
+              '${movement.abs()}',
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                height: 1,
               ),
+            ),
           ],
         ),
       ),
@@ -709,199 +805,195 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
     final isCurrentUser = entry['artistId'] == _currentUserId;
     final movement = entry['movement'] as int? ?? 0;
     final lastWeekPosition = entry['lastWeekPosition'] as int?;
-    final weeksOnChart = entry['weeksOnChart'] as int? ?? 0;
 
     // Responsive sizing
     final avatarSize = _getResponsiveSize(context, 56.0);
-    final titleFontSize = _getResponsiveSize(context, 16.0);
-    final subtitleFontSize = _getResponsiveSize(context, 14.0);
-    final padding = _getResponsivePadding(context, 12.0);
+    final titleFontSize = _getResponsiveSize(context, 15.0);
 
-    return Card(
-      margin: EdgeInsets.only(bottom: _getResponsivePadding(context, 12.0)),
-      color: isCurrentUser ? Colors.green[900] : Colors.grey[850],
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: EdgeInsets.only(bottom: _getResponsivePadding(context, 8.0)),
+      decoration: BoxDecoration(
+        color:
+            isCurrentUser ? const Color(0xFF1B4D3E) : const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(12),
-        side: isCurrentUser
-            ? const BorderSide(color: Colors.green, width: 2)
-            : BorderSide.none,
+        border:
+            isCurrentUser ? Border.all(color: Colors.green, width: 2) : null,
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(padding),
-        leading: (() {
-          final avatar = entry['avatarUrl'] as String?;
-          if (avatar != null && avatar.isNotEmpty) {
-            return Stack(
-              children: [
-                Container(
-                  width: avatarSize,
-                  height: avatarSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white24, width: 1),
+      child: Padding(
+        padding: EdgeInsets.all(_getResponsivePadding(context, 12.0)),
+        child: Row(
+          children: [
+            // Position number with special styling for top 3
+            _buildPositionNumber(position),
+            SizedBox(width: _getResponsivePadding(context, 12.0)),
+
+            // Avatar
+            _buildAvatar(entry, avatarSize),
+            SizedBox(width: _getResponsivePadding(context, 12.0)),
+
+            // Artist info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Artist name with trending indicator
+                  Row(
+                    children: [
+                      if (_selectedPeriod == 'weekly') ...[
+                        _buildTrendingIndicator(movement, lastWeekPosition),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          entry['artistName'] ?? 'Unknown Artist',
+                          style: TextStyle(
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isCurrentUser)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child:
+                              Icon(Icons.star, color: Colors.amber, size: 16),
+                        ),
+                    ],
                   ),
-                  child: ClipOval(
-                    child: CachedNetworkImage(
-                      imageUrl: avatar,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: Colors.grey[800],
-                        child: Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white30,
-                            ),
+                  const SizedBox(height: 2),
+
+                  // Song count
+                  Text(
+                    '${entry['songCount'] ?? 0} ${(entry['songCount'] ?? 0) == 1 ? 'song' : 'songs'}',
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: _getResponsiveSize(context, 13.0),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Streams and stats
+                  Row(
+                    children: [
+                      Text(
+                        '${_chartService.formatStreams(entry['periodStreams'] ?? 0)}',
+                        style: TextStyle(
+                          color: _getStreamColor(),
+                          fontWeight: FontWeight.bold,
+                          fontSize: _getResponsiveSize(context, 13.0),
+                        ),
+                      ),
+                      Text(
+                        ' streams',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: _getResponsiveSize(context, 11.0),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white30,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: _getResponsiveSize(context, 11.0),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Weeks on chart badge
+                  if (_selectedPeriod == 'weekly' &&
+                      _getChartEntryText(entry).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _getChartEntryColor(entry).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: _getChartEntryColor(entry).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          _getChartEntryText(entry),
+                          style: TextStyle(
+                            color: _getChartEntryColor(entry),
+                            fontSize: _getResponsiveSize(context, 10.0),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      errorWidget: (context, url, error) =>
-                          _buildPositionBadge(position),
                     ),
-                  ),
-                ),
-                // Position badge overlay
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.75),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: position <= 3
-                            ? (position == 1
-                                ? Colors.amber
-                                : position == 2
-                                    ? Colors.grey[300]!
-                                    : Colors.brown)
-                            : Colors.white24,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      '#$position',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: _getResponsiveSize(context, 10.0),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-          return _buildPositionBadge(position);
-        }()),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                entry['artistName'] ?? 'Unknown Artist',
-                style: TextStyle(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                ],
               ),
             ),
-            // Trending indicator for weekly charts
-            if (_selectedPeriod == 'weekly' && lastWeekPosition != null)
-              _buildTrendingIndicator(movement, lastWeekPosition),
           ],
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${entry['songCount'] ?? 0} ${(entry['songCount'] ?? 0) == 1 ? 'song' : 'songs'}',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: subtitleFontSize,
-              ),
-            ),
-            SizedBox(height: 4),
-            Row(
-              children: [
-                Text(
-                  '${_chartService.formatStreams(entry['periodStreams'] ?? 0)} streams',
-                  style: TextStyle(
-                    color: _getStreamColor(),
-                    fontWeight: FontWeight.bold,
-                    fontSize: _getResponsiveSize(context, 12.0),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: _getResponsiveSize(context, 11.0),
-                  ),
-                ),
-              ],
-            ),
-            // Weeks on chart (for weekly charts only)
-            if (_selectedPeriod == 'weekly' && weeksOnChart > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  weeksOnChart == 1
-                      ? 'New Entry'
-                      : '$weeksOnChart weeks on chart',
-                  style: TextStyle(
-                    color: weeksOnChart == 1 ? Colors.green : Colors.cyan,
-                    fontSize: _getResponsiveSize(context, 10.0),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        trailing: isCurrentUser
-            ? Icon(Icons.star,
-                color: Colors.amber, size: _getResponsiveSize(context, 24.0))
-            : null,
       ),
     );
   }
 
-  Widget _buildPositionBadge(int position) {
-    Color badgeColor;
-
-    if (position == 1) {
-      badgeColor = Colors.amber;
-    } else if (position == 2) {
-      badgeColor = Colors.grey[300]!;
-    } else if (position == 3) {
-      badgeColor = Colors.brown;
-    } else {
-      badgeColor = Colors.grey[600]!;
-    }
+  Widget _buildAvatar(Map<String, dynamic> entry, double size) {
+    final avatarUrl = entry['avatarUrl'] as String?;
 
     return Container(
-      width: 50,
-      height: 50,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.25),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: badgeColor, width: 2),
-      ),
-      child: Center(
-        child: Text(
-          '#$position',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            fontSize: 14,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
+        ],
+      ),
+      child: ClipOval(
+        child: avatarUrl != null && avatarUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: avatarUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: Colors.grey[800],
+                  child: const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white30,
+                      ),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.grey[800],
+                  child:
+                      const Icon(Icons.person, color: Colors.white30, size: 24),
+                ),
+              )
+            : Container(
+                color: Colors.grey[800],
+                child:
+                    const Icon(Icons.person, color: Colors.white30, size: 24),
+              ),
       ),
     );
   }

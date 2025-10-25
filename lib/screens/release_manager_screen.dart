@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../services/firebase_service.dart';
+import '../services/cover_art_uploader.dart';
 
 /// Screen for managing EP and Album releases
 /// Players can bundle songs into EPs (3-6 songs) or Albums (7+ songs)
@@ -50,30 +49,43 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
 
   Future<void> _uploadCoverArt() async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Generate a temporary album ID if creating new album
+      final albumId = const Uuid().v4();
+
+      // Upload to Firebase Storage using the helper service
+      final storageUrl = await CoverArtUploader.pickAndUploadCoverArt(
+        userId: userId,
+        songId: albumId, // Use album ID for album art
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
       );
 
-      if (image == null) return;
-
-      // Read image as bytes and convert to base64
-      final Uint8List imageBytes = await image.readAsBytes();
-      final String base64Image = base64Encode(imageBytes);
-      final String dataUrl = 'data:image/jpeg;base64,$base64Image';
+      if (storageUrl == null) return; // User cancelled
 
       setState(() {
-        _uploadedCoverArtUrl = dataUrl;
+        _uploadedCoverArtUrl = storageUrl;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cover art uploaded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       print('Error uploading cover art: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to upload cover art'),
+          SnackBar(
+            content: Text('Failed to upload cover art: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -437,7 +449,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                       _uploadedCoverArtUrl != null
                           ? 'Songs without cover art will use this'
                           : 'Optional - Upload custom album artwork',
-                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 12),
                     ),
                   ],
                 ),
@@ -445,9 +458,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: _uploadCoverArt,
-                icon: Icon(_uploadedCoverArtUrl != null
-                    ? Icons.edit
-                    : Icons.upload),
+                icon: Icon(
+                    _uploadedCoverArtUrl != null ? Icons.edit : Icons.upload),
                 label: Text(_uploadedCoverArtUrl != null ? 'Change' : 'Upload'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF9B59B6),
@@ -1068,13 +1080,13 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               ),
             );
           }),
-              if (!isReleased) ...[
+          if (!isReleased) ...[
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _confirmRelease(album),
+                  child: ElevatedButton.icon(
+                    onPressed: () => _confirmRelease(album),
                     icon: const Icon(Icons.rocket_launch),
                     label: const Text('Release Now'),
                     style: ElevatedButton.styleFrom(
@@ -1097,8 +1109,14 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   }
 
   Widget _buildPlatformBadge(String platform) {
-    final name = platform == 'tunify' ? 'Tunify' : platform == 'maple_music' ? 'Maple' : platform;
-    final color = platform == 'tunify' ? const Color(0xFF1DB954) : const Color(0xFFFF6B9D);
+    final name = platform == 'tunify'
+        ? 'Tunify'
+        : platform == 'maple_music'
+            ? 'Maple'
+            : platform;
+    final color = platform == 'tunify'
+        ? const Color(0xFF1DB954)
+        : const Color(0xFFFF6B9D);
     final icon = platform == 'tunify' ? '🎵' : '🍁';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1113,7 +1131,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           const SizedBox(width: 6),
           Text(
             name,
-            style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+                color: color, fontSize: 12, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1131,7 +1150,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         }
       }
     }
-    if (albumPlatforms.isEmpty) albumPlatforms.addAll(['tunify', 'maple_music']);
+    if (albumPlatforms.isEmpty)
+      albumPlatforms.addAll(['tunify', 'maple_music']);
 
     // Show confirmation dialog with ability to edit platforms
     final selected = Set<String>.from(albumPlatforms);
@@ -1141,33 +1161,42 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
             backgroundColor: const Color(0xFF161B22),
-            title: const Text('Confirm Release', style: TextStyle(color: Colors.white)),
+            title: const Text('Confirm Release',
+                style: TextStyle(color: Colors.white)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('This release will be available on:', style: TextStyle(color: Colors.white70)),
+                const Text('This release will be available on:',
+                    style: TextStyle(color: Colors.white70)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Checkbox(
                       value: selected.contains('tunify'),
-                      onChanged: (v) => setState(() => v! ? selected.add('tunify') : selected.remove('tunify')),
+                      onChanged: (v) => setState(() => v!
+                          ? selected.add('tunify')
+                          : selected.remove('tunify')),
                     ),
                     const SizedBox(width: 4),
                     const Text('Tunify', style: TextStyle(color: Colors.white)),
                     const SizedBox(width: 12),
                     Checkbox(
                       value: selected.contains('maple_music'),
-                      onChanged: (v) => setState(() => v! ? selected.add('maple_music') : selected.remove('maple_music')),
+                      onChanged: (v) => setState(() => v!
+                          ? selected.add('maple_music')
+                          : selected.remove('maple_music')),
                     ),
                     const SizedBox(width: 4),
-                    const Text('Maple Music', style: TextStyle(color: Colors.white)),
+                    const Text('Maple Music',
+                        style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel')),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 child: const Text('Release Now'),
@@ -1181,20 +1210,28 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     if (result == true) {
       // Call server to perform the release atomically
       try {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('🔄 Releasing...'), duration: Duration(seconds: 2)));
-        final payload = await FirebaseService().releaseAlbumSecurely(albumId: album.id, overridePlatforms: selected.toList());
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('🔄 Releasing...'), duration: Duration(seconds: 2)));
+        final payload = await FirebaseService().releaseAlbumSecurely(
+            albumId: album.id, overridePlatforms: selected.toList());
 
         if (payload != null && payload['success'] == true) {
           // Update local state to reflect server commit
           _releaseAlbum(album, overridePlatforms: selected.toList());
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Released successfully'), backgroundColor: Color(0xFF32D74B)));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('✅ Released successfully'),
+              backgroundColor: Color(0xFF32D74B)));
         } else {
           print('Server release returned unexpected payload: $payload');
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Release incomplete, check logs'), backgroundColor: Colors.orange));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('⚠️ Release incomplete, check logs'),
+              backgroundColor: Colors.orange));
         }
       } catch (e) {
         print('Error releasing album on server: $e');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('❌ Failed to release album (server error)'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('❌ Failed to release album (server error)'),
+            backgroundColor: Colors.red));
       }
     }
   }
@@ -1211,7 +1248,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       if (album.songIds.contains(song.id)) {
         // This song is part of the album
         String? finalCoverArt = song.coverArtUrl; // Keep existing if it has one
-        
+
         // If song has NO cover art AND album has cover art, use album's
         if (finalCoverArt == null && album.coverArtUrl != null) {
           finalCoverArt = album.coverArtUrl;
@@ -1221,7 +1258,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         // This prevents overwriting the original release date of singles
         final DateTime releaseDate = song.state == SongState.released
             ? song.releasedDate! // Keep existing release date
-            : DateTime.now();     // Set new release date
+            : DateTime.now(); // Set new release date
 
         // Ensure songs have streaming platforms for Tunify and Maple Music.
         // We merge (union) with any existing platforms so platforms aren't lost.
@@ -1249,9 +1286,11 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     final albumSongIds = album.songIds.toSet();
     final albumPlatformsSet = <String>{};
     for (final s in updatedSongs) {
-      if (albumSongIds.contains(s.id)) albumPlatformsSet.addAll(s.streamingPlatforms);
+      if (albumSongIds.contains(s.id))
+        albumPlatformsSet.addAll(s.streamingPlatforms);
     }
-    if (albumPlatformsSet.isEmpty) albumPlatformsSet.addAll(['tunify', 'maple_music']);
+    if (albumPlatformsSet.isEmpty)
+      albumPlatformsSet.addAll(['tunify', 'maple_music']);
 
     // Mark album as released and assign platforms
     final updatedAlbum = album.copyWith(
@@ -1270,9 +1309,10 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         ? 50
         : albumSongs.map((s) => s.finalQuality).reduce((a, b) => a + b) /
             albumSongs.length;
-    
+
     final fameGain = 5 + (avgQuality ~/ 20); // 5-10 fame based on quality
-    final fanbaseGain = 100 + (fameGain * 20); // Larger fanbase boost for albums
+    final fanbaseGain =
+        100 + (fameGain * 20); // Larger fanbase boost for albums
 
     // Update local state and notify parent
     setState(() {
@@ -1367,9 +1407,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               }).toList();
 
               // Remove album
-              final updatedAlbums = _currentStats.albums
-                  .where((a) => a.id != album.id)
-                  .toList();
+              final updatedAlbums =
+                  _currentStats.albums.where((a) => a.id != album.id).toList();
 
               setState(() {
                 _currentStats = _currentStats.copyWith(

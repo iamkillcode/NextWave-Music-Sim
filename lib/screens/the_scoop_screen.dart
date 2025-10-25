@@ -106,7 +106,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text('Error: ${_error ?? ''}', style: const TextStyle(color: Colors.redAccent)),
+                  child: Text('Error: ${_error ?? ''}',
+                      style: const TextStyle(color: Colors.redAccent)),
                 ),
               )
             else ...[
@@ -115,7 +116,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
               if (_todaysHits.isNotEmpty)
                 SliverToBoxAdapter(child: _buildSectionTitle("Today's Hits")),
               if (_todaysHits.isNotEmpty)
-                SliverToBoxAdapter(child: _buildHorizontalCovers(
+                SliverToBoxAdapter(
+                    child: _buildHorizontalCovers(
                   _todaysHits,
                   deepLinkPeriod: 'daily',
                   deepLinkType: 'singles',
@@ -124,7 +126,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                 SliverToBoxAdapter(child: _buildFeaturedStory()),
               if (_newThisWeek.isNotEmpty) ...[
                 SliverToBoxAdapter(child: _buildSectionTitle('New This Week')),
-                SliverToBoxAdapter(child: _buildHorizontalCovers(
+                SliverToBoxAdapter(
+                    child: _buildHorizontalCovers(
                   _newThisWeek,
                   deepLinkPeriod: 'weekly',
                   deepLinkType: 'singles',
@@ -132,38 +135,51 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
               ],
               // Info cards like screenshot 2
               if (_weeklyTopArtist != null)
-                SliverToBoxAdapter(child: _buildInfoCard(
+                SliverToBoxAdapter(
+                    child: _buildInfoCard(
                   title: 'Most Streamed Artist',
                   imageUrl: _weeklyTopArtist!['avatarUrl'],
                   headline: (_weeklyTopArtist!['artistName'] ?? 'Unknown') +
                       ' led this week with ' +
-                      _newsService.shortStreams((_weeklyTopArtist!['periodStreams'] ?? _weeklyTopArtist!['streams'] ?? 0) as int) +
+                      _newsService.shortStreams(
+                          (_weeklyTopArtist!['periodStreams'] ??
+                              _weeklyTopArtist!['streams'] ??
+                              0) as int) +
                       ' streams.',
                   onTap: () => _openArtistDetails(_weeklyTopArtist!),
                 )),
               if (_weeklyTopAlbum != null)
-                SliverToBoxAdapter(child: _buildInfoCard(
+                SliverToBoxAdapter(
+                    child: _buildInfoCard(
                   title: 'Top Album This Week',
                   imageUrl: _weeklyTopAlbum!['coverArtUrl'],
-                  headline: (_weeklyTopSong?['artist'] ?? _weeklyTopAlbum!['artist'] ?? 'Unknown') +
+                  headline: (_weeklyTopSong?['artist'] ??
+                          _weeklyTopAlbum!['artist'] ??
+                          'Unknown') +
                       ' earned the top album this week with ' +
-                      (_weeklyTopAlbum!['title'] ?? 'Untitled') + ', accumulating ' +
-                      _newsService.shortStreams((_weeklyTopAlbum!['periodStreams'] ?? 0) as int) +
+                      (_weeklyTopAlbum!['title'] ?? 'Untitled') +
+                      ', accumulating ' +
+                      _newsService.shortStreams(
+                          (_weeklyTopAlbum!['periodStreams'] ?? 0) as int) +
                       ' streams.',
                   onTap: () => _openSongDetails(_weeklyTopAlbum!),
                 )),
               if (_highestDebut != null)
-                SliverToBoxAdapter(child: _buildInfoCard(
+                SliverToBoxAdapter(
+                    child: _buildInfoCard(
                   title: 'Highest Debut',
                   imageUrl: _highestDebut!['coverArtUrl'],
-                  headline: '"${(_highestDebut!['title'] ?? 'Untitled') as String}" by ${(_highestDebut!['artist'] ?? 'Unknown') as String} debuts at #${_highestDebut!['position'] ?? 0} on this week\'s chart.',
+                  headline:
+                      '"${(_highestDebut!['title'] ?? 'Untitled') as String}" by ${(_highestDebut!['artist'] ?? 'Unknown') as String} debuts at #${_highestDebut!['position'] ?? 0} on this week\'s chart.',
                   onTap: () => _openSongDetails(_highestDebut!),
                 )),
               if (_biggestMover != null)
-                SliverToBoxAdapter(child: _buildInfoCard(
+                SliverToBoxAdapter(
+                    child: _buildInfoCard(
                   title: 'Biggest Mover',
                   imageUrl: _biggestMover!['coverArtUrl'],
-                  headline: '"${(_biggestMover!['title'] ?? 'Untitled') as String}" by ${(_biggestMover!['artist'] ?? 'Unknown') as String} jumps ${((_biggestMover!['movement'] ?? 0) as int).abs()} spots to #${_biggestMover!['position'] ?? 0}.',
+                  headline:
+                      '"${(_biggestMover!['title'] ?? 'Untitled') as String}" by ${(_biggestMover!['artist'] ?? 'Unknown') as String} jumps ${((_biggestMover!['movement'] ?? 0) as int).abs()} spots to #${_biggestMover!['position'] ?? 0}.',
                   onTap: () => _openSongDetails(_biggestMover!),
                 )),
               SliverToBoxAdapter(child: _buildSectionDivider()),
@@ -204,47 +220,48 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
     final avatar = artist['avatarUrl'];
     final bg = avatar ?? '';
     return GestureDetector(
-      onTap: () => _openArtistDetails(artist),
-      child: Container(
-      height: 180,
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        image: DecorationImage(
-          image: bg.isNotEmpty
-              ? CachedNetworkImageProvider(bg)
-              : const AssetImage('assets/icon/app_icon.png') as ImageProvider,
-          fit: BoxFit.cover,
-          colorFilter:
-              ColorFilter.mode(Colors.black.withOpacity(0.35), BlendMode.darken),
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                fontStyle: FontStyle.italic,
-              ),
+        onTap: () => _openArtistDetails(artist),
+        child: Container(
+          height: 180,
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            image: DecorationImage(
+              image: bg.isNotEmpty
+                  ? CachedNetworkImageProvider(bg)
+                  : const AssetImage('assets/icon/app_icon.png')
+                      as ImageProvider,
+              fit: BoxFit.cover,
+              colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.35), BlendMode.darken),
             ),
-            const SizedBox(height: 6),
-            const Text(
-              'is #1 this week',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'is #1 this week',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    ));
+          ),
+        ));
   }
 
   Widget _buildHorizontalCovers(
@@ -294,7 +311,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600),
                 ),
                 Text(
                   artist,
@@ -321,95 +339,101 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            (s['title'] ?? 'Untitled') as String,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              (s['title'] ?? 'Untitled') as String,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              color: Colors.white10,
-              height: 180,
-              width: double.infinity,
-        child: img != null
-                  ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover)
-          : const Image(
-            image: AssetImage('assets/icon/app_icon.png'),
-                      fit: BoxFit.cover,
-                    ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Colors.white10,
+                height: 180,
+                width: double.infinity,
+                child: img != null
+                    ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover)
+                    : const Image(
+                        image: AssetImage('assets/icon/app_icon.png'),
+                        fit: BoxFit.cover,
+                      ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${s['artist'] ?? 'Unknown'} is #1 this week with ${(s['title'] ?? 'this track')}, accumulating ${_newsService.shortStreams(streams)} streams.',
-            style: const TextStyle(color: Colors.white70, height: 1.6),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              '${s['artist'] ?? 'Unknown'} is #1 this week with ${(s['title'] ?? 'this track')}, accumulating ${_newsService.shortStreams(streams)} streams.',
+              style: const TextStyle(color: Colors.white70, height: 1.6),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard({required String title, required String? imageUrl, required String headline, VoidCallback? onTap}) {
+  Widget _buildInfoCard(
+      {required String title,
+      required String? imageUrl,
+      required String headline,
+      VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              color: Colors.white10,
-              width: 90,
-              height: 90,
-        child: imageUrl != null
-                  ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover)
-          : const Image(
-            image: AssetImage('assets/icon/app_icon.png'),
-                      fit: BoxFit.cover,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                color: Colors.white10,
+                width: 90,
+                height: 90,
+                child: imageUrl != null
+                    ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover)
+                    : const Image(
+                        image: AssetImage('assets/icon/app_icon.png'),
+                        fit: BoxFit.cover,
+                      ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  headline,
-                  style: const TextStyle(color: Colors.white70, height: 1.5),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    headline,
+                    style: const TextStyle(color: Colors.white70, height: 1.5),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
   }
 
   // Detail sheets
-  void _openSongDetails(Map<String, dynamic> item, {String? preferredPeriod, String? preferredType}) {
+  void _openSongDetails(Map<String, dynamic> item,
+      {String? preferredPeriod, String? preferredType}) {
     final isAlbum = (item['isAlbum'] as bool?) ?? false;
-    final title = (item['title'] ?? (isAlbum ? 'Untitled Album' : 'Untitled')) as String;
+    final title =
+        (item['title'] ?? (isAlbum ? 'Untitled Album' : 'Untitled')) as String;
     final artist = (item['artist'] ?? 'Unknown') as String;
     final cover = item['coverArtUrl'] as String?;
     final streams = (item['periodStreams'] ?? item['streams'] ?? 0) as int;
@@ -437,7 +461,9 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                     color: Colors.white10,
                     child: cover != null
                         ? CachedNetworkImage(imageUrl: cover, fit: BoxFit.cover)
-                        : const Image(image: AssetImage('assets/icon/app_icon.png'), fit: BoxFit.cover),
+                        : const Image(
+                            image: AssetImage('assets/icon/app_icon.png'),
+                            fit: BoxFit.cover),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -445,12 +471,23 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(title,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      Text(artist, style: const TextStyle(color: Colors.white70)),
+                      Text(artist,
+                          style: const TextStyle(color: Colors.white70)),
                       const SizedBox(height: 6),
-                      Text('${isAlbum ? 'Album' : 'Song'} • ${_newsService.shortStreams(streams)} streams', style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                      if (pos != null) Text('Chart position: #$pos', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                      Text(
+                          '${isAlbum ? 'Album' : 'Song'} • ${_newsService.shortStreams(streams)} streams',
+                          style: const TextStyle(
+                              color: Colors.white60, fontSize: 12)),
+                      if (pos != null)
+                        Text('Chart position: #$pos',
+                            style: const TextStyle(
+                                color: Colors.white38, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -469,7 +506,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                       MaterialPageRoute(
                         builder: (_) => UnifiedChartsScreen(
                           initialPeriod: preferredPeriod ?? 'weekly',
-                          initialType: preferredType ?? (isAlbum ? 'albums' : 'singles'),
+                          initialType:
+                              preferredType ?? (isAlbum ? 'albums' : 'singles'),
                           initialRegion: 'global',
                         ),
                       ),
@@ -491,7 +529,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
   }
 
   void _openArtistDetails(Map<String, dynamic> artist) {
-    final name = (artist['artistName'] ?? artist['artist'] ?? 'Unknown') as String;
+    final name =
+        (artist['artistName'] ?? artist['artist'] ?? 'Unknown') as String;
     final avatar = artist['avatarUrl'] as String?;
     final streams = (artist['periodStreams'] ?? artist['streams'] ?? 0) as int;
     final released = artist['releasedSongs'] as int?;
@@ -518,8 +557,11 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                     height: 80,
                     color: Colors.white10,
                     child: avatar != null
-                        ? CachedNetworkImage(imageUrl: avatar, fit: BoxFit.cover)
-                        : const Image(image: AssetImage('assets/icon/app_icon.png'), fit: BoxFit.cover),
+                        ? CachedNetworkImage(
+                            imageUrl: avatar, fit: BoxFit.cover)
+                        : const Image(
+                            image: AssetImage('assets/icon/app_icon.png'),
+                            fit: BoxFit.cover),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -527,11 +569,20 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(name,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-                      Text('This week: ${_newsService.shortStreams(streams)} streams', style: const TextStyle(color: Colors.white70)),
+                      Text(
+                          'This week: ${_newsService.shortStreams(streams)} streams',
+                          style: const TextStyle(color: Colors.white70)),
                       if (released != null || charting != null)
-                        Text('Songs: ${released ?? '-'} • Charting: ${charting ?? '-'}', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                        Text(
+                            'Songs: ${released ?? '-'} • Charting: ${charting ?? '-'}',
+                            style: const TextStyle(
+                                color: Colors.white60, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -632,7 +683,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
       category: _selectedCategory!,
       timestamp: DateTime.now(),
     );
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       child: Row(
@@ -640,7 +691,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
           Chip(
             avatar: Text(tempNews.getCategoryEmoji()),
             label: Text(tempNews.getCategoryName()),
-            backgroundColor: Color(tempNews.getCategoryColorValue()).withOpacity(0.2),
+            backgroundColor:
+                Color(tempNews.getCategoryColorValue()).withOpacity(0.2),
             deleteIcon: const Icon(Icons.close, size: 18),
             onDeleted: () {
               setState(() {
@@ -722,13 +774,21 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
 
   Widget _buildNewsCard(NewsItem news) {
     final categoryColor = Color(news.getCategoryColorValue());
+    final isGandalf = news.authorId == 'gandalf_the_black';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      color: const Color(0xFF161B22),
+      color: isGandalf
+          ? const Color(0xFF1A0A0A) // Darker red tint for Gandalf
+          : const Color(0xFF161B22),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[800]!),
+        side: BorderSide(
+          color: isGandalf
+              ? Colors.red.withOpacity(0.5) // Red border for controversial
+              : Colors.grey[800]!,
+          width: isGandalf ? 2 : 1,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -742,7 +802,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: categoryColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
@@ -750,7 +811,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(news.getCategoryEmoji(), style: const TextStyle(fontSize: 12)),
+                        Text(news.getCategoryEmoji(),
+                            style: const TextStyle(fontSize: 12)),
                         const SizedBox(width: 4),
                         Text(
                           news.getCategoryName().toUpperCase(),
@@ -764,6 +826,35 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                       ],
                     ),
                   ),
+                  // Controversial badge for Gandalf posts
+                  if (isGandalf) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.red.withOpacity(0.5)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('⚠️', style: TextStyle(fontSize: 10)),
+                          SizedBox(width: 4),
+                          Text(
+                            'CONTROVERSIAL',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 9,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   Text(
                     _newsService.formatTimestamp(news.timestamp),
@@ -775,6 +866,38 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                 ],
               ),
               const SizedBox(height: 12),
+              // Author info for Gandalf posts
+              if (isGandalf) ...[
+                Row(
+                  children: [
+                    const Text('🧙‍♂️', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          news.authorName ?? 'Gandalf The Black',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (news.authorTitle != null)
+                          Text(
+                            news.authorTitle!,
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 10,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               // Headline
               Text(
                 news.headline,
@@ -815,9 +938,51 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   ],
                 ),
               ],
+              // Reactions for controversial posts
+              if (isGandalf && news.reactions != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildReactionChip('🔥', news.reactions!['fire'] ?? 0),
+                    const SizedBox(width: 8),
+                    _buildReactionChip('😱', news.reactions!['shocked'] ?? 0),
+                    const SizedBox(width: 8),
+                    _buildReactionChip('😂', news.reactions!['laughing'] ?? 0),
+                    const SizedBox(width: 8),
+                    _buildReactionChip('😡', news.reactions!['angry'] ?? 0),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildReactionChip(String emoji, int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.grey[850],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          if (count > 0) ...[
+            const SizedBox(width: 4),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -858,7 +1023,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: categoryColor.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(6),
@@ -866,7 +1032,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(news.getCategoryEmoji(), style: const TextStyle(fontSize: 14)),
+                            Text(news.getCategoryEmoji(),
+                                style: const TextStyle(fontSize: 14)),
                             const SizedBox(width: 6),
                             Text(
                               news.getCategoryName().toUpperCase(),
@@ -996,7 +1163,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
               const SizedBox(height: 16),
               ListTile(
                 leading: const Text('🌟', style: TextStyle(fontSize: 24)),
-                title: const Text('All News', style: TextStyle(color: Colors.white)),
+                title: const Text('All News',
+                    style: TextStyle(color: Colors.white)),
                 onTap: () {
                   setState(() {
                     _selectedCategory = null;
@@ -1013,7 +1181,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   timestamp: DateTime.now(),
                 );
                 return ListTile(
-                  leading: Text(newsItem.getCategoryEmoji(), style: const TextStyle(fontSize: 24)),
+                  leading: Text(newsItem.getCategoryEmoji(),
+                      style: const TextStyle(fontSize: 24)),
                   title: Text(
                     newsItem.getCategoryName(),
                     style: const TextStyle(color: Colors.white),

@@ -230,6 +230,36 @@ class AdminService {
     }
   }
 
+  /// Trigger Gandalf The Black controversial post (Admin Only)
+  Future<Map<String, dynamic>> triggerGandalfPost() async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final callable = _functions.httpsCallable('triggerGandalfPost');
+      final result = await callable.call();
+      return result.data as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to trigger Gandalf post: $e');
+    }
+  }
+
+  /// Trigger side hustle contract generation (Admin Only)
+  Future<Map<String, dynamic>> triggerSideHustleGeneration() async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final callable = _functions.httpsCallable('triggerSideHustleGeneration');
+      final result = await callable.call();
+      return result.data as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to trigger side hustle generation: $e');
+    }
+  }
+
   /// Get game statistics (Admin Only)
   Future<Map<String, dynamic>> getGameStats() async {
     if (!await isAdmin()) {

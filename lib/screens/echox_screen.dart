@@ -390,7 +390,8 @@ class _EchoXScreenState extends State<EchoXScreen>
             children: [
               // Make avatar tappable to view artist platforms
               GestureDetector(
-                onTap: () => _showViewArtistOptions(post.authorId, post.authorName),
+                onTap: () =>
+                    _showViewArtistOptions(post.authorId, post.authorName),
                 child: Container(
                   width: 40,
                   height: 40,
@@ -402,13 +403,15 @@ class _EchoXScreenState extends State<EchoXScreen>
                     ),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 24),
+                  child:
+                      const Icon(Icons.person, color: Colors.white, size: 24),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _showViewArtistOptions(post.authorId, post.authorName),
+                  onTap: () =>
+                      _showViewArtistOptions(post.authorId, post.authorName),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -455,7 +458,8 @@ class _EchoXScreenState extends State<EchoXScreen>
               IconButton(
                 tooltip: 'View platforms',
                 icon: const Icon(Icons.open_in_new, color: Colors.white70),
-                onPressed: () => _showViewArtistOptions(post.authorId, post.authorName),
+                onPressed: () =>
+                    _showViewArtistOptions(post.authorId, post.authorName),
               ),
             ],
           ),
@@ -547,54 +551,57 @@ class _EchoXScreenState extends State<EchoXScreen>
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _postController,
-              maxLines: 4,
-              maxLength: 280,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                hintText: "What's happening in your music career?",
-                hintStyle: TextStyle(color: Colors.white38),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00D9FF)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white24),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF00D9FF), width: 2),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _postController,
+                maxLines: 4,
+                maxLength: 280,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: "What's happening in your music career?",
+                  hintStyle: TextStyle(color: Colors.white38),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00D9FF)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white24),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF00D9FF), width: 2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00D9FF).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF00D9FF)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFF00D9FF), size: 16),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Cost: 5 Energy • Gain: +1 Fame, +2 Hype',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D9FF).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF00D9FF)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        color: Color(0xFF00D9FF), size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Cost: 5 Energy • Gain: +1 Fame, +2 Hype',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -695,9 +702,9 @@ class _EchoXScreenState extends State<EchoXScreen>
           .collection('echox_posts')
           .doc(post.id)
           .update(sanitizeForFirestore({
-        'likes': isLiked ? post.likes - 1 : post.likes + 1,
-        'likedBy': newLikedBy,
-      }));
+            'likes': isLiked ? post.likes - 1 : post.likes + 1,
+            'likedBy': newLikedBy,
+          }));
     } catch (e) {
       _showMessage('❌ Failed to like post');
     }
@@ -714,8 +721,8 @@ class _EchoXScreenState extends State<EchoXScreen>
           .collection('echox_posts')
           .doc(post.id)
           .update(sanitizeForFirestore({
-        'echoes': post.echoes + 1,
-      }));
+            'echoes': post.echoes + 1,
+          }));
 
       _currentStats = _currentStats.copyWith(
         energy: _currentStats.energy - 3,
@@ -809,9 +816,11 @@ class _EchoXScreenState extends State<EchoXScreen>
             if (isLoading) return;
             setModalState(() => isLoading = true);
             try {
-              final stats = await FirebaseService().getArtistStatsForPlayer(playerId);
+              final stats =
+                  await FirebaseService().getArtistStatsForPlayer(playerId);
               if (stats == null) {
-                if (mounted) _showMessage('⚠️ Could not load $authorName\'s profile');
+                if (mounted)
+                  _showMessage('⚠️ Could not load $authorName\'s profile');
                 return;
               }
               if (!mounted) return;
@@ -873,25 +882,38 @@ class _EchoXScreenState extends State<EchoXScreen>
                 const SizedBox(height: 8),
                 Text(
                   'Open on streaming platforms',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.6), fontSize: 12),
                 ),
                 const SizedBox(height: 16),
                 ListTile(
-                  leading: const Icon(Icons.music_note, color: Color(0xFF1DB954)),
-                  title: const Text('Tunify', style: TextStyle(color: Colors.white)),
-                  subtitle: Text('Spotify-style profile', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  leading:
+                      const Icon(Icons.music_note, color: Color(0xFF1DB954)),
+                  title: const Text('Tunify',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Spotify-style profile',
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
                   trailing: isLoading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.chevron_right, color: Colors.white70),
                   onTap: () => openFor('tunify'),
                 ),
                 const Divider(color: Colors.white12, height: 1),
                 ListTile(
-                  leading: const Icon(Icons.album_rounded, color: Color(0xFFFC3C44)),
-                  title: const Text('Maple Music', style: TextStyle(color: Colors.white)),
-                  subtitle: Text('Apple Music-style profile', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  leading:
+                      const Icon(Icons.album_rounded, color: Color(0xFFFC3C44)),
+                  title: const Text('Maple Music',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text('Apple Music-style profile',
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
                   trailing: isLoading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.chevron_right, color: Colors.white70),
                   onTap: () => openFor('maple'),
                 ),

@@ -20,6 +20,11 @@ class NewsItem {
   final String? relatedArtistName;
   final String? imageUrl;
   final Map<String, dynamic>? metadata;
+  final bool isControversial;
+  final String? authorId;
+  final String? authorName;
+  final String? authorTitle;
+  final Map<String, int>? reactions;
 
   NewsItem({
     required this.id,
@@ -31,6 +36,11 @@ class NewsItem {
     this.relatedArtistName,
     this.imageUrl,
     this.metadata,
+    this.isControversial = false,
+    this.authorId,
+    this.authorName,
+    this.authorTitle,
+    this.reactions,
   });
 
   factory NewsItem.fromFirestore(Map<String, dynamic> data, String id) {
@@ -47,6 +57,13 @@ class NewsItem {
       relatedArtistName: data['relatedArtistName'],
       imageUrl: data['imageUrl'],
       metadata: data['metadata'] as Map<String, dynamic>?,
+      isControversial: data['isControversial'] ?? false,
+      authorId: data['authorId'],
+      authorName: data['authorName'],
+      authorTitle: data['authorTitle'],
+      reactions: data['reactions'] != null
+          ? Map<String, int>.from(data['reactions'])
+          : null,
     );
   }
 

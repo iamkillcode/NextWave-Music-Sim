@@ -133,217 +133,43 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
               child: SingleChildScrollView(
                 child: Container(
                   padding: const EdgeInsets.all(24),
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      const Center(
-                        child: Text(
-                          '🎼 Create Your Song',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Song Title Input with Generate Button
-                      Row(
-                        children: [
-                          const Text(
-                            'Song Title:',
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.9,
+                    maxHeight: MediaQuery.of(context).size.height * 0.85,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header
+                        const Center(
+                          child: Text(
+                            '🎼 Create Your Song',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const Spacer(),
-                          TextButton.icon(
-                            onPressed: () {
-                              dialogSetState(() {
-                                int quality = artistStats
-                                    .calculateSongQuality(
-                                      selectedGenre,
-                                      selectedEffort,
-                                    )
-                                    .round();
-                                nameSuggestions =
-                                    SongNameGenerator.getSuggestions(
-                                  selectedGenre,
-                                  count: 4,
-                                  quality: quality,
-                                );
-                              });
-                            },
-                            icon: const Icon(
-                              Icons.refresh,
-                              size: 16,
-                              color: Color(0xFF00D9FF),
-                            ),
-                            label: const Text(
-                              'New Ideas',
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Song Title Input with Generate Button
+                        Row(
+                          children: [
+                            const Text(
+                              'Song Title:',
                               style: TextStyle(
-                                color: Color(0xFF00D9FF),
-                                fontSize: 12,
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: songTitleController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: 'Enter song title or pick a suggestion...',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFF30363D),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        maxLength: 50,
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Name Suggestions
-                      const Text(
-                        '💡 Suggestions:',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: nameSuggestions.map((suggestion) {
-                          return GestureDetector(
-                            onTap: () {
-                              dialogSetState(() {
-                                songTitleController.text = suggestion;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF00D9FF).withOpacity(0.3),
-                                    const Color(0xFF9B59B6).withOpacity(0.3),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: const Color(
-                                    0xFF00D9FF,
-                                  ).withOpacity(0.5),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                suggestion,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Genre Selection
-                      const Text(
-                        'Genre:',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF30363D),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: selectedGenre,
-                            dropdownColor: const Color(0xFF30363D),
-                            style: const TextStyle(color: Colors.white),
-                            items: allGenres.map((genre) {
-                              // 🔒 Check if genre is unlocked
-                              final bool isUnlocked =
-                                  unlockedLower.contains(genre.toLowerCase());
-
-                              return DropdownMenuItem(
-                                value: genre,
-                                enabled: isUnlocked, // Disable locked genres
-                                child: Row(
-                                  children: [
-                                    // Show lock icon for locked genres
-                                    if (!isUnlocked)
-                                      const Icon(
-                                        Icons.lock,
-                                        size: 16,
-                                        color: Colors.grey,
-                                      ),
-                                    if (!isUnlocked) const SizedBox(width: 4),
-                                    Genres.getIcon(genre),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      genre,
-                                      style: TextStyle(
-                                        color: isUnlocked
-                                            ? Colors.white
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                    if (!isUnlocked)
-                                      const Text(
-                                        ' (Locked)',
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              // Only allow changing to unlocked genres
-                              if (value != null &&
-                                  unlockedLower.contains(value.toLowerCase())) {
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: () {
                                 dialogSetState(() {
-                                  selectedGenre = value;
-                                  // Regenerate suggestions when genre changes
                                   int quality = artistStats
                                       .calculateSongQuality(
                                         selectedGenre,
@@ -357,195 +183,377 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
                                     quality: quality,
                                   );
                                 });
-                              }
-                            },
-                            isExpanded: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Effort Level Selection
-                      const Text(
-                        'Effort Level:',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [1, 2, 3, 4].map((effort) {
-                          bool isSelected = selectedEffort == effort;
-                          bool canAfford = artistStats.energy >=
-                              _getEnergyCostForEffort(effort);
-
-                          return GestureDetector(
-                            onTap: canAfford
-                                ? () {
-                                    dialogSetState(() {
-                                      selectedEffort = effort;
-                                      // Regenerate suggestions when effort changes
-                                      int quality = artistStats
-                                          .calculateSongQuality(
-                                            selectedGenre,
-                                            selectedEffort,
-                                          )
-                                          .round();
-                                      nameSuggestions =
-                                          SongNameGenerator.getSuggestions(
-                                        selectedGenre,
-                                        count: 4,
-                                        quality: quality,
-                                      );
-                                    });
-                                  }
-                                : null,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                                horizontal: 12,
+                              },
+                              icon: const Icon(
+                                Icons.refresh,
+                                size: 16,
+                                color: Color(0xFF00D9FF),
                               ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xFF00D9FF)
-                                    : canAfford
-                                        ? const Color(0xFF30363D)
-                                        : const Color(0xFF30363D)
-                                            .withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? const Color(0xFF00D9FF)
-                                      : Colors.transparent,
-                                  width: 2,
+                              label: const Text(
+                                'New Ideas',
+                                style: TextStyle(
+                                  color: Color(0xFF00D9FF),
+                                  fontSize: 12,
                                 ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    _getEffortName(effort),
-                                    style: TextStyle(
-                                      color: canAfford
-                                          ? Colors.white
-                                          : Colors.white30,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${_getEnergyCostForEffort(effort)} Energy',
-                                    style: TextStyle(
-                                      color: canAfford
-                                          ? Colors.white70
-                                          : Colors.white30,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Energy Cost Display
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF30363D).withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Energy Cost:',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Text(
-                              '-$energyCost Energy',
-                              style: TextStyle(
-                                color: artistStats.energy >= energyCost
-                                    ? const Color(0xFFFF6B9D)
-                                    : Colors.redAccent,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: songTitleController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Enter song title or pick a suggestion...',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFF30363D),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          maxLength: 50,
+                        ),
+                        const SizedBox(height: 8),
 
-                      // Action Buttons
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextButton(
-                              onPressed: () {
-                                Navigator.of(
-                                  context,
-                                ).pop(); // Close custom form
-                                _showSongWritingDialog(); // Go back to main dialog
+                        // Name Suggestions
+                        const Text(
+                          '💡 Suggestions:',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: nameSuggestions.map((suggestion) {
+                            return GestureDetector(
+                              onTap: () {
+                                dialogSetState(() {
+                                  songTitleController.text = suggestion;
+                                });
                               },
-                              style: TextButton.styleFrom(
+                              child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      const Color(0xFF00D9FF).withOpacity(0.3),
+                                      const Color(0xFF9B59B6).withOpacity(0.3),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF00D9FF,
+                                    ).withOpacity(0.5),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  suggestion,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
-                              child: const Text(
-                                'Cancel',
-                                style: TextStyle(color: Colors.white70),
-                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Genre Selection
+                        const Text(
+                          'Genre:',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF30363D),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: selectedGenre,
+                              dropdownColor: const Color(0xFF30363D),
+                              style: const TextStyle(color: Colors.white),
+                              items: allGenres.map((genre) {
+                                // 🔒 Check if genre is unlocked
+                                final bool isUnlocked =
+                                    unlockedLower.contains(genre.toLowerCase());
+
+                                return DropdownMenuItem(
+                                  value: genre,
+                                  enabled: isUnlocked, // Disable locked genres
+                                  child: Row(
+                                    children: [
+                                      // Show lock icon for locked genres
+                                      if (!isUnlocked)
+                                        const Icon(
+                                          Icons.lock,
+                                          size: 16,
+                                          color: Colors.grey,
+                                        ),
+                                      if (!isUnlocked) const SizedBox(width: 4),
+                                      Genres.getIcon(genre),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        genre,
+                                        style: TextStyle(
+                                          color: isUnlocked
+                                              ? Colors.white
+                                              : Colors.grey,
+                                        ),
+                                      ),
+                                      if (!isUnlocked)
+                                        const Text(
+                                          ' (Locked)',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                // Only allow changing to unlocked genres
+                                if (value != null &&
+                                    unlockedLower
+                                        .contains(value.toLowerCase())) {
+                                  dialogSetState(() {
+                                    selectedGenre = value;
+                                    // Regenerate suggestions when genre changes
+                                    int quality = artistStats
+                                        .calculateSongQuality(
+                                          selectedGenre,
+                                          selectedEffort,
+                                        )
+                                        .round();
+                                    nameSuggestions =
+                                        SongNameGenerator.getSuggestions(
+                                      selectedGenre,
+                                      count: 4,
+                                      quality: quality,
+                                    );
+                                  });
+                                }
+                              },
+                              isExpanded: true,
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            flex: 2,
-                            child: ElevatedButton(
-                              onPressed:
-                                  (songTitleController.text.trim().isNotEmpty &&
-                                          artistStats.energy >= energyCost)
-                                      ? () => _createCustomSong(
-                                            songTitleController.text.trim(),
-                                            selectedGenre,
-                                            selectedEffort,
-                                          )
-                                      : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00D9FF),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Effort Level Selection
+                        const Text(
+                          'Effort Level:',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [1, 2, 3, 4].map((effort) {
+                            bool isSelected = selectedEffort == effort;
+                            bool canAfford = artistStats.energy >=
+                                _getEnergyCostForEffort(effort);
+
+                            return GestureDetector(
+                              onTap: canAfford
+                                  ? () {
+                                      dialogSetState(() {
+                                        selectedEffort = effort;
+                                        // Regenerate suggestions when effort changes
+                                        int quality = artistStats
+                                            .calculateSongQuality(
+                                              selectedGenre,
+                                              selectedEffort,
+                                            )
+                                            .round();
+                                        nameSuggestions =
+                                            SongNameGenerator.getSuggestions(
+                                          selectedGenre,
+                                          count: 4,
+                                          quality: quality,
+                                        );
+                                      });
+                                    }
+                                  : null,
+                              child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
+                                  vertical: 8,
+                                  horizontal: 12,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFF00D9FF)
+                                      : canAfford
+                                          ? const Color(0xFF30363D)
+                                          : const Color(0xFF30363D)
+                                              .withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF00D9FF)
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      _getEffortName(effort),
+                                      style: TextStyle(
+                                        color: canAfford
+                                            ? Colors.white
+                                            : Colors.white30,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${_getEnergyCostForEffort(effort)} Energy',
+                                      style: TextStyle(
+                                        color: canAfford
+                                            ? Colors.white70
+                                            : Colors.white30,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: const Text(
-                                'Create Song',
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Energy Cost Display
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF30363D).withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Energy Cost:',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                '-$energyCost Energy',
+                                style: TextStyle(
+                                  color: artistStats.energy >= energyCost
+                                      ? const Color(0xFFFF6B9D)
+                                      : Colors.redAccent,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Action Buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () {
+                                  Navigator.of(
+                                    context,
+                                  ).pop(); // Close custom form
+                                  _showSongWritingDialog(); // Go back to main dialog
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(color: Colors.white70),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: (songTitleController.text
+                                            .trim()
+                                            .isNotEmpty &&
+                                        artistStats.energy >= energyCost)
+                                    ? () => _createCustomSong(
+                                          songTitleController.text.trim(),
+                                          selectedGenre,
+                                          selectedEffort,
+                                        )
+                                    : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF00D9FF),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Create Song',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -637,8 +645,8 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
         0,
         10000,
       ),
-      lyricsSkill: (artistStats.lyricsSkill + skillGains['lyricsSkill']!)
-          .clamp(0, 100),
+      lyricsSkill:
+          (artistStats.lyricsSkill + skillGains['lyricsSkill']!).clamp(0, 100),
       compositionSkill:
           (artistStats.compositionSkill + skillGains['compositionSkill']!)
               .clamp(0, 100),
@@ -652,7 +660,8 @@ class _WriteSongScreenState extends State<WriteSongScreen> {
 
     // Close dialog and screen with updated stats - no setState needed
     Navigator.of(context).pop(); // Close dialog
-    Navigator.of(context).pop(updatedStats); // Return to previous screen with updated stats
+    Navigator.of(context)
+        .pop(updatedStats); // Return to previous screen with updated stats
   }
 
   @override

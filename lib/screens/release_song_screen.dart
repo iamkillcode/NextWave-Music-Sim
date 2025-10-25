@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/streaming_platform.dart';
 import '../services/stream_growth_service.dart';
+import '../services/cover_art_uploader.dart';
 
 class ReleaseSongScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -77,30 +76,40 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
   Future<void> _uploadCoverArt() async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Upload to Firebase Storage using the helper service
+      final storageUrl = await CoverArtUploader.pickAndUploadCoverArt(
+        userId: userId,
+        songId: widget.song.id,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
       );
 
-      if (image == null) return;
-
-      // Read image as bytes and convert to base64
-      final Uint8List imageBytes = await image.readAsBytes();
-      final String base64Image = base64Encode(imageBytes);
-      final String dataUrl = 'data:image/jpeg;base64,$base64Image';
+      if (storageUrl == null) return; // User cancelled
 
       setState(() {
-        _uploadedCoverArtUrl = dataUrl;
+        _uploadedCoverArtUrl = storageUrl;
       });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cover art uploaded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       print('Error uploading cover art: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to upload cover art'),
+          SnackBar(
+            content: Text('Failed to upload cover art: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

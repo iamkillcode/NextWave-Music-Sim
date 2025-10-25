@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
-import 'dart:typed_data';
 import '../models/artist_stats.dart';
 import '../services/admin_service.dart';
+import '../services/cover_art_uploader.dart';
 import 'admin_dashboard_screen.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../utils/genres.dart';
@@ -103,13 +101,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (userId != null) {
         // Reset genre mastery for the new genre
         await _firestore.collection('players').doc(userId).update(
-          sanitizeForFirestore({
-            'primaryGenre': newGenre,
-            'hasResetGenre': true,
-            'genreMastery': {newGenre: 0},
-            'unlockedGenres': [newGenre],
-          }),
-        );
+              sanitizeForFirestore({
+                'primaryGenre': newGenre,
+                'hasResetGenre': true,
+                'genreMastery': {newGenre: 0},
+                'unlockedGenres': [newGenre],
+              }),
+            );
 
         setState(() {
           _currentGenre = newGenre;
@@ -157,9 +155,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     try {
-          final userId = _auth.currentUser?.uid;
-          if (userId != null) {
-            await _firestore.collection('players').doc(userId).update(
+      final userId = _auth.currentUser?.uid;
+      if (userId != null) {
+        await _firestore.collection('players').doc(userId).update(
               sanitizeForFirestore({
                 'gender': gender,
               }),
@@ -198,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final userId = _auth.currentUser?.uid;
       if (userId != null) {
-            await _firestore.collection('players').doc(userId).update(
+        await _firestore.collection('players').doc(userId).update(
               sanitizeForFirestore({
                 'notificationsEnabled': _notificationsEnabled,
                 'soundEnabled': _soundEnabled,
@@ -308,12 +306,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final userId = _auth.currentUser?.uid;
-        if (userId != null) {
+      if (userId != null) {
         await _firestore.collection('players').doc(userId).update(
-          sanitizeForFirestore({
-            'artistName': newName,
-          }),
-        );
+              sanitizeForFirestore({
+                'displayName':
+                    newName, // Fixed: Update displayName (used by dashboard)
+              }),
+            );
 
         // Update the artist stats and notify parent
         final updatedStats = widget.artistStats.copyWith(name: newName);
@@ -343,49 +342,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _uploadAvatar() async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.gallery,
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Upload to Firebase Storage using the helper service
+      // Use 'avatar' as songId to create avatar-specific path
+      final storageUrl = await CoverArtUploader.pickAndUploadCoverArt(
+        userId: userId,
+        songId: 'avatar',
         maxWidth: 512,
         maxHeight: 512,
         imageQuality: 85,
       );
 
-      if (image == null) return;
-
-      // Read image as bytes and convert to base64
-      final Uint8List imageBytes = await image.readAsBytes();
-      final String base64Image = base64Encode(imageBytes);
-      final String dataUrl = 'data:image/jpeg;base64,$base64Image';
+      if (storageUrl == null) return; // User cancelled
 
       setState(() {
-        _avatarUrl = dataUrl;
+        _avatarUrl = storageUrl;
       });
 
       // Save avatar URL to Firestore
-      final userId = _auth.currentUser?.uid;
-      if (userId != null) {
-            await _firestore.collection('players').doc(userId).update(
-              sanitizeForFirestore({
-                'avatarUrl': _avatarUrl,
-              }),
-            );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Avatar updated!'),
-              backgroundColor: Colors.green,
-            ),
+      await _firestore.collection('players').doc(userId).update(
+            sanitizeForFirestore({
+              'avatarUrl': _avatarUrl,
+            }),
           );
-        }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Avatar updated!'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       print('Error uploading avatar: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to upload avatar'),
+          SnackBar(
+            content: Text('Failed to upload avatar: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

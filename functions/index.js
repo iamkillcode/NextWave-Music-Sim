@@ -954,6 +954,48 @@ function applyEventBonuses(baseStreams, song, playerData, event) {
 
 async function createSongLeaderboardSnapshot(weekId, timestamp) {
   try {
+    // Get PREVIOUS week's snapshot to calculate movement and weeks on chart
+    const previousWeekId = getPreviousWeekId(weekId);
+    const previousSnapshots = {};
+    
+    try {
+      const prevGlobalDoc = await db.collection('leaderboard_history')
+        .doc(`songs_global_${previousWeekId}`)
+        .get();
+      
+      if (prevGlobalDoc.exists) {
+        const prevData = prevGlobalDoc.data();
+        prevData.rankings.forEach(entry => {
+          previousSnapshots[`global_${entry.songId}`] = {
+            position: entry.position,
+            weeksOnChart: entry.weeksOnChart || 0,
+            consecutiveWeeks: entry.consecutiveWeeks || 0,
+          };
+        });
+      }
+      
+      // Get previous regional snapshots
+      const regions = ['usa', 'europe', 'uk', 'asia', 'africa', 'latin_america', 'oceania'];
+      for (const region of regions) {
+        const prevRegionalDoc = await db.collection('leaderboard_history')
+          .doc(`songs_${region}_${previousWeekId}`)
+          .get();
+        
+        if (prevRegionalDoc.exists) {
+          const prevData = prevRegionalDoc.data();
+          prevData.rankings.forEach(entry => {
+            previousSnapshots[`${region}_${entry.songId}`] = {
+              position: entry.position,
+              weeksOnChart: entry.weeksOnChart || 0,
+              consecutiveWeeks: entry.consecutiveWeeks || 0,
+            };
+          });
+        }
+      }
+    } catch (error) {
+      console.log(`⚠️ No previous week data found for ${previousWeekId} - all entries will be "New Entry"`);
+    }
+    
     // Get top 100 songs by last7DaysStreams from BOTH players and NPCs
     const playersSnapshot = await db.collection('players').get();
     const allSongs = [];
@@ -1004,16 +1046,37 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
     globalSongs.sort((a, b) => b.last7DaysStreams - a.last7DaysStreams);
     const globalTop100 = globalSongs.slice(0, 100);
     
-    // Create global snapshot document
-    await db.collection('leaderboard_history').doc(`songs_global_${weekId}`).set({
-      weekId,
-      timestamp: admin.firestore.Timestamp.fromDate(timestamp),
-      type: 'songs',
-      region: 'global',
-      rankings: globalTop100.map((song, index) => ({
-        position: index + 1,
-        rank: index + 1,
-        songId: song.id || '',
+    // Calculate movement, entry type, and weeks on chart
+    const globalRankings = globalTop100.map((song, index) => {
+      const position = index + 1;
+      const songId = song.id || '';
+      const prevKey = `global_${songId}`;
+      const prevData = previousSnapshots[prevKey];
+      
+      let movement = 0;
+      let lastWeekPosition = null;
+      let weeksOnChart = 1;
+      let consecutiveWeeks = 1;
+      let entryType = 'new'; // 'new', 're-entry', or null
+      
+      if (prevData) {
+        // Song was on chart last week
+        lastWeekPosition = prevData.position;
+        movement = lastWeekPosition - position; // Positive = moved up
+        weeksOnChart = prevData.weeksOnChart + 1;
+        consecutiveWeeks = prevData.consecutiveWeeks + 1;
+        entryType = null; // Not a new or re-entry
+      } else {
+        // Song not on last week's chart - check if it's ever been on chart before
+        // (This would require historical tracking, for now treat as 'new')
+        // TODO: Add lifetime chart history tracking to distinguish 'new' from 're-entry'
+        entryType = 'new'; // Assume new for now
+      }
+      
+      return {
+        position,
+        rank: position,
+        songId,
         title: song.title,
         artistId: song.artistId,
         artist: song.artistName,
@@ -1023,7 +1086,22 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
         genre: song.genre,
         coverArtUrl: song.coverArtUrl || null,
         isNPC: song.isNPC || false,
-      })),
+        // NEW: Trending data
+        movement,
+        lastWeekPosition,
+        weeksOnChart,
+        consecutiveWeeks,
+        entryType,
+      };
+    });
+    
+    // Create global snapshot document
+    await db.collection('leaderboard_history').doc(`songs_global_${weekId}`).set({
+      weekId,
+      timestamp: admin.firestore.Timestamp.fromDate(timestamp),
+      type: 'songs',
+      region: 'global',
+      rankings: globalRankings,
     });
     
     console.log(`✅ Created GLOBAL song leaderboard snapshot for week ${weekId}`);
@@ -1041,26 +1119,56 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
       regionalSongs.sort((a, b) => b.regionStreams - a.regionStreams);
       const regionalTop100 = regionalSongs.slice(0, 100);
       
+      // Calculate movement and weeks on chart for regional rankings
+      const regionalRankings = regionalTop100.map((song, index) => {
+        const position = index + 1;
+        const songId = song.id || '';
+        const prevKey = `${region}_${songId}`;
+        const prevData = previousSnapshots[prevKey];
+        
+        let movement = 0;
+        let lastWeekPosition = null;
+        let weeksOnChart = 1;
+        let consecutiveWeeks = 1;
+        let entryType = 'new';
+        
+        if (prevData) {
+          lastWeekPosition = prevData.position;
+          movement = lastWeekPosition - position;
+          weeksOnChart = prevData.weeksOnChart + 1;
+          consecutiveWeeks = prevData.consecutiveWeeks + 1;
+          entryType = null;
+        }
+        
+        return {
+          position,
+          rank: position,
+          songId,
+          title: song.title,
+          artistId: song.artistId,
+          artist: song.artistName,
+          artistName: song.artistName,
+          streams: song.regionStreams,
+          totalStreams: song.streams,
+          genre: song.genre,
+          coverArtUrl: song.coverArtUrl || null,
+          isNPC: song.isNPC || false,
+          // NEW: Trending data
+          movement,
+          lastWeekPosition,
+          weeksOnChart,
+          consecutiveWeeks,
+          entryType,
+        };
+      });
+      
       // Create regional snapshot
       await db.collection('leaderboard_history').doc(`songs_${region}_${weekId}`).set({
         weekId,
         timestamp: admin.firestore.Timestamp.fromDate(timestamp),
         type: 'songs',
         region,
-        rankings: regionalTop100.map((song, index) => ({
-          position: index + 1,
-          rank: index + 1,
-          songId: song.id || '',
-          title: song.title,
-          artistId: song.artistId,
-          artist: song.artistName,
-          artistName: song.artistName,
-          streams: song.regionStreams, // Region-specific streams
-          totalStreams: song.streams, // Global total
-          genre: song.genre,
-          coverArtUrl: song.coverArtUrl || null,
-          isNPC: song.isNPC || false,
-        })),
+        rankings: regionalRankings,
       });
       
       console.log(`✅ Created ${region.toUpperCase()} song leaderboard snapshot for week ${weekId}`);
@@ -1267,6 +1375,19 @@ function getWeekId(date) {
   const startOfYear = new Date(date.getFullYear(), 0, 1);
   const days = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000));
   return date.getFullYear() * 100 + Math.ceil(days / 7);
+}
+
+function getPreviousWeekId(weekId) {
+  const year = Math.floor(weekId / 100);
+  const week = weekId % 100;
+  
+  if (week > 1) {
+    // Same year, previous week
+    return year * 100 + (week - 1);
+  } else {
+    // Previous year, last week (approximately week 52)
+    return (year - 1) * 100 + 52;
+  }
 }
 
 // ============================================================================
@@ -3883,6 +4004,341 @@ exports.sendGlobalNotificationToPlayers = functions.https.onCall(async (data, co
 });
 
 // ============================================================================
+// GANDALF THE BLACK - CONTROVERSIAL MUSIC CRITIC
+// ============================================================================
+
+/**
+ * Gandalf The Black - A notorious music critic who posts controversial takes
+ * Runs twice a day to stir up drama in The Scoop
+ */
+exports.gandalfTheBlackPosts = functions.pubsub
+  .schedule('0 */12 * * *') // Every 12 hours (twice a day)
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🧙‍♂️ Gandalf The Black is stirring up controversy...');
+    
+    try {
+      // Decide what type of post to create
+      const postType = Math.random();
+      
+      if (postType < 0.4) {
+        // 40% - Chart drama
+        await createChartDramaPost();
+      } else if (postType < 0.7) {
+        // 30% - Artist beef
+        await createArtistBeefPost();
+      } else {
+        // 30% - Controversial opinion
+        await createControversialOpinionPost();
+      }
+      
+      console.log('✅ Gandalf The Black has spoken!');
+      return null;
+    } catch (error) {
+      console.error('❌ Error in Gandalf posts:', error);
+      return null;
+    }
+  });
+
+/**
+ * Manual trigger for Gandalf posts (Admin only)
+ */
+exports.triggerGandalfPost = functions.https.onCall(async (data, context) => {
+  await validateAdminAccess(context);
+  
+  console.log('🧙‍♂️ Manually triggering Gandalf The Black post...');
+  
+  try {
+    // Handle null data or missing type property
+    const postType = (data && data.type) ? data.type : 'random';
+    
+    if (postType === 'chart' || (postType === 'random' && Math.random() < 0.5)) {
+      await createChartDramaPost();
+    } else {
+      await createArtistBeefPost();
+    }
+    
+    return { success: true, message: 'Gandalf has stirred up drama!' };
+  } catch (error) {
+    console.error('❌ Error triggering Gandalf:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Side Hustle Contract Generation - Runs daily at midnight
+ * Maintains a pool of 15-20 available contracts
+ */
+exports.dailySideHustleGeneration = functions.pubsub
+  .schedule('0 0 * * *') // Every day at midnight UTC
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('💼 Daily side hustle contract generation triggered');
+    try {
+      await generateDailySideHustleContracts();
+      return null;
+    } catch (error) {
+      console.error('❌ Error in daily side hustle generation:', error);
+      return null;
+    }
+  });
+
+/**
+ * Manual trigger for side hustle generation (Admin only)
+ */
+exports.triggerSideHustleGeneration = functions.https.onCall(async (data, context) => {
+  await validateAdminAccess(context);
+  
+  console.log('💼 Manually triggering side hustle contract generation...');
+  
+  try {
+    const result = await generateDailySideHustleContracts();
+    return { 
+      success: true, 
+      message: `Generated ${result.generated} new contracts. Pool size: ${result.currentPool}`,
+      ...result
+    };
+  } catch (error) {
+    console.error('❌ Error triggering side hustle generation:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Create a controversial post about chart movements
+ */
+async function createChartDramaPost() {
+  try {
+    // Get latest weekly chart
+    const now = new Date();
+    const weekId = getWeekId(now);
+    const previousWeekId = getPreviousWeekId(weekId);
+    
+    // Get current and previous week charts
+    const currentChartDoc = await db.collection('leaderboard_history')
+      .doc(`songs_global_${weekId}`)
+      .get();
+    
+    const previousChartDoc = await db.collection('leaderboard_history')
+      .doc(`songs_global_${previousWeekId}`)
+      .get();
+    
+    if (!currentChartDoc.exists || !previousChartDoc.exists) {
+      console.log('⚠️ Chart data not available, creating opinion post instead');
+      await createControversialOpinionPost();
+      return;
+    }
+    
+    const currentRankings = currentChartDoc.data().rankings;
+    const previousRankings = previousChartDoc.data().rankings;
+    
+    // Find dramatic movements
+    const biggestRiser = currentRankings
+      .filter(song => song.movement > 10)
+      .sort((a, b) => b.movement - a.movement)[0];
+    
+    const biggestFaller = currentRankings
+      .filter(song => song.movement < -10)
+      .sort((a, b) => a.movement - b.movement)[0];
+    
+    const newNumber1 = currentRankings[0];
+    const oldNumber1 = previousRankings[0];
+    
+    let post = null;
+    
+    if (newNumber1.songId !== oldNumber1.songId) {
+      // #1 spot changed - MAJOR drama
+      post = {
+        headline: '👑 NEW KING DETHRONED THE OLD GUARD',
+        content: `🔥 ${oldNumber1.artist} just got KNOCKED OFF the #1 spot by ${newNumber1.artist}'s "${newNumber1.title}"! ` +
+          `Is this the end of ${oldNumber1.artist}'s reign? The streets are saying they've lost their edge. ` +
+          `Sources say ${oldNumber1.artist} is in the studio working on a "response track" but let's be honest - ` +
+          `when you lose the crown, you rarely get it back. ${newNumber1.artist} is the future. Get used to it. 💀`,
+        tags: ['beef', 'charts', '#1_spot'],
+      };
+    } else if (biggestFaller) {
+      // Someone fell hard
+      post = {
+        headline: '📉 MASSIVE FLOP ALERT',
+        content: `💀 ${biggestFaller.artist}'s "${biggestFaller.title}" just PLUMMETED ${Math.abs(biggestFaller.movement)} spots on the charts! ` +
+          `From #${biggestFaller.lastWeekPosition} to #${biggestFaller.position}. That's not a drop, that's a CRASH. ` +
+          `Fans are jumping ship FAST. Word on the street? The label is already looking for the next big thing. ` +
+          `Maybe ${biggestFaller.artist} should've spent more time in the studio and less time on social media. ⚰️ #CareerOver`,
+        tags: ['charts', 'flop'],
+      };
+    } else if (biggestRiser) {
+      // Someone rose dramatically
+      post = {
+        headline: '⚠️ SUSPICIOUS CHART JUMP - BOT FARMS?',
+        content: `🤔 ${biggestRiser.artist}'s "${biggestRiser.title}" jumped ${biggestRiser.movement} spots this week. ` +
+          `That's... interesting. Real organic growth doesn't work like that. Industry insiders are whispering about ` +
+          `"strategic playlist placements" and "algorithmic manipulation." Not saying they're buying streams, but when ` +
+          `a song jumps that fast, you gotta wonder. True fans know what's up. 👀 #ExposedFraud #FakeStreams`,
+        tags: ['charts', 'controversy'],
+      };
+    }
+    
+    if (post) {
+      await db.collection('news').add({
+        category: 'drama',
+        headline: post.headline,
+        body: post.content,
+        authorId: 'gandalf_the_black',
+        authorName: 'Gandalf The Black',
+        authorTitle: 'The Dark Lord of Music Criticism',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        isControversial: true,
+        tags: post.tags,
+        reactions: { fire: 0, shocked: 0, laughing: 0, angry: 0 },
+      });
+      
+      console.log(`📰 Gandalf created chart drama post: ${post.headline}`);
+    }
+  } catch (error) {
+    console.error('Error creating chart drama:', error);
+  }
+}
+
+/**
+ * Create controversial artist beef post
+ */
+async function createArtistBeefPost() {
+  try {
+    // Get random artists from current charts
+    const now = new Date();
+    const weekId = getWeekId(now);
+    
+    const chartDoc = await db.collection('leaderboard_history')
+      .doc(`songs_global_${weekId}`)
+      .get();
+    
+    if (!chartDoc.exists) {
+      console.log('⚠️ No chart data, creating opinion instead');
+      await createControversialOpinionPost();
+      return;
+    }
+    
+    const rankings = chartDoc.data().rankings;
+    
+    // Get two different artists
+    const artist1 = rankings[Math.floor(Math.random() * Math.min(20, rankings.length))];
+    let artist2;
+    do {
+      artist2 = rankings[Math.floor(Math.random() * Math.min(20, rankings.length))];
+    } while (artist2.artistId === artist1.artistId);
+    
+    const beefTemplates = [
+      {
+        headline: '🥊 STUDIO BEEF: SHOTS FIRED',
+        content: `👊 Sources close to ${artist1.artist} say they were TALKING TRASH about ${artist2.artist} in the studio last night. ` +
+          `Apparently ${artist1.artist} called ${artist2.artist}'s music "basic" and "formulaic." ${artist2.artist}'s team is FURIOUS. ` +
+          `Word is ${artist2.artist} is already working on a diss track. This is about to get MESSY. 🍿 ` +
+          `Industry insiders say this beef has been brewing for months. Stay tuned.`,
+      },
+      {
+        headline: '😤 COPYCAT SCANDAL EXPOSED',
+        content: `🤔 Did ${artist2.artist} just COPY ${artist1.artist}'s sound? Both artists dropped ${artist1.genre} tracks recently ` +
+          `and they sound SUSPICIOUSLY similar. ${artist1.artist} fans are calling out ${artist2.artist} for being a fraud. ` +
+          `${artist2.artist}'s response? Silence. That's usually a guilty conscience talking. One of them is the real deal, ` +
+          `the other is a cheap imitation. Fans know which is which. 👀 #FakeArtist`,
+      },
+      {
+        headline: '💀 SOCIAL MEDIA WAR INCOMING',
+        content: `⚠️ ${artist1.artist} just liked a tweet DISSING ${artist2.artist}. Then unliked it 5 minutes later. ` +
+          `Too late, the internet saw everything. ${artist2.artist} fans are DEMANDING an apology. ${artist1.artist} fans are saying ` +
+          `"they said what we were all thinking." This passive-aggressive behavior is about to turn into full-on war. ` +
+          `My prediction? One of them drops a surprise track this week throwing shade. Mark my words. 🎯`,
+      },
+    ];
+    
+    const template = beefTemplates[Math.floor(Math.random() * beefTemplates.length)];
+    
+    await db.collection('news').add({
+      category: 'drama',
+      headline: template.headline,
+      body: template.content,
+      authorId: 'gandalf_the_black',
+      authorName: 'Gandalf The Black',
+      authorTitle: 'The Dark Lord of Music Criticism',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      isControversial: true,
+      relatedArtists: [artist1.artistId, artist2.artistId],
+      tags: ['beef', 'drama', 'controversy'],
+      reactions: { fire: 0, shocked: 0, laughing: 0, angry: 0 },
+    });
+    
+    console.log(`📰 Gandalf created beef post between ${artist1.artist} and ${artist2.artist}`);
+  } catch (error) {
+    console.error('Error creating beef post:', error);
+  }
+}
+
+/**
+ * Create a controversial opinion post about music trends
+ */
+async function createControversialOpinionPost() {
+  const opinionTemplates = [
+    {
+      headline: '🗑️ MODERN POP IS DEAD',
+      content: `💀 Let's be real - pop music in 2020 is TRASH. Every song sounds the same. Same four chords, same generic ` +
+        `lyrics about love and heartbreak, same auto-tuned vocals. Where's the creativity? Where's the risk-taking? ` +
+        `Artists are too scared to be different because they're chasing streams instead of making art. ` +
+        `The golden age of music is OVER. Fight me. 🎤`,
+      tags: ['opinion', 'pop', 'hot_take'],
+    },
+    {
+      headline: '📉 STREAMING KILLED MUSIC QUALITY',
+      content: `⚠️ Unpopular opinion: Streaming services RUINED music. Artists are making 3-minute songs designed for TikTok ` +
+        `instead of crafting albums. No one cares about artistry anymore, it's all about viral moments and playlist placements. ` +
+        `The algorithms are destroying creativity. Real music died when everyone started chasing streams. ` +
+        `Don't @ me, you know I'm right. 💯`,
+      tags: ['opinion', 'streaming', 'industry'],
+    },
+    {
+      headline: '🎸 ROCK IS THE ONLY REAL MUSIC',
+      content: `😤 Controversial take: If it doesn't have guitars, is it even music? Hip-hop is just talking over beats. ` +
+        `Electronic music is just pressing buttons. Pop is manufactured garbage. ROCK is the only genre that requires ` +
+        `actual musical talent. You need to play instruments, write meaningful lyrics, and perform live. ` +
+        `Everything else is fake music for fake fans. Change my mind. 🤘`,
+      tags: ['opinion', 'rock', 'genre_war'],
+    },
+    {
+      headline: '💸 BROKE ARTISTS = BAD ARTISTS',
+      content: `👀 Real talk: If you're not making money from your music, you're not good enough. "Starving artist" is just ` +
+        `code for "no talent." The best artists get recognized and PAID. If your music was actually good, people would stream it. ` +
+        `Don't blame "the algorithm" or "lack of promotion" - blame your lack of skill. The cream rises to the top. ` +
+        `Period. 💰`,
+      tags: ['opinion', 'money', 'hot_take'],
+    },
+    {
+      headline: '🚫 COLLABORATIONS ARE DESPERATE',
+      content: `🤔 Why do artists collab so much now? Because they can't carry a song on their own. When you see "feat." ` +
+        `on every track, that's a red flag. Real talent doesn't need features. You're either strong enough to stand alone ` +
+        `or you're not. These "super collabs" are just label executives trying to double the marketing reach. ` +
+        `Fans deserve solo artists with actual vision. 🎯`,
+      tags: ['opinion', 'collaboration', 'controversy'],
+    },
+  ];
+  
+  const template = opinionTemplates[Math.floor(Math.random() * opinionTemplates.length)];
+  
+  await db.collection('news').add({
+    category: 'drama',
+    headline: template.headline,
+    body: template.content,
+    authorId: 'gandalf_the_black',
+    authorName: 'Gandalf The Black',
+    authorTitle: 'The Dark Lord of Music Criticism',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    isControversial: true,
+    tags: template.tags,
+    reactions: { fire: 0, shocked: 0, laughing: 0, angry: 0 },
+  });
+  
+  console.log(`📰 Gandalf created opinion post: ${template.headline}`);
+}
+
+// ============================================================================
 // SIDE HUSTLE CONTRACT GENERATION
 // ============================================================================
 
@@ -3896,23 +4352,7 @@ async function generateDailySideHustleContracts() {
   try {
     const contractsRef = db.collection('side_hustle_contracts');
     
-    // 1. Clean up old unavailable contracts (older than 2 days)
-    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-    const oldContractsSnapshot = await contractsRef
-      .where('isAvailable', '==', false)
-      .where('createdAt', '<', admin.firestore.Timestamp.fromDate(twoDaysAgo))
-      .get();
-    
-    if (!oldContractsSnapshot.empty) {
-      const deleteBatch = db.batch();
-      oldContractsSnapshot.docs.forEach(doc => {
-        deleteBatch.delete(doc.ref);
-      });
-      await deleteBatch.commit();
-      console.log(`🗑️  Deleted ${oldContractsSnapshot.size} old contracts`);
-    }
-    
-    // 2. Count currently available contracts
+    // Count currently available contracts
     const availableSnapshot = await contractsRef
       .where('isAvailable', '==', true)
       .get();
@@ -3920,7 +4360,7 @@ async function generateDailySideHustleContracts() {
     const currentAvailable = availableSnapshot.size;
     console.log(`📊 Current available contracts: ${currentAvailable}`);
     
-    // 3. Generate new contracts to maintain pool of 15-20
+    // Generate new contracts to maintain pool of 15-20
     const targetContracts = 18; // Target pool size
     const contractsToGenerate = Math.max(0, targetContracts - currentAvailable);
     
@@ -3950,17 +4390,18 @@ async function generateDailySideHustleContracts() {
  * Generate a random side hustle contract
  */
 function generateRandomSideHustleContract() {
+  // Match Dart enum names exactly
   const hustleTypes = [
-    { name: 'Security Guard', icon: '🛡️', basePayPerDay: 150, baseEnergyPerDay: 15 },
-    { name: 'Dog Walker', icon: '🐕', basePayPerDay: 80, baseEnergyPerDay: 10 },
-    { name: 'Babysitter', icon: '👶', basePayPerDay: 120, baseEnergyPerDay: 20 },
-    { name: 'Food Delivery', icon: '🚴', basePayPerDay: 100, baseEnergyPerDay: 12 },
-    { name: 'Rideshare Driver', icon: '🚗', basePayPerDay: 130, baseEnergyPerDay: 12 },
-    { name: 'Retail Clerk', icon: '🛒', basePayPerDay: 90, baseEnergyPerDay: 15 },
-    { name: 'Tutor', icon: '📚', basePayPerDay: 140, baseEnergyPerDay: 8 },
-    { name: 'Bartender', icon: '🍸', basePayPerDay: 110, baseEnergyPerDay: 18 },
-    { name: 'Cleaner', icon: '🧹', basePayPerDay: 95, baseEnergyPerDay: 25 },
-    { name: 'Waiter/Waitress', icon: '🍽️', basePayPerDay: 105, baseEnergyPerDay: 18 },
+    { type: 'security', name: 'Security Personnel', icon: '🛡️', basePayPerDay: 150, baseEnergyPerDay: 15 },
+    { type: 'dogWalking', name: 'Dog Walking', icon: '🐕', basePayPerDay: 80, baseEnergyPerDay: 10 },
+    { type: 'babysitting', name: 'Babysitting', icon: '👶', basePayPerDay: 120, baseEnergyPerDay: 20 },
+    { type: 'foodDelivery', name: 'Food Delivery', icon: '🍔', basePayPerDay: 100, baseEnergyPerDay: 12 },
+    { type: 'rideshare', name: 'Rideshare Driver', icon: '🚗', basePayPerDay: 130, baseEnergyPerDay: 12 },
+    { type: 'retail', name: 'Retail Worker', icon: '🏪', basePayPerDay: 90, baseEnergyPerDay: 15 },
+    { type: 'tutoring', name: 'Tutoring', icon: '📚', basePayPerDay: 140, baseEnergyPerDay: 8 },
+    { type: 'bartending', name: 'Bartending', icon: '🍸', basePayPerDay: 110, baseEnergyPerDay: 18 },
+    { type: 'cleaning', name: 'Cleaning Service', icon: '🧹', basePayPerDay: 95, baseEnergyPerDay: 25 },
+    { type: 'waiter', name: 'Waiter/Waitress', icon: '🍽️', basePayPerDay: 105, baseEnergyPerDay: 18 },
   ];
   
   // Pick random hustle type
@@ -3979,13 +4420,18 @@ function generateRandomSideHustleContract() {
     hustleType.baseEnergyPerDay + Math.floor(Math.random() * energyVariance * 2) - energyVariance
   ));
   
+  // Generate unique ID
+  const contractId = Date.now().toString() + Math.floor(Math.random() * 1000).toString();
+  
+  // Return format matching Dart SideHustle model
   return {
-    name: hustleType.name,
-    icon: hustleType.icon,
+    id: contractId,
+    type: hustleType.type, // Enum name like 'security', 'dogWalking', etc.
     dailyPay: dailyPay,
     dailyEnergyCost: dailyEnergy,
-    contractLength: contractLength,
-    totalPay: dailyPay * contractLength,
+    contractLengthDays: contractLength,
+    startDate: null,
+    endDate: null,
     isAvailable: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };

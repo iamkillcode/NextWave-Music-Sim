@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../services/admin_service.dart';
-import '../services/side_hustle_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -16,7 +15,6 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final AdminService _adminService = AdminService();
-  final SideHustleService _sideHustleService = SideHustleService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = true;
@@ -314,6 +312,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             description: 'Regenerate weekly leaderboard snapshots',
             color: Colors.cyan,
             onPressed: _showTriggerWeeklyChartsDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.fire_extinguisher,
+            label: 'Trigger Gandalf The Black Post',
+            description: 'Generate controversial music critic post',
+            color: Colors.red,
+            onPressed: _triggerGandalfPost,
           ),
           const SizedBox(height: 12),
           _buildActionButton(
@@ -821,6 +827,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  Future<void> _triggerGandalfPost() async {
+    _showLoadingDialog('🧙‍♂️ Gandalf The Black is stirring up drama...');
+
+    try {
+      final result = await _adminService.triggerGandalfPost();
+
+      _safePopNavigator();
+
+      if (mounted) {
+        _showSuccessDialog(
+          '🔥 Drama Unleashed!',
+          result['message'] ?? 'Gandalf The Black has posted!',
+        );
+      }
+    } catch (e) {
+      _safePopNavigator();
+      if (mounted) {
+        _showError('Error', e.toString());
+      }
+    }
+  }
+
   void _showTriggerWeeklyChartsDialog() {
     int weeksAhead = 2;
 
@@ -1052,17 +1080,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _generateContracts(int count) async {
-    _showLoadingDialog('Generating $count side hustle contracts...');
+    _showLoadingDialog('💼 Generating $count side hustle contracts...');
 
     try {
-      await _sideHustleService.generateNewContracts(count);
+      final result = await _adminService.triggerSideHustleGeneration();
 
       _safePopNavigator();
 
       if (mounted) {
+        final generated = result['generated'] ?? 0;
+        final poolSize = result['currentPool'] ?? 0;
         _showSuccessDialog(
-          'Contracts Generated!',
-          'Successfully created $count new side hustle contracts.\n\n'
+          '✅ Contracts Generated!',
+          'Successfully generated $generated new contracts.\n'
+              'Current pool size: $poolSize contracts\n\n'
               'Players can now see and claim these contracts in the Side Hustle screen.',
         );
       }
