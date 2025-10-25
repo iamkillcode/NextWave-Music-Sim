@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import '../widgets/app_navigation_wrapper.dart';
 import 'write_song_screen.dart';
 import 'studios_list_screen.dart';
 import 'release_song_screen.dart';
@@ -42,54 +43,62 @@ class _MusicHubScreenState extends State<MusicHubScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Text('🎵', style: TextStyle(fontSize: 24)),
-            SizedBox(width: 8),
-            Text(
-              'Music Hub',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+    return AppNavigationWrapper(
+      currentIndex: 2, // Music Hub is index 2
+      artistStats: _currentStats,
+      onStatsUpdated: (updatedStats) {
+        setState(() => _currentStats = updatedStats);
+        widget.onStatsUpdated(updatedStats);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D1117),
+        appBar: AppBar(
+          title: const Row(
+            children: [
+              Text('🎵', style: TextStyle(fontSize: 24)),
+              SizedBox(width: 8),
+              Text(
+                'Music Hub',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF21262D),
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actions: [
+            IconButton(
+              onPressed: () => _navigateToReleaseManager(),
+              icon: const Icon(Icons.library_music),
+              tooltip: 'Release Manager',
             ),
           ],
-        ),
-        backgroundColor: const Color(0xFF21262D),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            onPressed: () => _navigateToReleaseManager(),
-            icon: const Icon(Icons.library_music),
-            tooltip: 'Release Manager',
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: const Color(0xFF00D9FF),
+            labelColor: const Color(0xFF00D9FF),
+            unselectedLabelColor: Colors.white60,
+            tabs: const [
+              Tab(text: 'Create'),
+              Tab(text: 'My Songs'),
+              Tab(text: 'Released'),
+            ],
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: const Color(0xFF00D9FF),
-          labelColor: const Color(0xFF00D9FF),
-          unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(text: 'Create'),
-            Tab(text: 'My Songs'),
-            Tab(text: 'Released'),
-          ],
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildCreateTab(),
-          _buildMySongsTab(),
-          _buildReleasedTab(),
-        ],
-      ),
-    );
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildCreateTab(),
+            _buildMySongsTab(),
+            _buildReleasedTab(),
+          ],
+        ), // Close TabBarView
+      ), // Close Scaffold
+    ); // Close AppNavigationWrapper
   }
 
   Widget _buildCreateTab() {
@@ -137,7 +146,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
           _buildActionCard(
             title: 'Manage Releases',
             subtitle: 'Bundle songs into EPs and Albums',
-            icon: Icons.library_music, 
+            icon: Icons.library_music,
             color: const Color(0xFFFFD700),
             energyCost: 0,
             onTap: () => _navigateToReleaseManager(),

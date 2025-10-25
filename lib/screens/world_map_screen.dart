@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
 import '../models/world_region.dart';
+import '../widgets/app_navigation_wrapper.dart';
 
 class WorldMapScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -27,63 +28,71 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Text(
-              '🌍',
-              style: TextStyle(fontSize: 24),
-            ),
-            SizedBox(width: 8),
-            Text(
-              'World Map',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+    return AppNavigationWrapper(
+      currentIndex: 5, // World Map is index 5
+      artistStats: _currentStats,
+      onStatsUpdated: (updatedStats) {
+        setState(() => _currentStats = updatedStats);
+        widget.onStatsUpdated(updatedStats);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D1117),
+        appBar: AppBar(
+          title: const Row(
+            children: [
+              Text(
+                '🌍',
+                style: TextStyle(fontSize: 24),
               ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF21262D),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCurrentLocationCard(),
-            const SizedBox(height: 24),
-            _buildTravelInfoCard(),
-            const SizedBox(height: 16),
-            const Text(
-              'Travel Destinations',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              SizedBox(width: 8),
+              Text(
+                'World Map',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            ..._buildRegionCards(),
-          ],
+            ],
+          ),
+          backgroundColor: const Color(0xFF21262D),
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
-      ),
-    );
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildCurrentLocationCard(),
+              const SizedBox(height: 24),
+              _buildTravelInfoCard(),
+              const SizedBox(height: 16),
+              const Text(
+                'Travel Destinations',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._buildRegionCards(),
+            ],
+          ),
+        ), // Close body SingleChildScrollView
+      ), // Close Scaffold
+    ); // Close AppNavigationWrapper
   }
 
   Widget _buildTravelInfoCard() {
     final fame = _currentStats.fame;
     final money = _currentStats.money;
-    
+
     String statusText;
     Color statusColor;
     String statusIcon;
-    
+
     if (money > 50000) {
       statusText = 'Elite Traveler - 20% discount on all flights!';
       statusColor = const Color(0xFFFFD700); // Gold
@@ -101,7 +110,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
       statusColor = Colors.green;
       statusIcon = '🎵';
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -188,7 +197,8 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0xFF00D9FF),
                   borderRadius: BorderRadius.circular(20),
@@ -245,14 +255,18 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
       orElse: () => regions.first,
     );
 
-    return regions.where((r) => r.id != _currentStats.currentRegion).map((region) {
+    return regions
+        .where((r) => r.id != _currentStats.currentRegion)
+        .map((region) {
       final travelCost = _calculateTravelCost(currentRegion.id, region.id);
       final canAfford = _currentStats.money >= travelCost;
 
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         child: GestureDetector(
-          onTap: canAfford ? () => _showTravelConfirmation(region, travelCost) : null,
+          onTap: canAfford
+              ? () => _showTravelConfirmation(region, travelCost)
+              : null,
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -310,7 +324,9 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                           return Text(
                             genre,
                             style: TextStyle(
-                              color: canAfford ? const Color(0xFF00D9FF) : Colors.white30,
+                              color: canAfford
+                                  ? const Color(0xFF00D9FF)
+                                  : Colors.white30,
                               fontSize: 11,
                             ),
                           );
@@ -325,7 +341,9 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                     Text(
                       '\$${_formatNumber(travelCost)}',
                       style: TextStyle(
-                        color: canAfford ? const Color(0xFFFF6B9D) : Colors.redAccent,
+                        color: canAfford
+                            ? const Color(0xFFFF6B9D)
+                            : Colors.redAccent,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -333,7 +351,8 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                     const SizedBox(height: 4),
                     Icon(
                       Icons.flight_takeoff,
-                      color: canAfford ? const Color(0xFF00D9FF) : Colors.white30,
+                      color:
+                          canAfford ? const Color(0xFF00D9FF) : Colors.white30,
                       size: 20,
                     ),
                   ],
@@ -355,10 +374,11 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
     // Mid game (20-50 fame): $1,500-$5,000
     // Late game (50-80 fame): $5,000-$15,000
     // Endgame (80+ fame): $15,000-$30,000
-    
+
     final fame = _currentStats.fame;
-    final fameMultiplier = 1.0 + (fame / 100.0); // 1.0x at 0 fame, 2.0x at 100 fame
-    
+    final fameMultiplier =
+        1.0 + (fame / 100.0); // 1.0x at 0 fame, 2.0x at 100 fame
+
     // Distance-based costs
     const adjacentRegions = {
       'usa': ['canada', 'latin_america', 'uk'],
@@ -382,17 +402,17 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
 
     // Apply fame scaling
     final scaledCost = (baseCost * fameMultiplier).round();
-    
+
     // Wealth-based discount (if you're rich, travel is relatively cheaper)
     // Players with lots of money get slight discount (max 20% off)
-    final wealthMultiplier = _currentStats.money > 50000 
+    final wealthMultiplier = _currentStats.money > 50000
         ? 0.8 // 20% discount for rich players
-        : _currentStats.money > 20000 
+        : _currentStats.money > 20000
             ? 0.9 // 10% discount for mid-wealth
             : 1.0; // No discount for broke players
-    
+
     final finalCost = (scaledCost * wealthMultiplier).round();
-    
+
     // Minimum cost: $100 (always affordable for new players)
     // Maximum cost: $50,000 (prevents ridiculous scaling)
     return finalCost.clamp(100, 50000);

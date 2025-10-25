@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/news_item.dart';
+import '../models/artist_stats.dart';
 import '../services/the_scoop_service.dart';
 import 'unified_charts_screen.dart';
+import '../widgets/app_navigation_wrapper.dart';
 
 class TheScoopScreen extends StatefulWidget {
-  const TheScoopScreen({super.key});
+  final ArtistStats artistStats;
+  final Function(ArtistStats) onStatsUpdated;
+
+  const TheScoopScreen({
+    super.key,
+    required this.artistStats,
+    required this.onStatsUpdated,
+  });
 
   @override
   State<TheScoopScreen> createState() => _TheScoopScreenState();
@@ -68,133 +77,139 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Text('📰', style: TextStyle(fontSize: 24)),
-            SizedBox(width: 8),
-            Text('The Scoop', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        backgroundColor: const Color(0xFFF44336),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showCategoryFilter,
-            tooltip: 'Filter by category',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _loadEditorial();
-          setState(() {});
-        },
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _buildHeader()),
-            if (_loading)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              )
-            else if (_error != null)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text('Error: ${_error ?? ''}',
-                      style: const TextStyle(color: Colors.redAccent)),
-                ),
-              )
-            else ...[
-              if (_weeklyTopArtist != null)
-                SliverToBoxAdapter(child: _buildHeroBanner()),
-              if (_todaysHits.isNotEmpty)
-                SliverToBoxAdapter(child: _buildSectionTitle("Today's Hits")),
-              if (_todaysHits.isNotEmpty)
-                SliverToBoxAdapter(
-                    child: _buildHorizontalCovers(
-                  _todaysHits,
-                  deepLinkPeriod: 'daily',
-                  deepLinkType: 'singles',
-                )),
-              if (_weeklyTopSong != null)
-                SliverToBoxAdapter(child: _buildFeaturedStory()),
-              if (_newThisWeek.isNotEmpty) ...[
-                SliverToBoxAdapter(child: _buildSectionTitle('New This Week')),
-                SliverToBoxAdapter(
-                    child: _buildHorizontalCovers(
-                  _newThisWeek,
-                  deepLinkPeriod: 'weekly',
-                  deepLinkType: 'singles',
-                )),
-              ],
-              // Info cards like screenshot 2
-              if (_weeklyTopArtist != null)
-                SliverToBoxAdapter(
-                    child: _buildInfoCard(
-                  title: 'Most Streamed Artist',
-                  imageUrl: _weeklyTopArtist!['avatarUrl'],
-                  headline: (_weeklyTopArtist!['artistName'] ?? 'Unknown') +
-                      ' led this week with ' +
-                      _newsService.shortStreams(
-                          (_weeklyTopArtist!['periodStreams'] ??
-                              _weeklyTopArtist!['streams'] ??
-                              0) as int) +
-                      ' streams.',
-                  onTap: () => _openArtistDetails(_weeklyTopArtist!),
-                )),
-              if (_weeklyTopAlbum != null)
-                SliverToBoxAdapter(
-                    child: _buildInfoCard(
-                  title: 'Top Album This Week',
-                  imageUrl: _weeklyTopAlbum!['coverArtUrl'],
-                  headline: (_weeklyTopSong?['artist'] ??
-                          _weeklyTopAlbum!['artist'] ??
-                          'Unknown') +
-                      ' earned the top album this week with ' +
-                      (_weeklyTopAlbum!['title'] ?? 'Untitled') +
-                      ', accumulating ' +
-                      _newsService.shortStreams(
-                          (_weeklyTopAlbum!['periodStreams'] ?? 0) as int) +
-                      ' streams.',
-                  onTap: () => _openSongDetails(_weeklyTopAlbum!),
-                )),
-              if (_highestDebut != null)
-                SliverToBoxAdapter(
-                    child: _buildInfoCard(
-                  title: 'Highest Debut',
-                  imageUrl: _highestDebut!['coverArtUrl'],
-                  headline:
-                      '"${(_highestDebut!['title'] ?? 'Untitled') as String}" by ${(_highestDebut!['artist'] ?? 'Unknown') as String} debuts at #${_highestDebut!['position'] ?? 0} on this week\'s chart.',
-                  onTap: () => _openSongDetails(_highestDebut!),
-                )),
-              if (_biggestMover != null)
-                SliverToBoxAdapter(
-                    child: _buildInfoCard(
-                  title: 'Biggest Mover',
-                  imageUrl: _biggestMover!['coverArtUrl'],
-                  headline:
-                      '"${(_biggestMover!['title'] ?? 'Untitled') as String}" by ${(_biggestMover!['artist'] ?? 'Unknown') as String} jumps ${((_biggestMover!['movement'] ?? 0) as int).abs()} spots to #${_biggestMover!['position'] ?? 0}.',
-                  onTap: () => _openSongDetails(_biggestMover!),
-                )),
-              SliverToBoxAdapter(child: _buildSectionDivider()),
-              // News stream below editorial
-              if (_selectedCategory != null)
-                SliverToBoxAdapter(child: _buildCategoryChip()),
-              SliverFillRemaining(
-                hasScrollBody: true,
-                child: _buildNewsFeed(),
-              ),
+    return AppNavigationWrapper(
+      currentIndex: 3, // The Scoop is index 3
+      artistStats: widget.artistStats,
+      onStatsUpdated: widget.onStatsUpdated,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D1117),
+        appBar: AppBar(
+          title: const Row(
+            children: [
+              Text('📰', style: TextStyle(fontSize: 24)),
+              SizedBox(width: 8),
+              Text('The Scoop', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
+          ),
+          backgroundColor: const Color(0xFFF44336),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _showCategoryFilter,
+              tooltip: 'Filter by category',
+            ),
           ],
         ),
-      ),
-    );
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await _loadEditorial();
+            setState(() {});
+          },
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(child: _buildHeader()),
+              if (_loading)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                )
+              else if (_error != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text('Error: ${_error ?? ''}',
+                        style: const TextStyle(color: Colors.redAccent)),
+                  ),
+                )
+              else ...[
+                if (_weeklyTopArtist != null)
+                  SliverToBoxAdapter(child: _buildHeroBanner()),
+                if (_todaysHits.isNotEmpty)
+                  SliverToBoxAdapter(child: _buildSectionTitle("Today's Hits")),
+                if (_todaysHits.isNotEmpty)
+                  SliverToBoxAdapter(
+                      child: _buildHorizontalCovers(
+                    _todaysHits,
+                    deepLinkPeriod: 'daily',
+                    deepLinkType: 'singles',
+                  )),
+                if (_weeklyTopSong != null)
+                  SliverToBoxAdapter(child: _buildFeaturedStory()),
+                if (_newThisWeek.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                      child: _buildSectionTitle('New This Week')),
+                  SliverToBoxAdapter(
+                      child: _buildHorizontalCovers(
+                    _newThisWeek,
+                    deepLinkPeriod: 'weekly',
+                    deepLinkType: 'singles',
+                  )),
+                ],
+                // Info cards like screenshot 2
+                if (_weeklyTopArtist != null)
+                  SliverToBoxAdapter(
+                      child: _buildInfoCard(
+                    title: 'Most Streamed Artist',
+                    imageUrl: _weeklyTopArtist!['avatarUrl'],
+                    headline: (_weeklyTopArtist!['artistName'] ?? 'Unknown') +
+                        ' led this week with ' +
+                        _newsService.shortStreams(
+                            (_weeklyTopArtist!['periodStreams'] ??
+                                _weeklyTopArtist!['streams'] ??
+                                0) as int) +
+                        ' streams.',
+                    onTap: () => _openArtistDetails(_weeklyTopArtist!),
+                  )),
+                if (_weeklyTopAlbum != null)
+                  SliverToBoxAdapter(
+                      child: _buildInfoCard(
+                    title: 'Top Album This Week',
+                    imageUrl: _weeklyTopAlbum!['coverArtUrl'],
+                    headline: (_weeklyTopSong?['artist'] ??
+                            _weeklyTopAlbum!['artist'] ??
+                            'Unknown') +
+                        ' earned the top album this week with ' +
+                        (_weeklyTopAlbum!['title'] ?? 'Untitled') +
+                        ', accumulating ' +
+                        _newsService.shortStreams(
+                            (_weeklyTopAlbum!['periodStreams'] ?? 0) as int) +
+                        ' streams.',
+                    onTap: () => _openSongDetails(_weeklyTopAlbum!),
+                  )),
+                if (_highestDebut != null)
+                  SliverToBoxAdapter(
+                      child: _buildInfoCard(
+                    title: 'Highest Debut',
+                    imageUrl: _highestDebut!['coverArtUrl'],
+                    headline:
+                        '"${(_highestDebut!['title'] ?? 'Untitled') as String}" by ${(_highestDebut!['artist'] ?? 'Unknown') as String} debuts at #${_highestDebut!['position'] ?? 0} on this week\'s chart.',
+                    onTap: () => _openSongDetails(_highestDebut!),
+                  )),
+                if (_biggestMover != null)
+                  SliverToBoxAdapter(
+                      child: _buildInfoCard(
+                    title: 'Biggest Mover',
+                    imageUrl: _biggestMover!['coverArtUrl'],
+                    headline:
+                        '"${(_biggestMover!['title'] ?? 'Untitled') as String}" by ${(_biggestMover!['artist'] ?? 'Unknown') as String} jumps ${((_biggestMover!['movement'] ?? 0) as int).abs()} spots to #${_biggestMover!['position'] ?? 0}.',
+                    onTap: () => _openSongDetails(_biggestMover!),
+                  )),
+                SliverToBoxAdapter(child: _buildSectionDivider()),
+                // News stream below editorial
+                if (_selectedCategory != null)
+                  SliverToBoxAdapter(child: _buildCategoryChip()),
+                SliverFillRemaining(
+                  hasScrollBody: true,
+                  child: _buildNewsFeed(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ), // Close Scaffold
+    ); // Close AppNavigationWrapper
   }
 
   Widget _buildSectionDivider() => const Padding(
@@ -386,6 +401,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -405,6 +421,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     title,
@@ -413,11 +430,15 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
                   Text(
                     headline,
                     style: const TextStyle(color: Colors.white70, height: 1.5),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

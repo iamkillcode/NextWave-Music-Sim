@@ -2354,7 +2354,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const TheScoopScreen(),
+                          builder: (context) => TheScoopScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: (updatedStats) {
+                              setState(() => artistStats = updatedStats);
+                              _immediateSave();
+                            },
+                          ),
                         ),
                       );
                     },
@@ -2530,7 +2536,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const TheScoopScreen(),
+              builder: (context) => TheScoopScreen(
+                artistStats: artistStats,
+                onStatsUpdated: (updatedStats) {
+                  setState(() => artistStats = updatedStats);
+                  _immediateSave();
+                },
+              ),
             ),
           );
         } else if (index == 4) {

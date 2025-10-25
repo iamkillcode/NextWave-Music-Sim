@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
 import '../models/pending_practice.dart';
+import '../widgets/app_navigation_wrapper.dart';
 import 'practice_screen.dart';
 import 'unified_charts_screen.dart';
 import 'side_hustle_screen.dart';
@@ -27,222 +28,232 @@ class ActivityHubScreen extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWideScreen = screenWidth > 600;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
-      appBar: AppBar(
-        title: const Text(
-          '⚡ Activity Hub',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+    return AppNavigationWrapper(
+      currentIndex: 1, // Activity Hub is index 1
+      artistStats: artistStats,
+      onStatsUpdated: onStatsUpdated,
+      currentGameDate: currentGameDate,
+      pendingPractices: pendingPractices,
+      onPracticeStarted: onPracticeStarted,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D1117),
+        appBar: AppBar(
+          title: const Text(
+            '⚡ Activity Hub',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
+          backgroundColor: const Color(0xFF21262D),
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF21262D),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header section
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E2329), Color(0xFF0D1117)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF30363D), width: 1),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0A84FF).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.flash_on,
-                          color: Color(0xFF0A84FF),
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Grow Your Career',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Practice, promote, compete, and earn',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header section
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E2329), Color(0xFF0D1117)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(height: 16),
-                  // Stats row
-                  Row(
-                    children: [
-                      _buildQuickStat('⚡', '${artistStats.energy}', 'Energy'),
-                      const SizedBox(width: 16),
-                      _buildQuickStat('💰', '\$${artistStats.money}', 'Money'),
-                      const SizedBox(width: 16),
-                      _buildQuickStat(
-                        '🎵',
-                        '${artistStats.songs.length}',
-                        'Songs',
-                      ),
-                    ],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF30363D), width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A84FF).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.flash_on,
+                            color: Color(0xFF0A84FF),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Grow Your Career',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Practice, promote, compete, and earn',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Stats row
+                    Row(
+                      children: [
+                        _buildQuickStat('⚡', '${artistStats.energy}', 'Energy'),
+                        const SizedBox(width: 16),
+                        _buildQuickStat(
+                            '💰', '\$${artistStats.money}', 'Money'),
+                        const SizedBox(width: 16),
+                        _buildQuickStat(
+                          '🎵',
+                          '${artistStats.songs.length}',
+                          'Songs',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Apps grid
+              const Text(
+                'Choose an Activity',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: isWideScreen ? 4 : 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.0,
+                children: [
+                  _buildAppCard(
+                    context,
+                    name: 'Practice',
+                    emoji: '🎸',
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFF39C12), Color(0xFFE67E22)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    badge: '15 ⚡',
+                    description: 'Improve your skills',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PracticeScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: onStatsUpdated,
+                            pendingPractices: pendingPractices,
+                            onPracticeStarted: onPracticeStarted,
+                            currentDate: currentGameDate,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppCard(
+                    context,
+                    name: 'Spotlight Charts',
+                    emoji: '📊',
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    badge: 'Top 100',
+                    description: 'View leaderboards',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UnifiedChartsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppCard(
+                    context,
+                    name: 'Side Hustle',
+                    emoji: '💼',
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD60A), Color(0xFFFF9F0A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    badge: artistStats.activeSideHustle != null
+                        ? 'Active'
+                        : 'Jobs',
+                    description: 'Earn extra money',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SideHustleScreen(
+                            artistStats: artistStats,
+                            onStatsUpdate: onStatsUpdated,
+                            currentGameDate: currentGameDate,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppCard(
+                    context,
+                    name: 'ViralWave',
+                    emoji: '📱',
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF6B9D), Color(0xFFFF1744)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    badge: 'Promote',
+                    description: 'Boost your music',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ViralWaveScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: onStatsUpdated,
+                            currentGameDate: currentGameDate,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Apps grid
-            const Text(
-              'Choose an Activity',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: isWideScreen ? 4 : 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.0,
-              children: [
-                _buildAppCard(
-                  context,
-                  name: 'Practice',
-                  emoji: '🎸',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF39C12), Color(0xFFE67E22)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  badge: '15 ⚡',
-                  description: 'Improve your skills',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PracticeScreen(
-                          artistStats: artistStats,
-                          onStatsUpdated: onStatsUpdated,
-                          pendingPractices: pendingPractices,
-                          onPracticeStarted: onPracticeStarted,
-                          currentDate: currentGameDate,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                _buildAppCard(
-                  context,
-                  name: 'Spotlight Charts',
-                  emoji: '📊',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  badge: 'Top 100',
-                  description: 'View leaderboards',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const UnifiedChartsScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildAppCard(
-                  context,
-                  name: 'Side Hustle',
-                  emoji: '💼',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFD60A), Color(0xFFFF9F0A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  badge:
-                      artistStats.activeSideHustle != null ? 'Active' : 'Jobs',
-                  description: 'Earn extra money',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SideHustleScreen(
-                          artistStats: artistStats,
-                          onStatsUpdate: onStatsUpdated,
-                          currentGameDate: currentGameDate,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                _buildAppCard(
-                  context,
-                  name: 'ViralWave',
-                  emoji: '📱',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6B9D), Color(0xFFFF1744)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  badge: 'Promote',
-                  description: 'Boost your music',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ViralWaveScreen(
-                          artistStats: artistStats,
-                          onStatsUpdated: onStatsUpdated,
-                          currentGameDate: currentGameDate,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      ), // Close Scaffold
+    ); // Close AppNavigationWrapper
   }
 
   Widget _buildQuickStat(String emoji, String value, String label) {
