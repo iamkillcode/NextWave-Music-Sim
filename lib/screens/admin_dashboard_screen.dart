@@ -371,6 +371,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 12),
           _buildActionButton(
+            icon: Icons.sync,
+            label: 'Sync Player Streams',
+            description: 'Update all player stream counts from songs',
+            color: Colors.blue,
+            onPressed: _syncPlayerStreams,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
             icon: Icons.cleaning_services,
             label: 'Clear Old Notifications',
             description: 'Delete notifications older than 30 days',
@@ -2802,6 +2810,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _syncPlayerStreams() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Row(
+          children: [
+            Icon(Icons.sync, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Sync Player Streams?', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'This will update all players\' stream counts from their actual song data.\n\n'
+          'This may take a few moments for many players.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Syncing player streams...');
+
+              try {
+                final callable = FirebaseFunctions.instance
+                    .httpsCallable('syncAllPlayerStreams');
+                final result = await callable.call();
+
+                _safePopNavigator(); // Close loading dialog
+
+                if (mounted && result.data['success']) {
+                  _showSuccessDialog(
+                    'Sync Complete!',
+                    'Updated ${result.data['updated']} players\n'
+                        'Errors: ${result.data['errors']}\n'
+                        'Total: ${result.data['total']}',
+                  );
+                }
+              } catch (e) {
+                _safePopNavigator();
+                if (mounted) {
+                  _showError('Sync Failed', e.toString());
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Sync Now'),
           ),
         ],
       ),

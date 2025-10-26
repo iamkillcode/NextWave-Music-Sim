@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
-import '../services/firebase_service.dart';
 import '../services/cover_art_uploader.dart';
 
 /// Screen for managing EP and Album releases
@@ -977,6 +976,118 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         .where((song) => album.songIds.contains(song.id))
         .toList();
 
+    // Compact released view - single row with cover art focus
+    if (isReleased) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C2128),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.green.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Album Cover Art
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFF0D1117),
+              ),
+              child: album.coverArtUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: album.coverArtUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        errorWidget: (context, url, error) => Center(
+                          child: Text(
+                            album.typeEmoji,
+                            style: const TextStyle(fontSize: 28),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Center(
+                      child: Text(
+                        album.typeEmoji,
+                        style: const TextStyle(fontSize: 28),
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            // Metadata
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    album.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${album.typeDisplay} • ${album.songIds.length} songs',
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Platform icons (compact)
+                  Row(
+                    children: (album.streamingPlatforms.isNotEmpty
+                            ? album.streamingPlatforms
+                            : <String>['tunify', 'maple_music'])
+                        .map((p) => Padding(
+                              padding: const EdgeInsets.only(right: 6.0),
+                              child: Text(
+                                p == 'tunify' ? '🎵' : '🍁',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+            // Released status badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade900.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.greenAccent, width: 1),
+              ),
+              child: const Text(
+                'Released',
+                style: TextStyle(
+                  color: Colors.greenAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Original expanded view for non-released albums
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -984,9 +1095,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         color: const Color(0xFF1C2128),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isReleased
-              ? Colors.green.withOpacity(0.3)
-              : const Color(0xFF00D9FF).withOpacity(0.3),
+          color: const Color(0xFF00D9FF).withOpacity(0.3),
         ),
       ),
       child: Column(
@@ -1035,24 +1144,6 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                   ],
                 ),
               ),
-              if (isReleased)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade900.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.greenAccent, width: 1),
-                  ),
-                  child: const Text(
-                    'Released',
-                    style: TextStyle(
-                      color: Colors.greenAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1080,29 +1171,27 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
               ),
             );
           }),
-          if (!isReleased) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _confirmRelease(album),
-                    icon: const Icon(Icons.rocket_launch),
-                    label: const Text('Release Now'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00D9FF),
-                      foregroundColor: Colors.black,
-                    ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _confirmRelease(album),
+                  icon: const Icon(Icons.rocket_launch),
+                  label: const Text('Release Now'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D9FF),
+                    foregroundColor: Colors.black,
                   ),
                 ),
-                const SizedBox(width: 12),
-                IconButton(
-                  onPressed: () => _deleteAlbum(album),
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                onPressed: () => _deleteAlbum(album),
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -1208,31 +1297,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     );
 
     if (result == true) {
-      // Call server to perform the release atomically
-      try {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('🔄 Releasing...'), duration: Duration(seconds: 2)));
-        final payload = await FirebaseService().releaseAlbumSecurely(
-            albumId: album.id, overridePlatforms: selected.toList());
-
-        if (payload != null && payload['success'] == true) {
-          // Update local state to reflect server commit
-          _releaseAlbum(album, overridePlatforms: selected.toList());
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('✅ Released successfully'),
-              backgroundColor: Color(0xFF32D74B)));
-        } else {
-          print('Server release returned unexpected payload: $payload');
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('⚠️ Release incomplete, check logs'),
-              backgroundColor: Colors.orange));
-        }
-      } catch (e) {
-        print('Error releasing album on server: $e');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('❌ Failed to release album (server error)'),
-            backgroundColor: Colors.red));
-      }
+      // Release album client-side (same as song releases)
+      _releaseAlbum(album, overridePlatforms: selected.toList());
     }
   }
 

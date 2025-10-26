@@ -6,6 +6,7 @@ class MultiplayerPlayer {
   final String displayName;
   final String email;
   final String? gender; // 'male', 'female', 'other', or null
+  final String? avatarUrl; // Profile picture URL
   final int totalStreams;
   final int totalLikes;
   final int songsPublished;
@@ -22,6 +23,7 @@ class MultiplayerPlayer {
     required this.displayName,
     required this.email,
     this.gender,
+    this.avatarUrl,
     this.totalStreams = 0,
     this.totalLikes = 0,
     this.songsPublished = 0,
@@ -42,6 +44,7 @@ class MultiplayerPlayer {
       displayName: data['displayName'] ?? '',
       email: data['email'] ?? '',
       gender: data['gender'] as String?,
+      avatarUrl: data['avatarUrl'] as String?,
       totalStreams: safeParseInt(data['totalStreams'], fallback: 0),
       totalLikes: safeParseInt(data['totalLikes'], fallback: 0),
       songsPublished: safeParseInt(data['songsPublished'], fallback: 0),
@@ -62,6 +65,7 @@ class MultiplayerPlayer {
       'displayName': displayName,
       'email': email,
       'gender': gender,
+      'avatarUrl': avatarUrl,
       'totalStreams': totalStreams,
       'totalLikes': totalLikes,
       'songsPublished': songsPublished,
@@ -80,6 +84,7 @@ class MultiplayerPlayer {
     String? displayName,
     String? email,
     String? gender,
+    String? avatarUrl,
     int? totalStreams,
     int? totalLikes,
     int? songsPublished,
@@ -96,6 +101,7 @@ class MultiplayerPlayer {
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       gender: gender ?? this.gender,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       totalStreams: totalStreams ?? this.totalStreams,
       totalLikes: totalLikes ?? this.totalLikes,
       songsPublished: songsPublished ?? this.songsPublished,

@@ -512,6 +512,8 @@ class _StudioScreenState extends State<StudioScreen>
         return Colors.blue;
       case SongState.released:
         return const Color(0xFF1DB954);
+      case SongState.scheduled:
+        return Colors.purple;
     }
   }
 

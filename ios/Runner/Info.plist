@@ -59,5 +59,10 @@
 	<!-- Camera usage description for image picker -->
 	<key>NSCameraUsageDescription</key>
 	<string>NextWave needs access to your camera to take photos for cover art and profile pictures.</string>
+	<!-- Push notification capability -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

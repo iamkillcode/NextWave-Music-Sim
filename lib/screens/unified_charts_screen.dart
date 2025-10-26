@@ -200,15 +200,22 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                       return Colors.white;
                     }),
                   ),
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: 'daily',
                       label: Text(
                         'Daily',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _selectedType == 'artists'
+                              ? Colors.grey[600]
+                              : null,
+                        ),
                       ),
+                      enabled: _selectedType !=
+                          'artists', // Disable Daily for Artists
                     ),
-                    ButtonSegment(
+                    const ButtonSegment(
                       value: 'weekly',
                       label: Text(
                         'Weekly',
@@ -297,6 +304,11 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   onSelectionChanged: (Set<String> newSelection) {
                     setState(() {
                       _selectedType = newSelection.first;
+                      // Auto-switch to weekly when Artists is selected (daily doesn't work for artists)
+                      if (_selectedType == 'artists' &&
+                          _selectedPeriod == 'daily') {
+                        _selectedPeriod = 'weekly';
+                      }
                     });
                     _onFilterChanged();
                   },
@@ -372,7 +384,11 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
   Widget _buildInfoBanner() {
     String info = '';
 
-    if (_selectedPeriod == 'daily') {
+    // Special message when Artists + Daily would be selected (but isn't allowed)
+    if (_selectedType == 'artists') {
+      info =
+          '📊 Artist rankings based on combined streams from all songs over the last 7 game days';
+    } else if (_selectedPeriod == 'daily') {
       info = '📊 Rankings based on streams gained in the last game day';
     } else {
       info = '📊 Rankings based on streams gained in the last 7 game days';

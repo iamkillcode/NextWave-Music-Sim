@@ -26,6 +26,7 @@ import 'notifications_screen.dart';
 import 'the_scoop_screen.dart';
 import 'unified_charts_screen.dart';
 import '../services/notification_service.dart';
+import '../services/push_notification_service.dart';
 import 'dart:ui';
 import '../widgets/glassmorphic_bottom_nav.dart';
 
@@ -65,6 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final StreamGrowthService _streamGrowthService = StreamGrowthService();
   final SideHustleService _sideHustleService = SideHustleService();
   final NotificationService _notificationService = NotificationService();
+  final PushNotificationService _pushNotificationService =
+      PushNotificationService();
   final List<Map<String, dynamic>> _notifications = []; // Store notifications
   int _unreadNotificationCount = 0; // Track unread notification count
   String _timeUntilNextDay = ''; // Formatted time until next day
@@ -115,6 +118,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Initialize notification service
     _notificationService.initialize();
+
+    // Initialize push notification service
+    _pushNotificationService.initialize();
 
     // Load unread count
     _loadUnreadNotificationCount();
@@ -1262,6 +1268,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           sideHustleExpired = result['expired'] == 1;
         }
 
+        // Check for scheduled song releases
+        await _checkScheduledReleases(newGameDate);
+
         // Update last sync time
         _lastSyncTime = DateTime.now();
 
@@ -1361,6 +1370,164 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       print('❌ Error updating game date: $e');
+    }
+  }
+
+  /// Check for scheduled song releases and auto-release them if the date has arrived
+  Future<void> _checkScheduledReleases(DateTime currentGameDate) async {
+    if (!mounted) return;
+
+    try {
+      bool hasChanges = false;
+      final List<Song> updatedSongs = [];
+      final streamGrowthService = StreamGrowthService();
+
+      // Compare dates without time component
+      final currentDate = DateTime(
+        currentGameDate.year,
+        currentGameDate.month,
+        currentGameDate.day,
+      );
+
+      for (final song in artistStats.songs) {
+        if (song.state == SongState.scheduled &&
+            song.scheduledReleaseDate != null) {
+          final scheduledDate = DateTime(
+            song.scheduledReleaseDate!.year,
+            song.scheduledReleaseDate!.month,
+            song.scheduledReleaseDate!.day,
+          );
+
+          // If scheduled date has arrived or passed, release the song
+          if (!currentDate.isBefore(scheduledDate)) {
+            print('🎵 Auto-releasing scheduled song: ${song.title}');
+
+            // Calculate release metrics (similar to immediate release)
+            final baseInitialStreams =
+                artistStats.fanbase > 0 ? artistStats.fanbase : 10;
+
+            final qualityMultiplier = (song.finalQuality / 100.0) * 0.6 + 0.4;
+            final platformMultiplier =
+                1.0 + (song.streamingPlatforms.length - 1) * 0.25;
+            final realisticInitialStreams =
+                (baseInitialStreams * qualityMultiplier * platformMultiplier)
+                    .round();
+
+            final viralityScore = streamGrowthService.calculateViralityScore(
+              songQuality: song.finalQuality,
+              artistFame: artistStats.fame,
+              artistFanbase: artistStats.fanbase,
+            );
+
+            // Calculate regional streams
+            final initialRegionalStreams =
+                streamGrowthService.calculateRegionalStreamDistribution(
+              totalDailyStreams: realisticInitialStreams,
+              currentRegion: artistStats.currentRegion,
+              regionalFanbase: artistStats.regionalFanbase,
+              genre: song.genre,
+            );
+
+            final releasedSong = song.copyWith(
+              state: SongState.released,
+              releasedDate: currentGameDate,
+              scheduledReleaseDate: null,
+              clearScheduledDate: true,
+              streams: realisticInitialStreams,
+              regionalStreams: initialRegionalStreams,
+              likes: (realisticInitialStreams * 0.3).round(),
+              viralityScore: viralityScore,
+              peakDailyStreams: realisticInitialStreams,
+            );
+
+            updatedSongs.add(releasedSong);
+            hasChanges = true;
+
+            // Show notification
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('🎵 "${song.title}" has been released!'),
+                  backgroundColor: const Color(0xFF32D74B),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+          }
+        }
+      }
+
+      if (hasChanges && mounted) {
+        // Calculate stat bonuses for scheduled releases
+        final fameGain = updatedSongs.fold<int>(
+          0,
+          (sum, song) => sum + (song.finalQuality * 0.1).round().clamp(1, 5),
+        );
+        final fanbaseGain = updatedSongs.fold<int>(
+          0,
+          (sum, song) => sum + (song.finalQuality * 0.5).round().clamp(5, 50),
+        );
+
+        // Calculate loyal fanbase growth
+        int totalLoyalFanbaseGrowth = 0;
+        for (final song in updatedSongs) {
+          final growth = streamGrowthService.calculateLoyalFanbaseGrowth(
+            currentLoyalFanbase:
+                artistStats.loyalFanbase + totalLoyalFanbaseGrowth,
+            songQuality: song.finalQuality,
+            totalFanbase: artistStats.fanbase + fanbaseGain,
+          );
+          totalLoyalFanbaseGrowth += growth;
+        }
+
+        // Calculate regional fanbase growth
+        final updatedRegionalFanbase =
+            Map<String, int>.from(artistStats.regionalFanbase);
+        for (final song in updatedSongs) {
+          final regionalGrowth =
+              streamGrowthService.calculateRegionalFanbaseGrowth(
+            currentRegion: artistStats.currentRegion,
+            originRegion: artistStats.currentRegion,
+            songQuality: song.finalQuality,
+            genre: song.genre,
+            currentGlobalFanbase: artistStats.fanbase + fanbaseGain,
+            currentRegionalFanbase: updatedRegionalFanbase,
+          );
+          regionalGrowth.forEach((region, growth) {
+            updatedRegionalFanbase[region] =
+                (updatedRegionalFanbase[region] ?? 0) + growth;
+          });
+        }
+
+        // Update songs list
+        final allSongs = artistStats.songs.map((s) {
+          final updated = updatedSongs.firstWhere(
+            (us) => us.id == s.id,
+            orElse: () => s,
+          );
+          return updated;
+        }).toList();
+
+        setState(() {
+          artistStats = artistStats.copyWith(
+            songs: allSongs,
+            fame: artistStats.fame + fameGain,
+            fanbase: artistStats.fanbase + fanbaseGain,
+            loyalFanbase: (artistStats.loyalFanbase + totalLoyalFanbaseGrowth)
+                .clamp(0, 1e12)
+                .toInt(),
+            regionalFanbase: updatedRegionalFanbase,
+          );
+        });
+
+        // Save to Firebase
+        _immediateSave();
+
+        print('✅ ${updatedSongs.length} scheduled song(s) auto-released');
+      }
+    } catch (e) {
+      print('❌ Error checking scheduled releases: $e');
     }
   }
 
@@ -2317,12 +2484,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 _lastLocalUpdate = DateTime.now();
                                 artistStats = updatedStats;
                               });
-                              // Immediate save for money/energy changes
-                              _immediateStatUpdate(
-                                money: updatedStats.money,
-                                energy: updatedStats.energy,
-                                context: 'Release Manager',
-                              );
+                              // Immediate save - album releases are critical multiplayer events
+                              _immediateSave();
                             },
                           ),
                         ),

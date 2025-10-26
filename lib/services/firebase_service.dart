@@ -16,9 +16,14 @@ class FirebaseService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  // Explicitly set region to us-central1 to match deployed functions
+  final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'us-central1');
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'], // Minimal scopes to avoid People API dependency
+    scopes: [
+      'email',
+      'profile'
+    ], // Minimal scopes to avoid People API dependency
   );
 
   // Lightweight in-memory cache for cross-player ArtistStats lookups
@@ -98,7 +103,7 @@ class FirebaseService {
     final playerDoc = _playersCollection.doc(user.uid);
     final playerSnapshot = await playerDoc.get();
 
-      if (!playerSnapshot.exists) {
+    if (!playerSnapshot.exists) {
       // Create new player
       final newPlayer = MultiplayerPlayer(
         id: user.uid,
@@ -107,19 +112,25 @@ class FirebaseService {
         joinDate: DateTime.now(),
         lastActive: DateTime.now(),
       );
-        // Sanitize before writing to Firestore
+      // Sanitize before writing to Firestore
       await playerDoc.set(sanitizeForFirestore(newPlayer.toFirestore()));
     } else {
       // Update last active
-        await playerDoc.update(sanitizeForFirestore({
-          'lastActive': Timestamp.fromDate(DateTime.now()),
-          'isOnline': true,
-        }));
+      await playerDoc.update(sanitizeForFirestore({
+        'lastActive': Timestamp.fromDate(DateTime.now()),
+        'isOnline': true,
+      }));
     }
   }
 
   Future<void> updatePlayerStats(ArtistStats stats) async {
     if (!isSignedIn) return;
+
+    // Calculate total streams from all songs
+    final totalStreams = stats.songs.fold<int>(
+      0,
+      (sum, song) => sum + song.streams,
+    );
 
     // Use secure server-side validation for all stat updates
     try {
@@ -142,6 +153,10 @@ class FirebaseService {
           'loyalFanbase': stats.loyalFanbase,
           'regionalFanbase': stats.regionalFanbase,
           'currentRegion': stats.currentRegion,
+          'avatarUrl': stats.avatarUrl, // Sync avatar URL to players collection
+          'totalStreams': totalStreams, // ✅ Sync total streams from songs
+          'songsPublished':
+              stats.songs.where((s) => s.state == SongState.released).length,
         },
         'action': 'stat_update',
         'context': {
@@ -150,7 +165,8 @@ class FirebaseService {
       };
 
       // Sanitize everything to avoid NaN/Infinity being sent upstream
-      final sanitizedPayload = sanitizeForFirestore(Map<String, dynamic>.from(rawPayload));
+      final sanitizedPayload =
+          sanitizeForFirestore(Map<String, dynamic>.from(rawPayload));
       final result = await callable.call(sanitizedPayload);
 
       if (!result.data['success']) {
@@ -186,7 +202,8 @@ class FirebaseService {
       if (result.data['success']) {
         return result.data;
       } else {
-        throw Exception('Server rejected song creation: ${result.data['error']}');
+        throw Exception(
+            'Server rejected song creation: ${result.data['error']}');
       }
     } catch (e) {
       print('Error creating song: $e');
@@ -211,7 +228,8 @@ class FirebaseService {
       if (result.data['success']) {
         return result.data;
       } else {
-        throw Exception('Server rejected side hustle reward: ${result.data['error']}');
+        throw Exception(
+            'Server rejected side hustle reward: ${result.data['error']}');
       }
     } catch (e) {
       print('Error processing side hustle reward: $e');
@@ -232,11 +250,17 @@ class FirebaseService {
         'albumId': albumId,
         'overridePlatforms': overridePlatforms ?? [],
         'action': 'release_album',
+        'debug': true,
       });
 
       return result.data as Map<String, dynamic>?;
+    } on FirebaseFunctionsException catch (e) {
+      // Surface detailed information from the callable function
+      print(
+          'Error releasing album securely: code=${e.code}, message=${e.message}, details=${e.details}');
+      rethrow;
     } catch (e) {
-      print('Error releasing album securely: $e');
+      print('Error releasing album securely (unknown): $e');
       rethrow;
     }
   }
@@ -244,7 +268,8 @@ class FirebaseService {
   /// Trigger server-side migration for a player's songs/albums arrays -> subcollections
   Future<Map<String, dynamic>?> migratePlayerContent(String playerId) async {
     try {
-      final callable = _functions.httpsCallable('migratePlayerContentToSubcollections');
+      final callable =
+          _functions.httpsCallable('migratePlayerContentToSubcollections');
       final res = await callable.call({'playerId': playerId});
       return res.data as Map<String, dynamic>?;
     } catch (e) {
@@ -293,8 +318,8 @@ class FirebaseService {
         try {
           final songsList = data['songs'] as List<dynamic>;
           loadedSongs = songsList
-              .map((songData) => Song.fromJson(
-                  Map<String, dynamic>.from(songData as Map)))
+              .map((songData) =>
+                  Song.fromJson(Map<String, dynamic>.from(songData as Map)))
               .toList();
         } catch (e) {
           print('⚠️ Error parsing songs for $playerId: $e');
@@ -304,16 +329,15 @@ class FirebaseService {
       // If no songs array (migrated), try subcollection fallback
       if (loadedSongs.isEmpty) {
         try {
-          final snap = await _playersCollection
-              .doc(playerId)
-              .collection('songs')
-              .get();
-      loadedSongs = snap.docs
-        .map((d) => Song.fromJson(
-          Map<String, dynamic>.from(d.data() as Map)))
+          final snap =
+              await _playersCollection.doc(playerId).collection('songs').get();
+          loadedSongs = snap.docs
+              .map((d) =>
+                  Song.fromJson(Map<String, dynamic>.from(d.data() as Map)))
               .toList();
           if (loadedSongs.isNotEmpty) {
-            print('ℹ️ Loaded ${loadedSongs.length} songs from subcollection for $playerId');
+            print(
+                'ℹ️ Loaded ${loadedSongs.length} songs from subcollection for $playerId');
           }
         } catch (e) {
           print('⚠️ Error loading songs subcollection for $playerId: $e');
@@ -337,16 +361,15 @@ class FirebaseService {
       // If no albums array (migrated), try subcollection fallback
       if (loadedAlbums.isEmpty) {
         try {
-          final snap = await _playersCollection
-              .doc(playerId)
-              .collection('albums')
-              .get();
-      loadedAlbums = snap.docs
-        .map((d) => Album.fromJson(
-          Map<String, dynamic>.from(d.data() as Map)))
+          final snap =
+              await _playersCollection.doc(playerId).collection('albums').get();
+          loadedAlbums = snap.docs
+              .map((d) =>
+                  Album.fromJson(Map<String, dynamic>.from(d.data() as Map)))
               .toList();
           if (loadedAlbums.isNotEmpty) {
-            print('ℹ️ Loaded ${loadedAlbums.length} albums from subcollection for $playerId');
+            print(
+                'ℹ️ Loaded ${loadedAlbums.length} albums from subcollection for $playerId');
           }
         } catch (e) {
           print('⚠️ Error loading albums subcollection for $playerId: $e');
@@ -391,7 +414,8 @@ class FirebaseService {
         }
       } else {
         loadedUnlockedGenres = [primaryGenre];
-        loadedGenreMastery[primaryGenre] = loadedGenreMastery[primaryGenre] ?? 0;
+        loadedGenreMastery[primaryGenre] =
+            loadedGenreMastery[primaryGenre] ?? 0;
       }
 
       final stats = ArtistStats(
@@ -404,15 +428,12 @@ class FirebaseService {
         loyalFanbase: safeParseInt(data['loyalFanbase'], fallback: 0),
         albumsSold: safeParseInt(data['albumsReleased'], fallback: 0),
         songsWritten: safeParseInt(data['songsPublished'], fallback: 0),
-        concertsPerformed:
-            safeParseInt(data['concertsPerformed'], fallback: 0),
+        concertsPerformed: safeParseInt(data['concertsPerformed'], fallback: 0),
         songwritingSkill: safeParseInt(data['songwritingSkill'], fallback: 10),
         experience: safeParseInt(data['experience'], fallback: 0),
         lyricsSkill: safeParseInt(data['lyricsSkill'], fallback: 10),
-        compositionSkill:
-            safeParseInt(data['compositionSkill'], fallback: 10),
-        inspirationLevel:
-            safeParseInt(data['inspirationLevel'], fallback: 0),
+        compositionSkill: safeParseInt(data['compositionSkill'], fallback: 10),
+        inspirationLevel: safeParseInt(data['inspirationLevel'], fallback: 0),
         songs: loadedSongs,
         albums: loadedAlbums,
         currentRegion: data['homeRegion'] ?? 'usa',
@@ -468,12 +489,15 @@ class FirebaseService {
         releaseDate: DateTime.now(),
       );
 
-  final docRef = await _songsCollection.add(sanitizeForFirestore(song.toFirestore()));
+      final docRef =
+          await _songsCollection.add(sanitizeForFirestore(song.toFirestore()));
 
       // Update player song count
-      await _playersCollection.doc(currentUser!.uid).update(sanitizeForFirestore({
-        'songsPublished': FieldValue.increment(1),
-      }));
+      await _playersCollection
+          .doc(currentUser!.uid)
+          .update(sanitizeForFirestore({
+            'songsPublished': FieldValue.increment(1),
+          }));
 
       return docRef.id;
     } catch (e) {

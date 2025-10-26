@@ -5,6 +5,7 @@ import '../models/artist_stats.dart';
 import '../services/the_scoop_service.dart';
 import 'unified_charts_screen.dart';
 import '../widgets/app_navigation_wrapper.dart';
+import '../services/game_time_service.dart';
 
 class TheScoopScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -42,6 +43,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
   }
 
   Future<void> _loadEditorial() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -57,6 +59,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
         // Biggest mover is optional; ignore errors per-section
         _newsService.getBiggestMoverSong().catchError((_) => null),
       ]);
+      if (!mounted) return;
       setState(() {
         _todaysHits = (results[0] as List<Map<String, dynamic>>);
         _weeklyTopSong = results[1] as Map<String, dynamic>?;
@@ -68,6 +71,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -103,7 +107,9 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
         body: RefreshIndicator(
           onRefresh: () async {
             await _loadEditorial();
-            setState(() {});
+            if (mounted) {
+              setState(() {});
+            }
           },
           child: CustomScrollView(
             slivers: [
@@ -878,7 +884,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                   ],
                   const Spacer(),
                   Text(
-                    _newsService.formatTimestamp(news.timestamp),
+                    GameTimeService()
+                        .formatGameDate(news.gameTimestamp ?? news.timestamp),
                     style: TextStyle(
                       color: Colors.grey[500],
                       fontSize: 12,
@@ -1070,7 +1077,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
                       ),
                       const Spacer(),
                       Text(
-                        _newsService.formatTimestamp(news.timestamp),
+                        GameTimeService().formatGameDate(
+                            news.gameTimestamp ?? news.timestamp),
                         style: TextStyle(color: Colors.grey[500], fontSize: 13),
                       ),
                     ],

@@ -49,6 +49,9 @@ class Song {
   final int? promoBuffer; // Daily bonus streams from promo
   final DateTime? promoEndDate; // When the promo ends
 
+  // Scheduled release tracking
+  final DateTime? scheduledReleaseDate; // Game time date for scheduled release
+
   const Song({
     required this.id,
     required this.title,
@@ -78,6 +81,7 @@ class Song {
     this.releaseType = 'single',
     this.promoBuffer,
     this.promoEndDate,
+    this.scheduledReleaseDate,
   });
 
   Song copyWith({
@@ -109,6 +113,8 @@ class Song {
     String? releaseType,
     int? promoBuffer,
     DateTime? promoEndDate,
+    DateTime? scheduledReleaseDate,
+    bool clearScheduledDate = false,
   }) {
     return Song(
       id: id ?? this.id,
@@ -139,6 +145,9 @@ class Song {
       releaseType: releaseType ?? this.releaseType,
       promoBuffer: promoBuffer ?? this.promoBuffer,
       promoEndDate: promoEndDate ?? this.promoEndDate,
+      scheduledReleaseDate: clearScheduledDate
+          ? null
+          : (scheduledReleaseDate ?? this.scheduledReleaseDate),
     );
   }
 
@@ -173,6 +182,7 @@ class Song {
       'releaseType': releaseType,
       'promoBuffer': promoBuffer,
       'promoEndDate': promoEndDate?.toIso8601String(),
+      'scheduledReleaseDate': scheduledReleaseDate?.toIso8601String(),
     };
   }
 
@@ -218,6 +228,9 @@ class Song {
       promoBuffer: json['promoBuffer'] as int?,
       promoEndDate: json['promoEndDate'] != null
           ? DateTime.parse(json['promoEndDate'] as String)
+          : null,
+      scheduledReleaseDate: json['scheduledReleaseDate'] != null
+          ? DateTime.parse(json['scheduledReleaseDate'] as String)
           : null,
     );
   }
@@ -274,6 +287,8 @@ class Song {
         return 'Recorded';
       case SongState.released:
         return 'Released';
+      case SongState.scheduled:
+        return 'Scheduled';
     }
   }
 
@@ -338,4 +353,4 @@ class Song {
   }
 }
 
-enum SongState { written, recorded, released }
+enum SongState { written, recorded, released, scheduled }

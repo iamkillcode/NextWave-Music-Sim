@@ -56,6 +56,35 @@ function toDateSafe(value) {
   return null;
 }
 
+// Compute the current in-game date based on game settings
+async function getCurrentGameDateServer() {
+  try {
+    const gameSettingsRef = db.collection('gameSettings').doc('globalTime');
+    const gameSettingsDoc = await gameSettingsRef.get();
+    if (!gameSettingsDoc.exists) {
+      // Default to Jan 1, 2020 if not initialized
+      return new Date(2020, 0, 1);
+    }
+
+    const data = gameSettingsDoc.data();
+    const realWorldStartDate = toDateSafe(data.realWorldStartDate);
+    const gameWorldStartDate = toDateSafe(data.gameWorldStartDate);
+
+    // Use server time to keep consistent across users
+    const now = new Date();
+
+    const realHoursElapsed = Math.floor((now - realWorldStartDate) / (1000 * 60 * 60));
+    const gameDaysElapsed = realHoursElapsed; // 1 real hour = 1 game day
+    const calculated = new Date(gameWorldStartDate.getTime());
+    calculated.setDate(calculated.getDate() + gameDaysElapsed);
+    // Normalize to midnight
+    return new Date(calculated.getFullYear(), calculated.getMonth(), calculated.getDate());
+  } catch (e) {
+    console.error('❌ Error computing current game date on server:', e);
+    return new Date(2020, 0, 1);
+  }
+}
+
 // ============================================================================
 // 1. DAILY UPDATE - Main game progression (EVERY HOUR)
 // In-game: 1 day = 1 real-world hour
@@ -2187,6 +2216,21 @@ exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
             // Accept simple values without strict validation
             validatedUpdates[stat] = newValue;
             break;
+          
+          case 'avatarUrl':
+            // Accept avatar URL string (can be null)
+            if (newValue === null || typeof newValue === 'string') {
+              validatedUpdates[stat] = newValue;
+            }
+            break;
+          
+          case 'totalStreams':
+          case 'songsPublished':
+            // Accept computed values from client
+            if (typeof newValue === 'number' && Number.isFinite(newValue)) {
+              validatedUpdates[stat] = Math.max(0, newValue);
+            }
+            break;
             
           default:
             validatedUpdates[stat] = newValue;
@@ -2373,8 +2417,18 @@ exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
     targetPlayerId = playerId;
   }
 
+  const debug = !!data?.debug;
+
   try {
-    return await db.runTransaction(async (transaction) => {
+    // Entry log (safe, non-PII): helps correlate invocation in logs
+    if (debug) {
+      console.log('secureReleaseAlbum invoked', {
+        albumId: String(albumId),
+        targetPlayerId,
+        overridePlatformsCount: Array.isArray(overridePlatforms) ? overridePlatforms.length : 0,
+      });
+    }
+    const result = await db.runTransaction(async (transaction) => {
       const playerRef = db.collection('players').doc(targetPlayerId);
       const playerDoc = await transaction.get(playerRef);
       if (!playerDoc.exists) {
@@ -2498,7 +2552,9 @@ exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
       const existingSongs = Array.isArray(playerData.songs) ? playerData.songs : [];
       const existingAlbums = Array.isArray(playerData.albums) ? playerData.albums : [];
 
-      const albumIndex = existingAlbums.findIndex((a) => a.id === albumId);
+      // Normalize ID comparison (string vs number) to avoid false negatives
+      const albumIdStr = String(albumId);
+      const albumIndex = existingAlbums.findIndex((a) => String(a?.id) === albumIdStr);
       if (albumIndex === -1) {
         throw new functions.https.HttpsError('not-found', 'Album not found');
       }
@@ -2510,13 +2566,15 @@ exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
       }
 
       // Determine which songs belong to the album
-      const albumSongIds = new Set(Array.isArray(album.songIds) ? album.songIds : []);
+      const albumSongIds = new Set(
+        Array.isArray(album.songIds) ? album.songIds.map((sid) => String(sid)) : []
+      );
 
       // Build incoming updated song objects
       const nowTs = admin.firestore.Timestamp.fromDate(new Date());
       const incomingSongs = existingSongs.map((s) => {
         if (!s || !s.id) return s;
-        if (!albumSongIds.has(s.id)) return s;
+        if (!albumSongIds.has(String(s.id))) return s;
 
         const updated = { ...s };
         // Respect existing release date for singles, otherwise set now
@@ -2544,7 +2602,7 @@ exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
       // Determine album-level platforms from its updated songs
       const albumPlatformsSet = new Set();
       for (const s of incomingSongs) {
-        if (albumSongIds.has(s.id) && Array.isArray(s.streamingPlatforms)) {
+        if (s && albumSongIds.has(String(s.id)) && Array.isArray(s.streamingPlatforms)) {
           for (const p of s.streamingPlatforms) albumPlatformsSet.add(String(p));
         }
       }
@@ -2580,13 +2638,13 @@ exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
       };
 
       // Check for suspicious activity
-      const flags = detectSuspiciousActivity({ ...playerData, ...validatedUpdates }, validatedUpdates);
-      if (flags.length > 0) {
-        await logSuspiciousActivity(targetPlayerId, 'release_album', flags, { albumId, validatedUpdates });
-        if (flags.length > 3) {
-          throw new functions.https.HttpsError('permission-denied', 'Suspicious activity detected');
+        const flags = detectSuspiciousActivity({ ...playerData, ...validatedUpdates }, validatedUpdates);
+        if (flags.length > 0) {
+          // Avoid logging inside the transaction; if needed, do best-effort logging after commit elsewhere
+          if (flags.length > 3) {
+            throw new functions.https.HttpsError('permission-denied', 'Suspicious activity detected');
+          }
         }
-      }
 
       // Commit transaction
       try {
@@ -2605,9 +2663,26 @@ exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
         },
       };
     });
+    // Best-effort: add debug signal
+    if (debug) {
+      console.log('secureReleaseAlbum completed successfully', { albumId, targetPlayerId });
+    }
+    return result;
   } catch (error) {
-    console.error('Error in secureReleaseAlbum:', error, error && error.stack ? error.stack : 'no-stack');
-    throw new functions.https.HttpsError('internal', error && error.message ? error.message : 'Internal error during album release');
+    const errMsg = error && error.message ? error.message : 'Internal error during album release';
+    const errCode = error && error.code ? String(error.code) : 'unknown';
+    const errName = error && error.name ? String(error.name) : 'Error';
+    const details = {
+      step: 'secureReleaseAlbum',
+      code: errCode,
+      name: errName,
+      message: errMsg,
+      stack: error && error.stack ? String(error.stack) : undefined,
+      albumId: albumId,
+      targetPlayerId: targetPlayerId,
+    };
+    console.error('Error in secureReleaseAlbum:', details);
+    throw new functions.https.HttpsError('internal', errMsg, details);
   }
 });
 
@@ -4179,6 +4254,7 @@ async function createChartDramaPost() {
     }
     
     if (post) {
+      const gameDate = await getCurrentGameDateServer();
       await db.collection('news').add({
         category: 'drama',
         headline: post.headline,
@@ -4187,6 +4263,7 @@ async function createChartDramaPost() {
         authorName: 'Gandalf The Black',
         authorTitle: 'The Dark Lord of Music Criticism',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        gameTimestamp: admin.firestore.Timestamp.fromDate(gameDate),
         isControversial: true,
         tags: post.tags,
         reactions: { fire: 0, shocked: 0, laughing: 0, angry: 0 },
@@ -4253,6 +4330,7 @@ async function createArtistBeefPost() {
     
     const template = beefTemplates[Math.floor(Math.random() * beefTemplates.length)];
     
+    const gameDate = await getCurrentGameDateServer();
     await db.collection('news').add({
       category: 'drama',
       headline: template.headline,
@@ -4261,6 +4339,7 @@ async function createArtistBeefPost() {
       authorName: 'Gandalf The Black',
       authorTitle: 'The Dark Lord of Music Criticism',
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      gameTimestamp: admin.firestore.Timestamp.fromDate(gameDate),
       isControversial: true,
       relatedArtists: [artist1.artistId, artist2.artistId],
       tags: ['beef', 'drama', 'controversy'],
@@ -4322,6 +4401,7 @@ async function createControversialOpinionPost() {
   
   const template = opinionTemplates[Math.floor(Math.random() * opinionTemplates.length)];
   
+  const gameDate = await getCurrentGameDateServer();
   await db.collection('news').add({
     category: 'drama',
     headline: template.headline,
@@ -4330,6 +4410,7 @@ async function createControversialOpinionPost() {
     authorName: 'Gandalf The Black',
     authorTitle: 'The Dark Lord of Music Criticism',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    gameTimestamp: admin.firestore.Timestamp.fromDate(gameDate),
     isControversial: true,
     tags: template.tags,
     reactions: { fire: 0, shocked: 0, laughing: 0, angry: 0 },
@@ -4436,4 +4517,433 @@ function generateRandomSideHustleContract() {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   };
 }
+
+// ============================================================================
+// PUSH NOTIFICATION SYSTEM
+// ============================================================================
+
+/**
+ * Send push notification to a specific player
+ * @param {string} playerId - Player's Firebase UID
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body
+ * @param {object} data - Additional data payload
+ */
+async function sendPushNotification(playerId, title, body, data = {}) {
+  try {
+    const playerDoc = await db.collection('players').doc(playerId).get();
+    
+    if (!playerDoc.exists) {
+      console.log(`⚠️ Player ${playerId} not found`);
+      return;
+    }
+    
+    const playerData = playerDoc.data();
+    const fcmToken = playerData.fcmToken;
+    
+    if (!fcmToken) {
+      console.log(`⚠️ No FCM token for player ${playerId}`);
+      return;
+    }
+    
+    // Send notification
+    const message = {
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: {
+        ...data,
+        timestamp: Date.now().toString(),
+      },
+      token: fcmToken,
+    };
+    
+    await admin.messaging().send(message);
+    console.log(`✅ Push notification sent to ${playerData.displayName || playerId}`);
+    
+    // Also create in-app notification
+    await db.collection('players').doc(playerId).collection('notifications').add({
+      title: title,
+      message: body,
+      type: data.type || 'info',
+      read: false,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      data: data,
+    });
+    
+  } catch (error) {
+    console.error(`❌ Error sending push notification to ${playerId}:`, error);
+  }
+}
+
+/**
+ * Monitor EchoX posts for viral engagement
+ * Triggered when a post document is updated
+ */
+exports.onPostEngagement = functions.firestore
+  .document('echox_posts/{postId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    const postId = context.params.postId;
+    
+    const authorId = after.authorId;
+    const authorName = after.authorName;
+    const content = after.content || '';
+    
+    // Get author's fanbase to calculate thresholds
+    const authorDoc = await db.collection('players').doc(authorId).get();
+    if (!authorDoc.exists) return;
+    
+    const fanbase = authorDoc.data().fanbase || 0;
+    
+    // Calculate engagement thresholds based on fanbase
+    let likeThreshold, echoThreshold, commentThreshold;
+    
+    if (fanbase < 10000) {
+      // Small artist
+      likeThreshold = 100;
+      echoThreshold = 20;
+      commentThreshold = 50;
+    } else if (fanbase < 100000) {
+      // Medium artist
+      likeThreshold = 1000;
+      echoThreshold = 200;
+      commentThreshold = 500;
+    } else {
+      // Big artist
+      likeThreshold = 10000;
+      echoThreshold = 2000;
+      commentThreshold = 5000;
+    }
+    
+    const likesGained = (after.likes || 0) - (before.likes || 0);
+    const echoesGained = (after.echoes || 0) - (before.echoes || 0);
+    const commentsGained = (after.comments || 0) - (before.comments || 0);
+    
+    // Check for milestone achievements
+    if (after.likes >= likeThreshold && before.likes < likeThreshold) {
+      await sendPushNotification(
+        authorId,
+        '🔥 Your post is blowing up!',
+        `Your post reached ${after.likes.toLocaleString()} likes!`,
+        {
+          type: 'post_engagement',
+          postId: postId,
+          metric: 'likes',
+          value: after.likes,
+        }
+      );
+    }
+    
+    if (after.echoes >= echoThreshold && before.echoes < echoThreshold) {
+      await sendPushNotification(
+        authorId,
+        '🎉 Viral Alert!',
+        `Your post has been echoed ${after.echoes.toLocaleString()} times!`,
+        {
+          type: 'post_engagement',
+          postId: postId,
+          metric: 'echoes',
+          value: after.echoes,
+        }
+      );
+    }
+    
+    // Check for viral status (engagement rate > 2x expected)
+    const totalEngagement = after.likes + (after.echoes * 2) + (after.comments * 1.5);
+    const expectedEngagement = fanbase * 0.001; // 0.1% engagement is baseline
+    
+    if (totalEngagement > expectedEngagement * 2 && likesGained > 10) {
+      await sendPushNotification(
+        authorId,
+        '🚀 You\'re going viral!',
+        `Your post has ${totalEngagement.toFixed(0)} total engagements!`,
+        {
+          type: 'post_engagement',
+          postId: postId,
+          metric: 'viral',
+          value: totalEngagement,
+        }
+      );
+    }
+    
+    // Check for first milestone achievements
+    if (after.likes >= 1000000 && before.likes < 1000000) {
+      await sendPushNotification(
+        authorId,
+        '🏆 Milestone: First 1M Likes!',
+        'Your post just hit 1 million likes! Legendary status achieved.',
+        {
+          type: 'post_engagement',
+          postId: postId,
+          metric: 'milestone',
+          value: 1000000,
+        }
+      );
+    }
+  });
+
+/**
+ * Monitor chart positions and notify players
+ * Runs after weekly chart updates
+ */
+exports.onChartUpdate = functions.firestore
+  .document('leaderboard_history/{chartId}')
+  .onCreate(async (snapshot, context) => {
+    const chartData = snapshot.data();
+    const chartId = context.params.chartId;
+    
+    // Parse chart type (e.g., "songs_global_2025W42")
+    const chartParts = chartId.split('_');
+    if (chartParts.length < 3) return;
+    
+    const chartType = chartParts[0]; // 'songs' or 'artists'
+    const region = chartParts[1]; // 'global', 'usa', etc.
+    
+    const rankings = chartData.rankings || [];
+    
+    // Notify top 10 entries
+    for (let i = 0; i < Math.min(10, rankings.length); i++) {
+      const entry = rankings[i];
+      const position = entry.position;
+      const artistId = entry.artistId;
+      
+      if (!artistId) continue;
+      
+      // Check if this is a new chart entry or significant movement
+      const movement = entry.movement || 0;
+      const lastWeekPosition = entry.lastWeekPosition;
+      
+      // Notify if entering top 10, reaching #1, or big jump
+      if (position <= 10 && (!lastWeekPosition || lastWeekPosition > 10)) {
+        // Entered top 10
+        const chartName = chartType === 'songs' ? 'Spotlight Charts' : 'Artist Charts';
+        await sendPushNotification(
+          artistId,
+          `🎵 You made the ${chartName}!`,
+          `Your ${chartType === 'songs' ? 'song' : 'artist profile'} "${entry.title || entry.name}" is now #${position}!`,
+          {
+            type: 'chart_achievement',
+            chartType: chartType,
+            region: region,
+            position: position,
+            entryId: entry.songId || entry.artistId,
+          }
+        );
+      } else if (position === 1 && lastWeekPosition && lastWeekPosition !== 1) {
+        // Reached #1
+        await sendPushNotification(
+          artistId,
+          '👑 #1 on the Charts!',
+          `"${entry.title || entry.name}" just hit #1! You're at the top!`,
+          {
+            type: 'chart_achievement',
+            chartType: chartType,
+            region: region,
+            position: 1,
+            entryId: entry.songId || entry.artistId,
+          }
+        );
+      } else if (movement >= 5) {
+        // Big jump up
+        await sendPushNotification(
+          artistId,
+          `📈 Climbing the Charts!`,
+          `"${entry.title || entry.name}" jumped ${movement} spots to #${position}!`,
+          {
+            type: 'chart_achievement',
+            chartType: chartType,
+            region: region,
+            position: position,
+            movement: movement,
+            entryId: entry.songId || entry.artistId,
+          }
+        );
+      }
+    }
+    
+    console.log(`✅ Chart notifications sent for ${chartId}`);
+  });
+
+/**
+ * Monitor chart positions for rivalry notifications
+ * Runs daily to check if rivals have overtaken player
+ */
+exports.checkRivalChartPositions = functions.pubsub
+  .schedule('0 */6 * * *') // Every 6 hours
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🔍 Checking for rival chart overtakes...');
+    
+    try {
+      // Get latest global song chart
+      const weekId = getWeekId(new Date());
+      const chartDoc = await db.collection('leaderboard_history')
+        .doc(`songs_global_${weekId}`)
+        .get();
+      
+      if (!chartDoc.exists) {
+        console.log('⚠️ No chart data available');
+        return;
+      }
+      
+      const rankings = chartDoc.data().rankings || [];
+      
+      // Build position map
+      const positionMap = new Map();
+      rankings.forEach(entry => {
+        positionMap.set(entry.songId, {
+          position: entry.position,
+          lastWeekPosition: entry.lastWeekPosition,
+          artistId: entry.artistId,
+          title: entry.title,
+        });
+      });
+      
+      // Check each player's songs
+      const playersSnapshot = await db.collection('players').limit(1000).get();
+      
+      for (const playerDoc of playersSnapshot.docs) {
+        const playerData = playerDoc.data();
+        const playerId = playerDoc.id;
+        const songs = playerData.songs || [];
+        
+        // Find player's best charting song
+        let playerBestPosition = null;
+        let playerBestSong = null;
+        
+        for (const song of songs) {
+          if (song.state !== 'released') continue;
+          
+          const chartData = positionMap.get(song.id);
+          if (chartData && chartData.artistId === playerId) {
+            if (!playerBestPosition || chartData.position < playerBestPosition) {
+              playerBestPosition = chartData.position;
+              playerBestSong = song;
+            }
+          }
+        }
+        
+        if (!playerBestPosition || playerBestPosition > 20) continue;
+        
+        // Find rivals (artists ranked just above)
+        const rivalPosition = playerBestPosition - 1;
+        const rival = rankings.find(r => r.position === rivalPosition);
+        
+        if (rival && rival.artistId !== playerId) {
+          // Check if rival overtook player this week
+          const playerChartData = positionMap.get(playerBestSong.id);
+          const rivalMovement = rival.movement || 0;
+          
+          if (rivalMovement > 0 && playerChartData.lastWeekPosition &&
+              playerChartData.lastWeekPosition < rival.lastWeekPosition) {
+            // Rival overtook player
+            const rivalDoc = await db.collection('players').doc(rival.artistId).get();
+            const rivalName = rivalDoc.exists ? rivalDoc.data().displayName : 'Another artist';
+            
+            await sendPushNotification(
+              playerId,
+              '⚠️ You\'ve Been Overtaken!',
+              `${rivalName} just passed you on the charts! They're now at #${rivalPosition}.`,
+              {
+                type: 'rival_overtake',
+                rivalId: rival.artistId,
+                rivalName: rivalName,
+                rivalPosition: rivalPosition,
+                yourPosition: playerBestPosition,
+                songTitle: playerBestSong.title,
+              }
+            );
+          }
+        }
+      }
+      
+      console.log('✅ Rival chart checks complete');
+    } catch (error) {
+      console.error('❌ Error checking rival positions:', error);
+    }
+  });
+
+/**
+ * Sync player totalStreams from their artistStats
+ * Call this to update all players' stream counts from their actual song data
+ */
+exports.syncAllPlayerStreams = functions.https.onCall(async (data, context) => {
+  // Require admin access
+  await validateAdminAccess(context);
+  
+  try {
+    console.log('Starting player streams sync...');
+    
+    const playersSnapshot = await db.collection('players').get();
+    let updated = 0;
+    let errors = 0;
+    
+    for (const playerDoc of playersSnapshot.docs) {
+      try {
+        const playerId = playerDoc.id;
+        const playerData = playerDoc.data();
+        
+        let totalStreams = 0;
+        let songsPublished = 0;
+        
+        // Check if player has migrated to subcollections
+        const migrated = playerData.migratedToSubcollections === true;
+        
+        if (migrated) {
+          // Count streams from songs subcollection under players
+          const songsSnapshot = await db.collection('players').doc(playerId).collection('songs').get();
+          
+          for (const songDoc of songsSnapshot.docs) {
+            const song = songDoc.data();
+            if (song.state === 'released') {
+              totalStreams += song.streams || 0;
+              songsPublished++;
+            }
+          }
+        } else {
+          // Count streams from songs array in player document
+          const songs = playerData.songs || [];
+          
+          for (const song of songs) {
+            if (song.state === 'released') {
+              totalStreams += song.streams || 0;
+              songsPublished++;
+            }
+          }
+        }
+        
+        // Update player document
+        await db.collection('players').doc(playerId).update({
+          totalStreams: totalStreams,
+          songsPublished: songsPublished,
+          avatarUrl: playerData.avatarUrl || null,
+          lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        updated++;
+        console.log(`Updated ${playerId}: ${totalStreams} streams, ${songsPublished} songs`);
+        
+      } catch (err) {
+        errors++;
+        console.error(`Error updating player ${playerDoc.id}:`, err);
+      }
+    }
+    
+    console.log(`✅ Sync complete: ${updated} updated, ${errors} errors`);
+    
+    return {
+      success: true,
+      updated: updated,
+      errors: errors,
+      total: playersSnapshot.size,
+    };
+    
+  } catch (error) {
+    console.error('Error syncing player streams:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to sync player streams');
+  }
+});
 

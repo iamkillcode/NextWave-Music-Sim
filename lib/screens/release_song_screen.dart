@@ -5,6 +5,7 @@ import '../models/song.dart';
 import '../models/streaming_platform.dart';
 import '../services/stream_growth_service.dart';
 import '../services/cover_art_uploader.dart';
+import '../services/game_time_service.dart';
 
 class ReleaseSongScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -28,6 +29,20 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     'tunify',
   }; // Can select multiple platforms
   String? _uploadedCoverArtUrl; // URL of uploaded cover art image
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeScheduledDate();
+  }
+
+  Future<void> _initializeScheduledDate() async {
+    final gameTimeService = GameTimeService();
+    final currentGameDate = await gameTimeService.getCurrentGameDate();
+    setState(() {
+      _scheduledDate = currentGameDate.add(const Duration(days: 7));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -906,11 +921,15 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
   }
 
   Future<void> _selectDate() async {
+    final gameTimeService = GameTimeService();
+    final currentGameDate = await gameTimeService.getCurrentGameDate();
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _scheduledDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: currentGameDate.add(const Duration(days: 7)),
+      firstDate: currentGameDate,
+      lastDate: currentGameDate.add(const Duration(days: 365)),
+      helpText: 'Schedule Release (Game Time)',
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
@@ -936,14 +955,18 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
     }
   }
 
-  void _releaseSong() {
+  void _releaseSong() async {
     setState(() {
       _isProcessing = true;
     });
 
+    // Get current game date for release
+    final gameTimeService = GameTimeService();
+    final currentGameDate = await gameTimeService.getCurrentGameDate();
+
     // Simulate processing
     Future.delayed(const Duration(seconds: 2), () {
-      final releaseDate = _releaseNow ? DateTime.now() : _scheduledDate;
+      final releaseDate = _releaseNow ? currentGameDate : _scheduledDate;
 
       // Calculate realistic initial streams based on artist's ACTUAL fanbase
       // Not based on unrealistic global population estimates
@@ -1024,8 +1047,9 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
       // Update song state with cover art, platforms, virality, and regional data
       final updatedSong = widget.song.copyWith(
-        state: SongState.released,
-        releasedDate: releaseDate,
+        state: _releaseNow ? SongState.released : SongState.scheduled,
+        releasedDate: _releaseNow ? releaseDate : null,
+        scheduledReleaseDate: _releaseNow ? null : releaseDate,
         streams: _releaseNow
             ? realisticInitialStreams
             : 0, // Initial streams based on artist's actual fanbase
@@ -1035,7 +1059,7 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
             : 0, // 30% of streams become likes
         coverArtUrl: _uploadedCoverArtUrl,
         streamingPlatforms: _selectedPlatforms.toList(),
-        viralityScore: viralityScore,
+        viralityScore: _releaseNow ? viralityScore : 0.5,
         daysOnChart: 0,
         peakDailyStreams: _releaseNow ? realisticInitialStreams : 0,
       );
@@ -1061,12 +1085,13 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
         final platformNames = _selectedPlatforms
             .map((id) => StreamingPlatform.getById(id).name)
             .join(' & ');
+        final gameTimeService = GameTimeService();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               _releaseNow
                   ? '🚀 "${widget.song.title}" is now live on $platformNames!'
-                  : '📅 "${widget.song.title}" scheduled for ${releaseDate.day}/${releaseDate.month}/${releaseDate.year} on $platformNames',
+                  : '📅 "${widget.song.title}" scheduled for ${gameTimeService.formatGameDate(releaseDate)} on $platformNames',
             ),
             backgroundColor: const Color(0xFF32D74B),
             behavior: SnackBarBehavior.floating,

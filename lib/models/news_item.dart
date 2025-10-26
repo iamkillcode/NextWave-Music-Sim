@@ -16,6 +16,8 @@ class NewsItem {
   final String body;
   final NewsCategory category;
   final DateTime timestamp;
+  // In-game time corresponding to when the news happened in the game world
+  final DateTime? gameTimestamp;
   final String? relatedArtistId;
   final String? relatedArtistName;
   final String? imageUrl;
@@ -32,6 +34,7 @@ class NewsItem {
     required this.body,
     required this.category,
     required this.timestamp,
+    this.gameTimestamp,
     this.relatedArtistId,
     this.relatedArtistName,
     this.imageUrl,
@@ -53,6 +56,7 @@ class NewsItem {
         orElse: () => NewsCategory.drama,
       ),
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      gameTimestamp: (data['gameTimestamp'] as Timestamp?)?.toDate(),
       relatedArtistId: data['relatedArtistId'],
       relatedArtistName: data['relatedArtistName'],
       imageUrl: data['imageUrl'],
@@ -73,6 +77,8 @@ class NewsItem {
       'body': body,
       'category': category.toString().split('.').last,
       'timestamp': Timestamp.fromDate(timestamp),
+      if (gameTimestamp != null)
+        'gameTimestamp': Timestamp.fromDate(gameTimestamp!),
       if (relatedArtistId != null) 'relatedArtistId': relatedArtistId,
       if (relatedArtistName != null) 'relatedArtistName': relatedArtistName,
       if (imageUrl != null) 'imageUrl': imageUrl,

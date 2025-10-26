@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/dashboard_screen_new.dart';
 import 'screens/auth_screen.dart';
 import 'firebase_options.dart';
 import 'utils/firebase_status.dart';
 import 'services/remote_config_service.dart';
+import 'services/push_notification_service.dart';
 import 'widgets/remote_config_guard.dart';
 import 'theme/nextwave_theme.dart';
 
@@ -14,6 +17,11 @@ void main() async {
 
   // Initialize Firebase with error handling
   await _initializeFirebase();
+
+  // Set up background message handler (skip on web; only after init)
+  if (FirebaseStatus.isInitialized && !kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
 
   // Initialize Remote Config
   if (FirebaseStatus.isInitialized) {
@@ -28,7 +36,8 @@ Future<void> _initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(
-      const Duration(seconds: 10),
+      // Give web more time before declaring a timeout
+      kIsWeb ? const Duration(seconds: 30) : const Duration(seconds: 10),
       onTimeout: () {
         throw Exception(
           'Firebase initialization timeout - check internet connection or try another platform (Windows/Android)',
@@ -63,9 +72,14 @@ Future<void> _initializeRemoteConfig() async {
   }
 }
 
-class MusicArtistApp extends StatelessWidget {
+class MusicArtistApp extends StatefulWidget {
   const MusicArtistApp({super.key});
 
+  @override
+  State<MusicArtistApp> createState() => _MusicArtistAppState();
+}
+
+class _MusicArtistAppState extends State<MusicArtistApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -81,6 +95,54 @@ class MusicArtistApp extends StatelessWidget {
   }
 
   Widget _getInitialScreen() {
+    // If Firebase failed to initialize, avoid touching Firebase APIs on web.
+    if (!FirebaseStatus.isInitialized) {
+      final error = FirebaseStatus.errorMessage;
+      return Scaffold(
+        backgroundColor: const Color(0xFF0D1117),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Running in demo mode',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  error ??
+                      'Firebase not initialized. Some features are unavailable.',
+                  style: const TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _initializeFirebase();
+                    if (mounted) setState(() {});
+                  },
+                  child: const Text('Retry initialization'),
+                ),
+                if (kIsWeb) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Tip: On web, initialization can be slower on first load. You can also try Windows: flutter run -d windows',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     // Wrap with RemoteConfigGuard to check maintenance mode & updates
     return RemoteConfigGuard(
       currentVersion: '1.0.0', // TODO: Get from package_info_plus

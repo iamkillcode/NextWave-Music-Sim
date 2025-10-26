@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/news_item.dart';
 import 'dart:math';
 import 'unified_chart_service.dart';
+import 'game_time_service.dart';
 
 class TheScoopService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -12,6 +13,9 @@ class TheScoopService {
   Stream<List<NewsItem>> getNewsStream({int limit = 50}) {
     return _firestore
         .collection('news')
+        // Keep ordering by real timestamp for index compatibility; display uses game time
+        // Order primarily by in-game time; use real timestamp as tiebreaker/fallback
+        .orderBy('gameTimestamp', descending: true)
         .orderBy('timestamp', descending: true)
         .limit(limit)
         .snapshots()
@@ -23,10 +27,12 @@ class TheScoopService {
   }
 
   /// Get news items for a specific category
-  Stream<List<NewsItem>> getNewsByCategory(NewsCategory category, {int limit = 20}) {
+  Stream<List<NewsItem>> getNewsByCategory(NewsCategory category,
+      {int limit = 20}) {
     return _firestore
         .collection('news')
         .where('category', isEqualTo: category.toString().split('.').last)
+        .orderBy('gameTimestamp', descending: true)
         .orderBy('timestamp', descending: true)
         .limit(limit)
         .snapshots()
@@ -39,7 +45,18 @@ class TheScoopService {
 
   /// Create a news item
   Future<void> createNewsItem(NewsItem newsItem) async {
-    await _firestore.collection('news').add(newsItem.toJson());
+    // Stamp game time for The Scoop posts
+    DateTime? gameDate;
+    try {
+      gameDate = await GameTimeService().getCurrentGameDate();
+    } catch (_) {}
+
+    final data = newsItem.toJson();
+    if (gameDate != null) {
+      data['gameTimestamp'] = Timestamp.fromDate(gameDate);
+    }
+
+    await _firestore.collection('news').add(data);
   }
 
   /// Generate news for chart movement
@@ -56,17 +73,21 @@ class TheScoopService {
     if (previousPosition == null) {
       // New entry
       headline = '🎵 "$songTitle" Debuts at #$position!';
-      body = '$artistName enters the Spotlight Charts with "$songTitle" at position #$position. The track is already making waves in the music industry!';
+      body =
+          '$artistName enters the Spotlight Charts with "$songTitle" at position #$position. The track is already making waves in the music industry!';
     } else if (position < previousPosition) {
       final movement = previousPosition - position;
       headline = '📈 $artistName Climbs to #$position!';
-      body = '"$songTitle" by $artistName surges $movement spots to #$position on the Spotlight Charts. The hit single continues its impressive run!';
+      body =
+          '"$songTitle" by $artistName surges $movement spots to #$position on the Spotlight Charts. The hit single continues its impressive run!';
     } else if (position == 1) {
       headline = '👑 $artistName Claims #1 Spot!';
-      body = '"$songTitle" by $artistName reaches the top of the Spotlight Charts! This marks a career milestone for the artist.';
+      body =
+          '"$songTitle" by $artistName reaches the top of the Spotlight Charts! This marks a career milestone for the artist.';
     } else {
       headline = '⭐ $artistName Holds Strong at #$position';
-      body = '"$songTitle" maintains its position on the charts. $artistName\'s fanbase continues to show unwavering support!';
+      body =
+          '"$songTitle" maintains its position on the charts. $artistName\'s fanbase continues to show unwavering support!';
     }
 
     final newsItem = NewsItem(
@@ -96,7 +117,7 @@ class TheScoopService {
   }) async {
     final type = isAlbum ? 'Album' : 'Single';
     final emoji = isAlbum ? '💿' : '🎵';
-    
+
     final headlines = [
       '$emoji $artistName Drops New $type "$title"',
       '🎉 Breaking: $artistName Releases "$title"',
@@ -174,22 +195,26 @@ class TheScoopService {
     final newsTemplates = [
       {
         'headline': '🎭 Industry Insiders Predict Next Big Genre Trend',
-        'body': 'Music analysts suggest that fusion genres are set to dominate the charts in upcoming months. Artists experimenting with unique sounds are gaining traction.',
+        'body':
+            'Music analysts suggest that fusion genres are set to dominate the charts in upcoming months. Artists experimenting with unique sounds are gaining traction.',
         'category': NewsCategory.drama,
       },
       {
         'headline': '💰 Streaming Numbers Hit All-Time High',
-        'body': 'The music industry celebrates record-breaking streaming numbers this quarter. Independent artists are leading the charge in innovation.',
+        'body':
+            'The music industry celebrates record-breaking streaming numbers this quarter. Independent artists are leading the charge in innovation.',
         'category': NewsCategory.milestone,
       },
       {
         'headline': '🎤 Virtual Concert Revolution Continues',
-        'body': 'More artists are embracing virtual performances, reaching global audiences like never before. The future of live music is evolving.',
+        'body':
+            'More artists are embracing virtual performances, reaching global audiences like never before. The future of live music is evolving.',
         'category': NewsCategory.collaboration,
       },
       {
         'headline': '⭐ Critics Praise New Wave of Underground Talent',
-        'body': 'Music critics are spotlighting emerging artists who are breaking conventional boundaries. The underground scene is more vibrant than ever.',
+        'body':
+            'Music critics are spotlighting emerging artists who are breaking conventional boundaries. The underground scene is more vibrant than ever.',
         'category': NewsCategory.drama,
       },
     ];
@@ -281,8 +306,9 @@ class TheScoopService {
       limit: 200,
     );
 
-    DateTime now = DateTime.now();
-    DateTime cutoff = now.subtract(const Duration(days: 7));
+    // Use in-game time for the cutoff window
+    final currentGame = await GameTimeService().getCurrentGameDate();
+    final cutoff = currentGame.subtract(const Duration(days: 7));
     List<Map<String, dynamic>> recent = [];
     for (final s in daily) {
       final rd = s['releaseDate'];
@@ -348,7 +374,8 @@ class TheScoopService {
     }).toList();
     if (movers.isEmpty) return null;
 
-    movers.sort((a, b) => ((b['movement'] as int?) ?? 0).compareTo((a['movement'] as int?) ?? 0));
+    movers.sort((a, b) =>
+        ((b['movement'] as int?) ?? 0).compareTo((a['movement'] as int?) ?? 0));
     return movers.first;
   }
 }
