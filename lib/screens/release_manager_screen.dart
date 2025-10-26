@@ -1081,23 +1081,71 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                   ],
                 ),
               ),
-              // Released status badge
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade900.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.greenAccent, width: 1),
-                ),
-                child: const Text(
-                  'Released',
-                  style: TextStyle(
-                    color: Colors.greenAccent,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
+              // Released status badge and actions
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade900.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.greenAccent, width: 1),
+                    ),
+                    child: const Text(
+                      'Released',
+                      style: TextStyle(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
-                ),
+                  // Show "Create Deluxe" button if not already deluxe and is a full album
+                  if (!album.isDeluxe && album.type == AlbumType.album) ...[
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => _showCreateDeluxeDialog(album),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.purple, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Text('💎', style: TextStyle(fontSize: 12)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Make Deluxe',
+                              style: TextStyle(
+                                color: Colors.purple,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  // Show "Original" link if this is a deluxe edition
+                  if (album.isDeluxe && album.originalAlbumId != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Deluxe Edition',
+                      style: TextStyle(
+                        color: Colors.purple.shade300,
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -1453,6 +1501,54 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     );
   }
 
+  void _showCreateDeluxeDialog(Album originalAlbum) {
+    // Get available songs that aren't already in an album
+    final availableSongs = _currentStats.songs
+        .where((song) =>
+            song.albumId == null &&
+            song.state == SongState.released &&
+            !originalAlbum.songIds.contains(song.id))
+        .toList();
+
+    if (availableSongs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No available songs to add. Record new tracks first!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => _DeluxeEditionDialog(
+        originalAlbum: originalAlbum,
+        availableSongs: availableSongs,
+        currentStats: _currentStats,
+        onDeluxeCreated: (Album deluxeAlbum, ArtistStats updatedStats) {
+          setState(() {
+            _currentStats = updatedStats;
+          });
+          widget.onStatsUpdated(updatedStats);
+          Navigator.pop(context);
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('💎 Deluxe edition of "${deluxeAlbum.title}" created!'),
+              backgroundColor: Colors.purple,
+            ),
+          );
+
+          // Switch to released tab
+          _tabController.animateTo(2);
+        },
+      ),
+    );
+  }
+
   void _deleteAlbum(Album album) {
     showDialog(
       context: context,
@@ -1513,5 +1609,252 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         ],
       ),
     );
+  }
+}
+
+// Deluxe Edition Creation Dialog
+class _DeluxeEditionDialog extends StatefulWidget {
+  final Album originalAlbum;
+  final List<Song> availableSongs;
+  final ArtistStats currentStats;
+  final Function(Album deluxeAlbum, ArtistStats updatedStats) onDeluxeCreated;
+
+  const _DeluxeEditionDialog({
+    required this.originalAlbum,
+    required this.availableSongs,
+    required this.currentStats,
+    required this.onDeluxeCreated,
+  });
+
+  @override
+  State<_DeluxeEditionDialog> createState() => _DeluxeEditionDialogState();
+}
+
+class _DeluxeEditionDialogState extends State<_DeluxeEditionDialog> {
+  final Set<String> _selectedBonusTracks = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final originalTrackCount = widget.originalAlbum.songIds.length;
+    final totalTracks = originalTrackCount + _selectedBonusTracks.length;
+    final minBonus = 3;
+    final maxBonus = 8;
+    final maxTotal = 20;
+
+    final canCreate = _selectedBonusTracks.length >= minBonus &&
+        _selectedBonusTracks.length <= maxBonus &&
+        totalTracks <= maxTotal;
+
+    String statusText = '';
+    if (_selectedBonusTracks.isEmpty) {
+      statusText = 'Select $minBonus-$maxBonus bonus tracks';
+    } else if (_selectedBonusTracks.length < minBonus) {
+      statusText = 'Need ${minBonus - _selectedBonusTracks.length} more tracks';
+    } else if (_selectedBonusTracks.length > maxBonus) {
+      statusText = 'Too many tracks (max $maxBonus bonus tracks)';
+    } else if (totalTracks > maxTotal) {
+      statusText = 'Album would exceed 20 tracks total';
+    } else {
+      statusText = 'Ready to create deluxe edition!';
+    }
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF161B22),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('💎', style: TextStyle(fontSize: 32)),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Create Deluxe Edition',
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.purple.withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.originalAlbum.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Original: $originalTrackCount tracks',
+                  style: const TextStyle(color: Colors.white60, fontSize: 12),
+                ),
+                Text(
+                  'Deluxe: $totalTracks tracks (+${_selectedBonusTracks.length} bonus)',
+                  style: TextStyle(
+                    color: _selectedBonusTracks.length >= minBonus
+                        ? Colors.purple.shade300
+                        : Colors.white60,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select bonus tracks to add:',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Choose $minBonus-$maxBonus songs • Max $maxTotal tracks total',
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: widget.availableSongs.length,
+                  itemBuilder: (context, index) {
+                    final song = widget.availableSongs[index];
+                    final isSelected = _selectedBonusTracks.contains(song.id);
+
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedBonusTracks.add(song.id);
+                          } else {
+                            _selectedBonusTracks.remove(song.id);
+                          }
+                        });
+                      },
+                      title: Text(
+                        song.title,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                      subtitle: Text(
+                        song.genre,
+                        style: const TextStyle(
+                            color: Colors.white60, fontSize: 12),
+                      ),
+                      activeColor: Colors.purple,
+                      checkColor: Colors.white,
+                      dense: true,
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: canCreate
+                    ? Colors.purple.withOpacity(0.1)
+                    : Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                statusText,
+                style: TextStyle(
+                  color: canCreate ? Colors.purple.shade300 : Colors.orange,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+        ),
+        ElevatedButton(
+          onPressed: canCreate ? _createDeluxeEdition : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.purple,
+            disabledBackgroundColor: Colors.grey.shade800,
+          ),
+          child: const Text(
+            'Create Deluxe',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _createDeluxeEdition() {
+    final deluxeId = const Uuid().v4();
+    final deluxeTitle = '${widget.originalAlbum.title} (Deluxe)';
+
+    // Combine original tracks + bonus tracks
+    final allTrackIds = [
+      ...widget.originalAlbum.songIds,
+      ..._selectedBonusTracks,
+    ];
+
+    // Create deluxe album
+    final deluxeAlbum = widget.originalAlbum.copyWith(
+      id: deluxeId,
+      title: deluxeTitle,
+      songIds: allTrackIds,
+      isDeluxe: true,
+      originalAlbumId: widget.originalAlbum.id,
+      state: AlbumState.released, // Auto-release deluxe
+      releasedDate: DateTime.now(),
+    );
+
+    // Update songs to mark bonus tracks as part of deluxe album
+    final updatedSongs = widget.currentStats.songs.map((song) {
+      if (_selectedBonusTracks.contains(song.id)) {
+        return song.copyWith(
+          albumId: deluxeId,
+          releaseType: 'album',
+          isAlbum: true,
+        );
+      }
+      return song;
+    }).toList();
+
+    // Add deluxe album to list
+    final updatedAlbums = [...widget.currentStats.albums, deluxeAlbum];
+
+    // Update stats
+    final updatedStats = widget.currentStats.copyWith(
+      albums: updatedAlbums,
+      songs: updatedSongs,
+      fame: widget.currentStats.fame + 3, // Bonus fame for deluxe
+      fanbase: widget.currentStats.fanbase + 50, // Bonus fanbase
+    );
+
+    widget.onDeluxeCreated(deluxeAlbum, updatedStats);
   }
 }

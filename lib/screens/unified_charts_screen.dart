@@ -562,36 +562,92 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                   ),
                   const SizedBox(height: 2),
 
-                  // Artist name
-                  Text(
-                    entry['artist'] ?? 'Unknown Artist',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: artistFontSize,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  // Artist name with album type badge for albums
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry['artist'] ?? 'Unknown Artist',
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: artistFontSize,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_selectedType == 'albums' &&
+                          entry['isDeluxe'] == true)
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.purple, width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '💎',
+                                style: TextStyle(fontSize: 10),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'DELUXE',
+                                style: TextStyle(
+                                  color: Colors.purple,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
 
                   // Streams and stats
                   Row(
                     children: [
-                      Text(
-                        '${_chartService.formatStreams(entry['periodStreams'] ?? 0)}',
-                        style: TextStyle(
-                          color: _getStreamColor(),
-                          fontWeight: FontWeight.bold,
-                          fontSize: _getResponsiveSize(context, 13.0),
+                      // For albums, show average streams per track (ranking metric)
+                      if (_selectedType == 'albums' &&
+                          entry['averageStreams'] != null) ...[
+                        Text(
+                          '${_chartService.formatStreams(entry['averageStreams'] ?? 0)}',
+                          style: TextStyle(
+                            color: _getStreamColor(),
+                            fontWeight: FontWeight.bold,
+                            fontSize: _getResponsiveSize(context, 13.0),
+                          ),
                         ),
-                      ),
-                      Text(
-                        ' streams',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: _getResponsiveSize(context, 11.0),
+                        Text(
+                          ' avg/track',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: _getResponsiveSize(context, 11.0),
+                          ),
                         ),
-                      ),
+                      ] else ...[
+                        Text(
+                          '${_chartService.formatStreams(entry['periodStreams'] ?? 0)}',
+                          style: TextStyle(
+                            color: _getStreamColor(),
+                            fontWeight: FontWeight.bold,
+                            fontSize: _getResponsiveSize(context, 13.0),
+                          ),
+                        ),
+                        Text(
+                          ' streams',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: _getResponsiveSize(context, 11.0),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 8),
                       Container(
                         width: 3,
@@ -602,11 +658,11 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Show track count for albums, or total streams for singles
+                      // Show track count and total streams for albums
                       if (_selectedType == 'albums' &&
                           entry['trackCount'] != null)
                         Text(
-                          '${entry['trackCount']} tracks',
+                          '${entry['trackCount']} tracks • ${_chartService.formatStreams(entry['periodStreams'] ?? 0)} total',
                           style: TextStyle(
                             color: Colors.white38,
                             fontSize: _getResponsiveSize(context, 11.0),

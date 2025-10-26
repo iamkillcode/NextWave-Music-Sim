@@ -1,6 +1,8 @@
 /// Represents an Album or EP - a collection of songs released together
 library;
+
 import '../utils/firestore_sanitizer.dart';
+
 class Album {
   final String id;
   final String title;
@@ -12,6 +14,8 @@ class Album {
   final int totalStreams; // Combined streams of all songs
   final AlbumState state; // planned, scheduled, released
   final List<String> streamingPlatforms; // Where it's available
+  final bool isDeluxe; // True if this is a deluxe edition
+  final String? originalAlbumId; // ID of the original album if this is deluxe
 
   const Album({
     required this.id,
@@ -24,6 +28,8 @@ class Album {
     this.totalStreams = 0,
     this.state = AlbumState.planned,
     this.streamingPlatforms = const [],
+    this.isDeluxe = false,
+    this.originalAlbumId,
   });
 
   Album copyWith({
@@ -37,6 +43,8 @@ class Album {
     int? totalStreams,
     AlbumState? state,
     List<String>? streamingPlatforms,
+    bool? isDeluxe,
+    String? originalAlbumId,
   }) {
     return Album(
       id: id ?? this.id,
@@ -49,6 +57,8 @@ class Album {
       totalStreams: totalStreams ?? this.totalStreams,
       state: state ?? this.state,
       streamingPlatforms: streamingPlatforms ?? this.streamingPlatforms,
+      isDeluxe: isDeluxe ?? this.isDeluxe,
+      originalAlbumId: originalAlbumId ?? this.originalAlbumId,
     );
   }
 
@@ -64,6 +74,8 @@ class Album {
       'totalStreams': totalStreams,
       'state': state.name,
       'streamingPlatforms': streamingPlatforms,
+      'isDeluxe': isDeluxe,
+      'originalAlbumId': originalAlbumId,
     };
   }
 
@@ -83,7 +95,7 @@ class Album {
           ? DateTime.parse(json['scheduledDate'] as String)
           : null,
       coverArtUrl: json['coverArtUrl'] as String?,
-  totalStreams: safeParseInt(json['totalStreams'], fallback: 0),
+      totalStreams: safeParseInt(json['totalStreams'], fallback: 0),
       state: AlbumState.values.firstWhere(
         (e) => e.name == json['state'],
         orElse: () => AlbumState.planned,
@@ -91,6 +103,8 @@ class Album {
       streamingPlatforms: List<String>.from(
         json['streamingPlatforms'] as List? ?? [],
       ),
+      isDeluxe: json['isDeluxe'] as bool? ?? false,
+      originalAlbumId: json['originalAlbumId'] as String?,
     );
   }
 
@@ -99,18 +113,41 @@ class Album {
     if (type == AlbumType.ep) {
       return songIds.length >= 3 && songIds.length <= 6;
     } else {
-      return songIds.length >= 7;
+      // Standard albums: 7-15 tracks
+      // Deluxe albums: 10-20 tracks (must have at least 10)
+      if (isDeluxe) {
+        return songIds.length >= 10 && songIds.length <= 20;
+      } else {
+        return songIds.length >= 7 && songIds.length <= 15;
+      }
     }
   }
 
   /// Get the minimum songs required for this album type
-  int get minimumSongs => type == AlbumType.ep ? 3 : 7;
+  int get minimumSongs {
+    if (type == AlbumType.ep) return 3;
+    if (isDeluxe) return 10;
+    return 7;
+  }
+
+  /// Get the maximum songs allowed for this album type
+  int get maximumSongs {
+    if (type == AlbumType.ep) return 6;
+    if (isDeluxe) return 20;
+    return 15;
+  }
 
   /// Get the emoji for the album type
-  String get typeEmoji => type == AlbumType.ep ? '💿' : '💽';
+  String get typeEmoji {
+    if (isDeluxe) return '💎';
+    return type == AlbumType.ep ? '💿' : '💽';
+  }
 
   /// Get display name for album type
-  String get typeDisplay => type == AlbumType.ep ? 'EP' : 'Album';
+  String get typeDisplay {
+    if (isDeluxe) return 'Deluxe Album';
+    return type == AlbumType.ep ? 'EP' : 'Album';
+  }
 }
 
 enum AlbumType {

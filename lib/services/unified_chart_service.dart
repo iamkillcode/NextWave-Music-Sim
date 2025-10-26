@@ -866,13 +866,20 @@ class UnifiedChartService {
 
             // Only include albums with streams in the period
             if (periodStreams > 0) {
+              // Calculate average streams per track for ranking
+              final averageStreams = songIds.isNotEmpty
+                  ? (periodStreams / songIds.length).round()
+                  : 0;
+
               allAlbums.add({
                 'title': albumMap['title'] ?? 'Untitled Album',
                 'artist': artistName,
                 'artistId': doc.id,
                 'isNPC': false,
                 'type': albumMap['type'] ?? 'album', // 'ep' or 'album'
-                'periodStreams': periodStreams,
+                'isDeluxe': albumMap['isDeluxe'] ?? false,
+                'periodStreams': periodStreams, // Total for display
+                'averageStreams': averageStreams, // Average for ranking
                 'totalStreams': totalStreams,
                 'trackCount': songIds.length,
                 'releaseDate': albumMap['releasedDate'],
@@ -961,13 +968,20 @@ class UnifiedChartService {
             }
 
             if (periodStreams > 0) {
+              // Calculate average streams per track for ranking
+              final averageStreams = songIds.isNotEmpty
+                  ? (periodStreams / songIds.length).round()
+                  : 0;
+
               allAlbums.add({
                 'title': albumMap['title'] ?? 'Untitled Album',
                 'artist': artistName,
                 'artistId': doc.id,
                 'isNPC': true,
                 'type': albumMap['type'] ?? 'album',
-                'periodStreams': periodStreams,
+                'isDeluxe': albumMap['isDeluxe'] ?? false,
+                'periodStreams': periodStreams, // Total for display
+                'averageStreams': averageStreams, // Average for ranking
                 'totalStreams': totalStreams,
                 'trackCount': songIds.length,
                 'releaseDate': albumMap['releasedDate'],
@@ -980,10 +994,10 @@ class UnifiedChartService {
         }
       }
 
-      // Sort by period streams (descending)
+      // Sort by AVERAGE streams per track (descending) to prevent gaming
       allAlbums.sort(
         (a, b) =>
-            (b['periodStreams'] as int).compareTo(a['periodStreams'] as int),
+            (b['averageStreams'] as int).compareTo(a['averageStreams'] as int),
       );
 
       final topAlbums = allAlbums.take(limit).toList();
