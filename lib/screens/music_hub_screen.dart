@@ -8,6 +8,7 @@ import 'studios_list_screen.dart';
 import 'release_song_screen.dart';
 import 'record_album_screen.dart';
 import 'release_manager_screen.dart';
+import '../services/game_time_service.dart';
 
 class MusicHubScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -27,12 +28,24 @@ class _MusicHubScreenState extends State<MusicHubScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late ArtistStats _currentStats;
+  DateTime?
+      _currentGameDate; // Cached current in-game date for timestamp conversion
 
   @override
   void initState() {
     super.initState();
     _currentStats = widget.artistStats;
     _tabController = TabController(length: 3, vsync: this);
+    _prefetchGameDate();
+  }
+
+  Future<void> _prefetchGameDate() async {
+    try {
+      final gameDate = await GameTimeService().getCurrentGameDate();
+      if (mounted) setState(() => _currentGameDate = gameDate);
+    } catch (_) {
+      // Non-fatal: leave null, UI will fall back gracefully
+    }
   }
 
   @override
@@ -689,7 +702,8 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                   Icons.favorite, '${_formatNumber(song.likes)} likes'),
               const Spacer(),
               Text(
-                'Released ${_formatDate(song.releasedDate)}',
+                // Use in-game calendar for release timestamp; convert legacy real-world timestamps to game dates
+                'Released ${_formatGameReleaseDate(song.releasedDate)}',
                 style: TextStyle(
                     color: Colors.white.withOpacity(0.4), fontSize: 10),
               ),
@@ -792,17 +806,34 @@ class _MusicHubScreenState extends State<MusicHubScreen>
     return number.toString();
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return 'Unknown';
-    final now = DateTime.now();
-    final diff = now.difference(date);
+  // Convert a stored release DateTime into an in-game formatted date string.
+  // Heuristic:
+  // - If time component is midnight (00:00), assume it's already a game date.
+  // - Otherwise treat it as a real-world timestamp and translate it using
+  //   the rule 1 real hour = 1 game day relative to the current game date.
+  String _formatGameReleaseDate(DateTime? released) {
+    if (released == null) return 'Unknown';
+    final svc = GameTimeService();
 
-    if (diff.inDays == 0) return 'today';
-    if (diff.inDays == 1) return 'yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()} weeks ago';
-    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()} months ago';
-    return '${(diff.inDays / 365).floor()} years ago';
+    // Already a game date if saved at midnight (as GameTimeService returns dates at 00:00)
+    if (released.hour == 0 && released.minute == 0 && released.second == 0) {
+      return svc.formatGameDate(released);
+    }
+
+    // Legacy real-world timestamp -> translate using current game date cache
+    if (_currentGameDate == null) {
+      // Fallback: format the original date (better than empty)
+      return svc.formatGameDate(
+          DateTime(released.year, released.month, released.day));
+    }
+
+    final now = DateTime.now();
+    final hoursAgo = now.difference(released).inHours;
+    final gameReleaseDate =
+        _currentGameDate!.subtract(Duration(days: hoursAgo));
+    final normalized = DateTime(
+        gameReleaseDate.year, gameReleaseDate.month, gameReleaseDate.day);
+    return svc.formatGameDate(normalized);
   }
 
   void _navigateToWriteSong() async {

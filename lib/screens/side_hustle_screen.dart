@@ -21,10 +21,12 @@ class SideHustleScreen extends StatefulWidget {
 
 class _SideHustleScreenState extends State<SideHustleScreen> {
   final SideHustleService _sideHustleService = SideHustleService();
+  late ArtistStats _currentStats;
 
   @override
   void initState() {
     super.initState();
+    _currentStats = widget.artistStats;
     // Initialize contract pool if needed
     _sideHustleService.initializeContractPool();
   }
@@ -56,7 +58,7 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Active contract section
-              if (widget.artistStats.activeSideHustle != null)
+              if (_currentStats.activeSideHustle != null)
                 _buildActiveContractCard()
               else
                 _buildNoActiveContractCard(),
@@ -84,7 +86,7 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
   }
 
   Widget _buildActiveContractCard() {
-    final hustle = widget.artistStats.activeSideHustle!;
+    final hustle = _currentStats.activeSideHustle!;
     final daysRemaining = hustle.daysRemaining(widget.currentGameDate);
     final progress = 1.0 - (daysRemaining / hustle.contractLengthDays);
 
@@ -322,7 +324,7 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
         if (contracts.isEmpty) {
           print('⚠️ No contracts found in Firestore');
           print('📍 Connection state: ${snapshot.connectionState}');
-          
+
           return Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -354,6 +356,32 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
                     fontSize: 14,
                   ),
                 ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    print('🔄 Manual refresh requested');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Refreshing contracts...'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    // Re-initialize pool
+                    await _sideHustleService.initializeContractPool();
+                  },
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  label: const Text(
+                    'Refresh',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A84FF),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
               ],
             ),
           );
@@ -369,7 +397,7 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
   }
 
   Widget _buildContractCard(SideHustle contract) {
-    final canClaim = widget.artistStats.activeSideHustle == null;
+    final canClaim = _currentStats.activeSideHustle == null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -768,6 +796,9 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
   Future<void> _claimContract(SideHustle contract) async {
     Navigator.pop(context); // Close dialog
 
+    print(
+        '🎯 Claiming contract with ID: ${contract.id} (type: ${contract.type.displayName})');
+
     // Show loading
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -783,11 +814,21 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
       );
 
       if (claimedContract != null) {
-        // Update artist stats
-        final updatedStats = widget.artistStats.copyWith(
-          activeSideHustle: claimedContract,
-        );
-        widget.onStatsUpdate(updatedStats);
+        print(
+            '✅ Contract claimed successfully! ID: ${claimedContract.id}, Type: ${claimedContract.type.displayName}');
+
+        // Update local state to show active contract immediately
+        setState(() {
+          _currentStats = _currentStats.copyWith(
+            activeSideHustle: claimedContract,
+          );
+        });
+
+        print(
+            '📊 Updated local state with contract ID: ${_currentStats.activeSideHustle?.id}');
+
+        // Also update parent stats
+        widget.onStatsUpdate(_currentStats);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -796,6 +837,7 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
                 '✅ Contract accepted: ${contract.type.displayName}',
               ),
               backgroundColor: const Color(0xFF32D74B),
+              duration: const Duration(seconds: 2),
             ),
           );
         }
@@ -821,18 +863,49 @@ class _SideHustleScreenState extends State<SideHustleScreen> {
     }
   }
 
-  void _terminateContract() {
+  Future<void> _terminateContract() async {
     Navigator.pop(context); // Close dialog
 
-    // Update artist stats (clear side hustle)
-    final updatedStats = widget.artistStats.copyWith(clearSideHustle: true);
-    widget.onStatsUpdate(updatedStats);
+    final active = _currentStats.activeSideHustle;
+    if (active == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active contract to terminate'),
+          backgroundColor: Color(0xFFFF453A),
+        ),
+      );
+      return;
+    }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Contract terminated'),
-        backgroundColor: Color(0xFFFF9F0A),
-      ),
-    );
+    // Try to return the contract to the pool first
+    final success = await _sideHustleService.terminateContract(active.id);
+    if (!success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to terminate contract. Please try again.'),
+            backgroundColor: Color(0xFFFF453A),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Update local state to clear side hustle
+    setState(() {
+      _currentStats = _currentStats.copyWith(clearSideHustle: true);
+    });
+
+    // Also update parent stats (saves to Firestore via dashboard callback)
+    widget.onStatsUpdate(_currentStats);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Contract terminated'),
+          backgroundColor: Color(0xFFFF9F0A),
+        ),
+      );
+    }
   }
 }

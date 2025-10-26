@@ -33,9 +33,9 @@ class SideHustleService {
         (baseEnergy + _random.nextInt(energyVariance * 2) - energyVariance)
             .clamp(5, 40); // Min 5, max 40 energy per day
 
+    // Use placeholder ID - will be replaced by Firestore document ID
     return SideHustle(
-      id: DateTime.now().millisecondsSinceEpoch.toString() +
-          _random.nextInt(1000).toString(),
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
       type: type,
       dailyPay: dailyPay,
       dailyEnergyCost: dailyEnergyCost,
@@ -105,10 +105,14 @@ class SideHustleService {
 
       for (int i = 0; i < count; i++) {
         final contract = _generateRandomContract();
-        final docRef = _contractsRef.doc(contract.id);
-        batch.set(docRef, contract.toJson());
+        // Use auto-generated Firestore document ID
+        final docRef = _contractsRef.doc();
+        // Ensure stored data uses the Firestore document ID for 'id'
+        final data = contract.toJson();
+        data['id'] = docRef.id;
+        batch.set(docRef, data);
         print(
-          '  📝 Contract $i: ${contract.type.displayName} - \$${contract.dailyPay}/day for ${contract.contractLengthDays} days',
+          '  📝 Contract $i: ${contract.type.displayName} - \$${contract.dailyPay}/day for ${contract.contractLengthDays} days (docId: ${docRef.id})',
         );
       }
 
@@ -131,15 +135,34 @@ class SideHustleService {
         .snapshots()
         .handleError((error) {
       print('❌ Error in contracts stream: $error');
+      print('❌ Error details: ${error.toString()}');
     }).map((snapshot) {
-      print('📊 Received ${snapshot.docs.length} available contracts');
+      print(
+          '📊 Received ${snapshot.docs.length} available contracts from Firestore');
+
+      // Debug: log first few contracts
+      if (snapshot.docs.isNotEmpty) {
+        for (var i = 0; i < snapshot.docs.length && i < 3; i++) {
+          final doc = snapshot.docs[i];
+          final data = doc.data() as Map<String, dynamic>;
+          print(
+              '  🔍 Contract ${i + 1}: docId=${doc.id}, dataId=${data['id']}, type=${data['type']}, isAvailable=${data['isAvailable']}');
+        }
+      }
+
       return snapshot.docs
           .map(
             (doc) {
               try {
-                return SideHustle.fromJson(
-                  doc.data() as Map<String, dynamic>,
-                );
+                final data = doc.data() as Map<String, dynamic>;
+                // IMPORTANT: Use Firestore document ID, not the 'id' field in data
+                final oldId = data['id'];
+                data['id'] = doc.id;
+                print('🔄 Replacing contract ID: old=$oldId, new=${doc.id}');
+                final contract = SideHustle.fromJson(data);
+                print(
+                    '✅ Parsed contract: id=${contract.id}, type=${contract.type.displayName}');
+                return contract;
               } catch (e) {
                 print('❌ Error parsing contract ${doc.id}: $e');
                 return null;
@@ -157,6 +180,7 @@ class SideHustleService {
     String contractId,
     DateTime currentGameDate,
   ) async {
+    print('🎯 Attempting to claim contract: $contractId');
     try {
       final docRef = _contractsRef.doc(contractId);
 
@@ -165,16 +189,24 @@ class SideHustleService {
         final snapshot = await transaction.get(docRef);
 
         if (!snapshot.exists) {
-          print('❌ Contract not found');
+          print('❌ Contract document does not exist in Firestore: $contractId');
           return null;
         }
 
-        final contract = SideHustle.fromJson(
-          snapshot.data() as Map<String, dynamic>,
-        );
+        final data = snapshot.data() as Map<String, dynamic>;
+        print(
+            '📋 Contract data BEFORE: id=${data['id']}, type=${data['type']}, isAvailable=${data['isAvailable']}');
+
+        // IMPORTANT: Replace with Firestore document ID (same as getAvailableContracts)
+        data['id'] = contractId;
+        print(
+            '✅ Contract data AFTER: id=${data['id']} (replaced with Firestore doc ID)');
+
+        final contract = SideHustle.fromJson(data);
 
         if (!contract.isAvailable) {
-          print('❌ Contract already claimed by another player');
+          print(
+              '❌ Contract already claimed by another player (isAvailable=false)');
           return null;
         }
 
@@ -190,6 +222,8 @@ class SideHustleService {
           isAvailable: false,
         );
 
+        print('🎉 Claimed contract has ID: ${claimedContract.id}');
+
         // Update Firestore
         transaction.update(docRef, {
           'isAvailable': false,
@@ -198,12 +232,12 @@ class SideHustleService {
         });
 
         print(
-          '✅ Contract claimed: ${contract.type.displayName} for ${contract.contractLengthDays} days',
-        );
+            '✅ Contract claimed successfully: ${contract.type.displayName} for ${contract.contractLengthDays} days');
         return claimedContract;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error claiming contract: $e');
+      print('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -240,18 +274,33 @@ class SideHustleService {
   Future<void> initializeContractPool() async {
     try {
       print('🔍 Checking if contract pool needs initialization...');
-      // Check if pool already has contracts
+      // Check if pool already has contracts (available or unavailable)
       final snapshot = await _contractsRef.limit(1).get();
 
       if (snapshot.docs.isEmpty) {
-        print('📋 Contract pool is empty, initializing with 15 contracts...');
+        print(
+            '📋 Contract pool is completely empty, initializing with 15 contracts...');
         // Generate initial batch of contracts
         await generateNewContracts(15);
         print('✅ Initialized contract pool with 15 contracts');
       } else {
         print(
-          '✅ Contract pool already initialized (${snapshot.docs.length} contracts found)',
+          '✅ Contract pool has documents (${snapshot.docs.length} found in sample)',
         );
+
+        // Check how many are available
+        final availableSnapshot = await _contractsRef
+            .where('isAvailable', isEqualTo: true)
+            .limit(5)
+            .get();
+        print(
+            '📊 Available contracts in pool: ${availableSnapshot.docs.length}');
+
+        if (availableSnapshot.docs.isEmpty) {
+          print(
+              '⚠️ No available contracts found! Generating 10 new contracts...');
+          await generateNewContracts(10);
+        }
       }
     } catch (e, stackTrace) {
       print('❌ Error initializing contract pool: $e');
@@ -292,5 +341,36 @@ class SideHustleService {
     );
 
     return {'money': newMoney, 'energy': newEnergy, 'expired': 0};
+  }
+
+  /// Terminate a claimed contract and return it to the pool
+  /// Marks the contract as available and clears start/end dates
+  Future<bool> terminateContract(String contractId) async {
+    print('🛑 Terminating contract: $contractId');
+    try {
+      final docRef = _contractsRef.doc(contractId);
+      await _firestore.runTransaction((tx) async {
+        final snap = await tx.get(docRef);
+        if (!snap.exists) {
+          throw Exception('Contract does not exist');
+        }
+        final data = snap.data() as Map<String, dynamic>;
+        final wasAvailable = (data['isAvailable'] as bool?) ?? true;
+        if (wasAvailable == true) {
+          print('ℹ️ Contract $contractId already available in pool');
+        }
+        tx.update(docRef, {
+          'isAvailable': true,
+          'startDate': null,
+          'endDate': null,
+        });
+      });
+      print('✅ Contract $contractId returned to pool');
+      return true;
+    } catch (e, st) {
+      print('❌ Error terminating contract $contractId: $e');
+      print(st);
+      return false;
+    }
   }
 }

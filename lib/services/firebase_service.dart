@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'game_time_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -479,6 +480,8 @@ class FirebaseService {
     if (!isSignedIn) return null;
 
     try {
+      // Use in-game date for the release timestamp in published songs
+      final gameDate = await GameTimeService().getCurrentGameDate();
       final song = PublishedSong(
         id: '',
         playerId: currentUser!.uid,
@@ -486,7 +489,7 @@ class FirebaseService {
         title: title,
         genre: genre,
         quality: quality,
-        releaseDate: DateTime.now(),
+        releaseDate: gameDate,
       );
 
       final docRef =

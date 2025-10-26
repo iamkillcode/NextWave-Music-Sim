@@ -6,6 +6,8 @@ import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../services/cover_art_uploader.dart';
+import '../services/game_time_service.dart';
+import 'album_detail_screen.dart';
 
 /// Screen for managing EP and Album releases
 /// Players can bundle songs into EPs (3-6 songs) or Albums (7+ songs)
@@ -978,111 +980,127 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
 
     // Compact released view - single row with cover art focus
     if (isReleased) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C2128),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.green.withOpacity(0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            // Album Cover Art
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: const Color(0xFF0D1117),
+      return InkWell(
+        onTap: () {
+          // Navigate to album detail screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AlbumDetailScreen(
+                album: album,
+                songs: songs,
               ),
-              child: album.coverArtUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: album.coverArtUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        errorWidget: (context, url, error) => Center(
-                          child: Text(
-                            album.typeEmoji,
-                            style: const TextStyle(fontSize: 28),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C2128),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.green.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Album Cover Art
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFF0D1117),
+                ),
+                child: album.coverArtUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: album.coverArtUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          errorWidget: (context, url, error) => Center(
+                            child: Text(
+                              album.typeEmoji,
+                              style: const TextStyle(fontSize: 28),
+                            ),
                           ),
                         ),
+                      )
+                    : Center(
+                        child: Text(
+                          album.typeEmoji,
+                          style: const TextStyle(fontSize: 28),
+                        ),
                       ),
-                    )
-                  : Center(
-                      child: Text(
-                        album.typeEmoji,
-                        style: const TextStyle(fontSize: 28),
+              ),
+              const SizedBox(width: 12),
+              // Metadata
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      album.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${album.typeDisplay} • ${album.songIds.length} songs',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
                       ),
                     ),
-            ),
-            const SizedBox(width: 12),
-            // Metadata
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    album.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 6),
+                    // Platform icons (compact)
+                    Row(
+                      children: (album.streamingPlatforms.isNotEmpty
+                              ? album.streamingPlatforms
+                              : <String>['tunify', 'maple_music'])
+                          .map((p) => Padding(
+                                padding: const EdgeInsets.only(right: 6.0),
+                                child: Text(
+                                  p == 'tunify' ? '🎵' : '🍁',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ))
+                          .toList(),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${album.typeDisplay} • ${album.songIds.length} songs',
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  // Platform icons (compact)
-                  Row(
-                    children: (album.streamingPlatforms.isNotEmpty
-                            ? album.streamingPlatforms
-                            : <String>['tunify', 'maple_music'])
-                        .map((p) => Padding(
-                              padding: const EdgeInsets.only(right: 6.0),
-                              child: Text(
-                                p == 'tunify' ? '🎵' : '🍁',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ],
-              ),
-            ),
-            // Released status badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green.shade900.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.greenAccent, width: 1),
-              ),
-              child: const Text(
-                'Released',
-                style: TextStyle(
-                  color: Colors.greenAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
+                  ],
                 ),
               ),
-            ),
-          ],
+              // Released status badge
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade900.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.greenAccent, width: 1),
+                ),
+                child: const Text(
+                  'Released',
+                  style: TextStyle(
+                    color: Colors.greenAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -1298,11 +1316,14 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
 
     if (result == true) {
       // Release album client-side (same as song releases)
-      _releaseAlbum(album, overridePlatforms: selected.toList());
+      await _releaseAlbum(album, overridePlatforms: selected.toList());
     }
   }
 
-  void _releaseAlbum(Album album, {List<String>? overridePlatforms}) {
+  Future<void> _releaseAlbum(Album album,
+      {List<String>? overridePlatforms}) async {
+    // Use in-game date for release timestamps
+    final currentGameDate = await GameTimeService().getCurrentGameDate();
     // Get the songs in this album
     final albumSongs = _currentStats.songs
         .where((song) => album.songIds.contains(song.id))
@@ -1324,7 +1345,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         // This prevents overwriting the original release date of singles
         final DateTime releaseDate = song.state == SongState.released
             ? song.releasedDate! // Keep existing release date
-            : DateTime.now(); // Set new release date
+            : currentGameDate; // Set new release date (in-game)
 
         // Ensure songs have streaming platforms for Tunify and Maple Music.
         // We merge (union) with any existing platforms so platforms aren't lost.
@@ -1361,7 +1382,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     // Mark album as released and assign platforms
     final updatedAlbum = album.copyWith(
       state: AlbumState.released,
-      releasedDate: DateTime.now(),
+      releasedDate: currentGameDate,
       streamingPlatforms: albumPlatformsSet.toList(),
     );
 

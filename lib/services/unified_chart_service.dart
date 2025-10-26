@@ -11,10 +11,10 @@ import '../utils/firestore_sanitizer.dart';
 ///
 /// Chart Combinations:
 /// - Daily Singles (Global/Regional) - Real-time queries
-/// - Daily Albums (Global/Regional) - Real-time queries
+/// - Daily Albums (Global/Regional) - Album objects with combined track streams
 /// - Daily Artists (Global/Regional) - Real-time queries
 /// - Weekly Singles (Global/Regional) - USES SNAPSHOTS for accurate regional rankings
-/// - Weekly Albums (Global/Regional) - Real-time queries (snapshots coming soon)
+/// - Weekly Albums (Global/Regional) - Album objects with combined track streams
 /// - Weekly Artists (Global/Regional) - USES SNAPSHOTS for accurate regional rankings
 class UnifiedChartService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -56,7 +56,7 @@ class UnifiedChartService {
 
   UnifiedChartService();
 
-  /// Get songs chart with flexible filtering
+  /// Get songs/albums chart - works for singles or albums
   ///
   /// [period] - 'daily' or 'weekly'
   /// [type] - 'singles' or 'albums'
@@ -70,6 +70,15 @@ class UnifiedChartService {
   }) async {
     try {
       print('📊 Fetching $period $type chart for $region (limit: $limit)');
+
+      // For ALBUMS, query the albums array instead of songs
+      if (type == 'albums') {
+        return await _getAlbumsChart(
+          period: period,
+          region: region,
+          limit: limit,
+        );
+      }
 
       // For WEEKLY SINGLES, use snapshot service for accurate regional rankings
       if (period == 'weekly' && type == 'singles') {
@@ -326,28 +335,30 @@ class UnifiedChartService {
 
         // If snapshots are available, use them
         if (chartData.isNotEmpty) {
-          // Transform to match expected format
-          return chartData
-              .map((entry) => {
+          // Transform to match expected format and then enrich with avatars
+          final result = chartData
+              .map((entry) => <String, dynamic>{
                     'artistName': entry['artistName'],
                     'artistId': entry['artistId'],
                     'isNPC': entry['isNPC'] ?? false,
-                    'streams':
-                        entry['streams'], // Use streams directly from snapshot
-                    'periodStreams': entry['streams'], // Backward compatibility
-                    'fanbase': entry['fanbase'] ?? 0, // Now stored in snapshots
-                    'fame': 0, // Not stored in snapshots
+                    'streams': entry['streams'],
+                    'periodStreams': entry['streams'],
+                    'fanbase': entry['fanbase'] ?? 0,
+                    'fame': 0,
                     'songCount': entry['songCount'],
-                    'releasedSongs':
-                        entry['songCount'], // Backward compatibility
+                    'releasedSongs': entry['songCount'],
                     'chartingSongs': entry['songCount'],
-                    'avatarUrl': null,
+                    'avatarUrl': null, // will be filled from players below
                     'position': entry['position'],
                     'movement': entry['movement'],
                     'lastWeekPosition': entry['lastWeekPosition'],
                     'weeksOnChart': entry['weeksOnChart'],
                   })
               .toList();
+
+          // Attach player avatars for non-NPC artists
+          await _attachPlayerAvatars(result);
+          return result;
         } else {
           print(
               '⚠️ No snapshot data available, falling back to real-time query');
@@ -561,6 +572,55 @@ class UnifiedChartService {
     }
   }
 
+  /// Enriches artist entries with avatarUrl by batching lookups in the players
+  /// collection. Only non-NPC entries are queried. Uses whereIn in chunks of 10
+  /// to minimize round trips and respect Firestore limits.
+  Future<void> _attachPlayerAvatars(List<Map<String, dynamic>> artists) async {
+    try {
+      // Collect unique player IDs for non-NPC artists
+      final ids = artists
+          .where((a) => (a['isNPC'] ?? false) == false)
+          .map((a) => (a['artistId'] ?? '') as String)
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      if (ids.isEmpty) return;
+
+      const int chunkSize = 10; // Firestore whereIn limit
+      final Map<String, String?> avatarById = {};
+
+      for (int i = 0; i < ids.length; i += chunkSize) {
+        final int end =
+            (i + chunkSize > ids.length) ? ids.length : i + chunkSize;
+        final chunk = ids.sublist(i, end);
+
+        final snapshot = await _firestore
+            .collection('players')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          avatarById[doc.id] = data['avatarUrl'] as String?;
+        }
+      }
+
+      for (final artist in artists) {
+        if ((artist['isNPC'] ?? false) == false) {
+          final id = (artist['artistId'] ?? '') as String;
+          if (avatarById.containsKey(id)) {
+            artist['avatarUrl'] = avatarById[id];
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal: if avatar enrichment fails, proceed without avatars
+      // to avoid breaking charts rendering.
+      // print('⚠️ Avatar enrichment failed: $e');
+    }
+  }
+
   /// Get chart position for a specific song
   Future<int?> getSongChartPosition({
     required String songTitle,
@@ -690,6 +750,250 @@ class UnifiedChartService {
         return '🌴';
       default:
         return '🎵';
+    }
+  }
+
+  /// Get albums chart - ranks Album objects by their combined streams
+  ///
+  /// [period] - 'daily' or 'weekly' (currently uses totalStreams for both)
+  /// [region] - Region code or 'global'
+  /// [limit] - Number of results (default: 100)
+  Future<List<Map<String, dynamic>>> _getAlbumsChart({
+    required String period,
+    required String region,
+    int limit = 100,
+  }) async {
+    try {
+      print('📀 Fetching $period albums chart for $region (limit: $limit)');
+
+      // Fetch both players AND NPCs
+      final playersSnapshot =
+          await _firestore.collection('players').get().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Chart query timeout');
+        },
+      );
+
+      final npcsSnapshot = await _firestore.collection('npcs').get().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('NPC chart query timeout');
+        },
+      );
+
+      List<Map<String, dynamic>> allAlbums = [];
+
+      // Process PLAYERS
+      for (var doc in playersSnapshot.docs) {
+        final data = doc.data();
+        final artistName = data['displayName'] ?? 'Unknown Artist';
+        final albums = data['albums'] as List<dynamic>?;
+        final songs = data['songs'] as List<dynamic>?;
+
+        if (albums != null && songs != null) {
+          for (var albumData in albums) {
+            final albumMap = Map<String, dynamic>.from(albumData);
+            final albumState = albumMap['state'] ?? 'planned';
+
+            // Only include released albums
+            if (albumState != 'released') continue;
+
+            final albumId = albumMap['id'] as String?;
+            if (albumId == null) continue;
+
+            // Calculate total streams from all songs in this album
+            final songIds = List<String>.from(albumMap['songIds'] ?? []);
+            int totalStreams = 0;
+            int periodStreams = 0;
+            String? coverArtUrl;
+
+            // Sum up streams from all songs in this album
+            for (var songData in songs) {
+              final songMap = Map<String, dynamic>.from(songData);
+              final songId = songMap['id'] as String?;
+
+              if (songId != null && songIds.contains(songId)) {
+                totalStreams += safeParseInt(songMap['streams'], fallback: 0);
+
+                // Get period-specific streams
+                if (period == 'daily') {
+                  periodStreams +=
+                      safeParseInt(songMap['lastDayStreams'], fallback: 0);
+                } else if (period == 'weekly') {
+                  periodStreams +=
+                      safeParseInt(songMap['last7DaysStreams'], fallback: 0);
+                }
+
+                // Use first song's cover art as album cover
+                if (coverArtUrl == null) {
+                  coverArtUrl = songMap['coverArtUrl'] as String?;
+                }
+              }
+            }
+
+            // Handle regional vs global
+            if (region != 'global') {
+              // For regional charts, calculate regional proportion
+              // This is an approximation since albums don't have regional streams directly
+              int regionTotal = 0;
+              int globalTotal = 0;
+
+              for (var songData in songs) {
+                final songMap = Map<String, dynamic>.from(songData);
+                final songId = songMap['id'] as String?;
+
+                if (songId != null && songIds.contains(songId)) {
+                  final regionalStreams =
+                      songMap['regionalStreams'] as Map<dynamic, dynamic>?;
+                  if (regionalStreams != null &&
+                      regionalStreams.containsKey(region)) {
+                    regionTotal +=
+                        safeParseInt(regionalStreams[region], fallback: 0);
+                  }
+                  globalTotal += safeParseInt(songMap['streams'], fallback: 0);
+                }
+              }
+
+              // Calculate regional proportion and apply to period streams
+              if (globalTotal > 0 && regionTotal > 0) {
+                final regionProportion = regionTotal / globalTotal;
+                periodStreams = (periodStreams * regionProportion).round();
+              } else {
+                periodStreams = 0;
+              }
+            }
+
+            // Only include albums with streams in the period
+            if (periodStreams > 0) {
+              allAlbums.add({
+                'title': albumMap['title'] ?? 'Untitled Album',
+                'artist': artistName,
+                'artistId': doc.id,
+                'isNPC': false,
+                'type': albumMap['type'] ?? 'album', // 'ep' or 'album'
+                'periodStreams': periodStreams,
+                'totalStreams': totalStreams,
+                'trackCount': songIds.length,
+                'releaseDate': albumMap['releasedDate'],
+                'state': 'released',
+                'isAlbum': true,
+                'coverArtUrl': coverArtUrl,
+              });
+            }
+          }
+        }
+      }
+
+      // Process NPCs
+      for (var doc in npcsSnapshot.docs) {
+        final data = doc.data();
+        final artistName = data['name'] ?? 'Unknown NPC';
+        final albums = data['albums'] as List<dynamic>?;
+        final songs = data['songs'] as List<dynamic>?;
+
+        if (albums != null && songs != null) {
+          for (var albumData in albums) {
+            final albumMap = Map<String, dynamic>.from(albumData);
+            final albumState = albumMap['state'] ?? 'planned';
+
+            if (albumState != 'released') continue;
+
+            final albumId = albumMap['id'] as String?;
+            if (albumId == null) continue;
+
+            final songIds = List<String>.from(albumMap['songIds'] ?? []);
+            int totalStreams = 0;
+            int periodStreams = 0;
+            String? coverArtUrl;
+
+            for (var songData in songs) {
+              final songMap = Map<String, dynamic>.from(songData);
+              final songId = songMap['id'] as String?;
+
+              if (songId != null && songIds.contains(songId)) {
+                totalStreams += safeParseInt(songMap['streams'], fallback: 0);
+
+                if (period == 'daily') {
+                  periodStreams += safeParseInt(songMap['lastDayStreams'],
+                      fallback: ((safeParseInt(songMap['last7DaysStreams'],
+                                  fallback: 0) /
+                              7)
+                          .round()));
+                } else if (period == 'weekly') {
+                  periodStreams +=
+                      safeParseInt(songMap['last7DaysStreams'], fallback: 0);
+                }
+
+                if (coverArtUrl == null) {
+                  coverArtUrl = songMap['coverArtUrl'] as String?;
+                }
+              }
+            }
+
+            // Handle regional filtering
+            if (region != 'global') {
+              int regionTotal = 0;
+              int globalTotal = 0;
+
+              for (var songData in songs) {
+                final songMap = Map<String, dynamic>.from(songData);
+                final songId = songMap['id'] as String?;
+
+                if (songId != null && songIds.contains(songId)) {
+                  final regionalStreams =
+                      songMap['regionalStreams'] as Map<dynamic, dynamic>?;
+                  if (regionalStreams != null &&
+                      regionalStreams.containsKey(region)) {
+                    regionTotal +=
+                        safeParseInt(regionalStreams[region], fallback: 0);
+                  }
+                  globalTotal += safeParseInt(songMap['streams'], fallback: 0);
+                }
+              }
+
+              if (globalTotal > 0 && regionTotal > 0) {
+                final regionProportion = regionTotal / globalTotal;
+                periodStreams = (periodStreams * regionProportion).round();
+              } else {
+                periodStreams = 0;
+              }
+            }
+
+            if (periodStreams > 0) {
+              allAlbums.add({
+                'title': albumMap['title'] ?? 'Untitled Album',
+                'artist': artistName,
+                'artistId': doc.id,
+                'isNPC': true,
+                'type': albumMap['type'] ?? 'album',
+                'periodStreams': periodStreams,
+                'totalStreams': totalStreams,
+                'trackCount': songIds.length,
+                'releaseDate': albumMap['releasedDate'],
+                'state': 'released',
+                'isAlbum': true,
+                'coverArtUrl': coverArtUrl,
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by period streams (descending)
+      allAlbums.sort(
+        (a, b) =>
+            (b['periodStreams'] as int).compareTo(a['periodStreams'] as int),
+      );
+
+      final topAlbums = allAlbums.take(limit).toList();
+      print(
+          '✅ Found ${topAlbums.length} albums on $period albums $region chart (${allAlbums.where((a) => a['isNPC'] == true).length} NPCs)');
+
+      return topAlbums;
+    } catch (e) {
+      print('❌ Error fetching albums chart: $e');
+      return [];
     }
   }
 }

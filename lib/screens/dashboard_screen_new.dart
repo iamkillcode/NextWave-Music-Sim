@@ -1054,6 +1054,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _immediateStatUpdate({
     int? money,
     int? energy,
+    Map<String, dynamic>? sideHustle,
+    bool? clearSideHustle,
     String? context,
   }) async {
     try {
@@ -1064,12 +1066,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (money != null) updates['currentMoney'] = money;
       if (energy != null) updates['energy'] = energy;
 
+      // Handle side hustle updates
+      if (clearSideHustle == true) {
+        updates['activeSideHustle'] = null;
+        print('🗑️ Clearing side hustle from Firestore');
+      } else if (sideHustle != null) {
+        updates['activeSideHustle'] = sideHustle;
+        print('💼 Saving side hustle to Firestore: ${sideHustle['type']}');
+      }
+
       if (updates.isEmpty) return;
 
       // Mark that we just made a local update
       _lastLocalUpdate = DateTime.now();
 
-      print('💾 Immediate stat update (${context ?? 'unknown'}): $updates');
+      print(
+          '💾 Immediate stat update (${context ?? 'unknown'}): ${updates.keys.toList()}');
 
       await FirebaseFirestore.instance
           .collection('players')
@@ -1254,10 +1266,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // ❌ REMOVED: Client-side stream calculation (_applyDailyStreamGrowth)
         // ALL progression stats are now server-authoritative (full Option A implementation)
         // Server calculates: streams, last7DaysStreams, income, fanbase, fame
-        // Client only handles: energy replenishment, UI updates, side hustle energy cost
+        // Client handles: energy replenishment, side hustle energy cost and payment
 
-        // Check for side hustle expiration (client-side check only)
+        // Apply side hustle effects (energy cost, daily pay, expiration check)
         bool sideHustleExpired = false;
+        int sideHustleMoney = 0;
+        int sideHustleEnergyCost = 0;
+
         if (artistStats.activeSideHustle != null) {
           final result = _sideHustleService.applyDailySideHustle(
             sideHustle: artistStats.activeSideHustle!,
@@ -1266,6 +1281,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             currentGameDate: newGameDate,
           );
           sideHustleExpired = result['expired'] == 1;
+
+          if (!sideHustleExpired) {
+            // Apply side hustle effects
+            sideHustleMoney = result['money']! - artistStats.money;
+            sideHustleEnergyCost = artistStats.energy - result['energy']!;
+
+            print('💼 Side hustle effects:');
+            print('   Daily pay: +\$$sideHustleMoney');
+            print('   Energy cost: -$sideHustleEnergyCost');
+          }
         }
 
         // Check for scheduled song releases
@@ -1281,9 +1306,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final int currentEnergy = artistStats.energy;
           final int restoredEnergy = currentEnergy < 100 ? 100 : currentEnergy;
 
+          // Apply side hustle energy cost AFTER restoration
+          final int finalEnergy = restoredEnergy - sideHustleEnergyCost;
+
           print('🔋 Energy restoration starting...');
           print('   Current energy: $currentEnergy');
           print('   Will restore to: $restoredEnergy');
+          print('   Side hustle cost: -$sideHustleEnergyCost');
+          print('   Final energy: $finalEnergy');
           print('   Restoration needed: ${currentEnergy < 100}');
 
           // Mark this as a local update to prevent real-time listener from overwriting
@@ -1295,7 +1325,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _lastEnergyReplenishDay = newGameDate.day;
 
             artistStats = artistStats.copyWith(
-              energy: restoredEnergy,
+              energy: finalEnergy,
+              money: artistStats.money + sideHustleMoney,
               clearSideHustle: sideHustleExpired,
             );
           });
@@ -1304,27 +1335,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
           print(
               '   New currentGameDate: ${currentGameDate!.day}/${currentGameDate!.month}/${currentGameDate!.year}');
           print('   Energy in artistStats: ${artistStats.energy}');
+          print('   Money in artistStats: ${artistStats.money}');
 
-          // Save restored energy to Firebase immediately
+          // Save restored energy and side hustle effects to Firebase immediately
           try {
             final user = FirebaseAuth.instance.currentUser;
             if (user != null) {
+              final updateData = <String, dynamic>{
+                'energy': finalEnergy,
+                'money': artistStats.money,
+              };
+
+              if (sideHustleExpired) {
+                updateData['activeSideHustle'] = null;
+              }
+
               await FirebaseFirestore.instance
                   .collection('players')
                   .doc(user.uid)
-                  .update({'energy': restoredEnergy});
-              print('✅ Energy saved to Firebase: $restoredEnergy');
+                  .update(updateData);
+              print('✅ Daily update saved to Firebase:');
+              print('   Energy: $finalEnergy');
+              print('   Money: ${artistStats.money}');
+              if (sideHustleExpired) {
+                print('   Cleared expired side hustle');
+              }
             }
           } catch (e) {
-            print('❌ Error saving energy to Firebase: $e');
+            print('❌ Error saving daily update to Firebase: $e');
           }
 
-          // Show appropriate message based on energy restoration
+          // Show appropriate message based on energy restoration and side hustle
+          String message = '☀️ New day! ';
           if (currentEnergy < 100) {
-            _showMessage('☀️ New day! Energy restored to 100');
+            message += 'Energy restored to 100';
           } else {
-            _showMessage('☀️ New day! You still have $restoredEnergy energy');
+            message += 'You still have $restoredEnergy energy';
           }
+
+          if (sideHustleMoney > 0) {
+            message += '\n💼 Side hustle paid: \$$sideHustleMoney';
+          }
+
+          _showMessage(message);
 
           if (sideHustleExpired) {
             _addNotification(
@@ -2655,14 +2708,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
               builder: (context) => ActivityHubScreen(
                 artistStats: artistStats,
                 onStatsUpdated: (updatedStats) {
+                  // Capture old side hustle before updating
+                  final oldSideHustle = artistStats.activeSideHustle;
+
                   setState(() {
                     _lastLocalUpdate = DateTime.now();
                     artistStats = updatedStats;
                   });
-                  // Immediate save for money/energy changes (prevents real-time listener race condition)
+
+                  // Prepare side hustle data for Firestore
+                  Map<String, dynamic>? sideHustleData;
+                  bool clearSideHustle = false;
+
+                  if (updatedStats.activeSideHustle != null) {
+                    // Side hustle was added or updated
+                    sideHustleData = updatedStats.activeSideHustle!.toJson();
+                    print(
+                        '💼 Side hustle changed - will save to Firestore: ID=${sideHustleData['id']}, Type=${sideHustleData['type']}');
+                  } else if (oldSideHustle != null &&
+                      updatedStats.activeSideHustle == null) {
+                    // Side hustle was cleared
+                    clearSideHustle = true;
+                    print(
+                        '🗑️ Side hustle cleared - will remove from Firestore');
+                  }
+
+                  // Immediate save for money/energy/side hustle changes (prevents real-time listener race condition)
                   _immediateStatUpdate(
                     money: updatedStats.money,
                     energy: updatedStats.energy,
+                    sideHustle: sideHustleData,
+                    clearSideHustle: clearSideHustle,
                     context: 'Activity Hub',
                   );
                 },

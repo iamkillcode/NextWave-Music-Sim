@@ -424,34 +424,52 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
     
     // ✅ CHECK IF SIDE HUSTLE CONTRACT EXPIRED (even when player offline)
     let sideHustleExpired = false;
-    if (playerData.currentSideHustle && playerData.currentSideHustle.startDate) {
-      const startDate = toDateSafe(playerData.currentSideHustle.startDate);
-      const contractLength = playerData.currentSideHustle.contractLength || 7;
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + contractLength);
+    let sideHustlePay = 0;
+    let sideHustleEnergyCost = 0;
+    
+    if (playerData.activeSideHustle && playerData.activeSideHustle.endDate) {
+      const endDate = toDateSafe(playerData.activeSideHustle.endDate);
       
       if (currentGameDate >= endDate) {
-        console.log(`⏰ Side hustle "${playerData.currentSideHustle.name}" expired for ${playerData.displayName || playerId}`);
+        console.log(`⏰ Side hustle "${playerData.activeSideHustle.type}" expired for ${playerData.displayName || playerId}`);
         sideHustleExpired = true;
+      } else {
+        // Contract still active - apply daily effects
+        sideHustlePay = Math.min(200, Math.max(50, playerData.activeSideHustle.dailyPay || 100));
+        sideHustleEnergyCost = Math.min(30, Math.max(5, playerData.activeSideHustle.dailyEnergyCost || 15));
+        console.log(`💼 Side hustle active: +$${sideHustlePay}, -${sideHustleEnergyCost} energy for ${playerData.displayName || playerId}`);
       }
     }
     
     if (songs.length === 0) {
-      // Even without songs, restore energy and check side hustle
+      // Even without songs, restore energy and apply side hustle
       const updates = {};
       
       // ✅ ENERGY RESTORATION - Always restore energy, even without songs
       const currentEnergy = playerData.energy || 100;
-      if (currentEnergy < 100) {
-        updates.energy = 100;
-        console.log(`🔋 ${playerData.displayName || playerId}: Energy restored ${currentEnergy} → 100 (no songs)`);
+      const restoredEnergy = currentEnergy < 100 ? 100 : currentEnergy;
+      const finalEnergy = Math.max(0, restoredEnergy - sideHustleEnergyCost);
+      
+      updates.energy = finalEnergy;
+      console.log(`🔋 ${playerData.displayName || playerId}: Energy ${currentEnergy} → ${restoredEnergy} → ${finalEnergy} (no songs)`);
+      
+      // Apply side hustle payment
+      if (sideHustlePay > 0) {
+        const currentMoney = playerData.money || 0;
+        updates.money = currentMoney + sideHustlePay;
+        console.log(`💰 ${playerData.displayName || playerId}: Side hustle pay +$${sideHustlePay}`);
       }
       
       // Check side hustle expiration
       if (sideHustleExpired) {
-        updates.currentSideHustle = null;
-        updates.sideHustlePaymentPerDay = 0;
+        updates.activeSideHustle = null;
         console.log(`✅ Terminated expired side hustle for ${playerData.displayName || playerId} (no songs)`);
+      }
+      
+      // REMOVE OLD FIELD if it exists
+      if (playerData.currentSideHustle) {
+        updates.currentSideHustle = null;
+        updates.sideHustlePaymentPerDay = null;
       }
       
       // Only return updates if there's something to update
@@ -636,18 +654,30 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         }
       }
       
-      // ✅ ENERGY RESTORATION - Restore energy to 100 if below 100
+      // ✅ ENERGY RESTORATION - Restore energy to 100 if below 100, then deduct side hustle cost
       const currentEnergy = playerData.energy || 100;
-      if (currentEnergy < 100) {
-        updates.energy = 100;
-        console.log(`🔋 ${playerData.displayName || playerId}: Energy restored ${currentEnergy} → 100`);
+      const restoredEnergy = currentEnergy < 100 ? 100 : currentEnergy;
+      const finalEnergy = Math.max(0, restoredEnergy - sideHustleEnergyCost);
+      
+      updates.energy = finalEnergy;
+      console.log(`🔋 ${playerData.displayName || playerId}: Energy ${currentEnergy} → ${restoredEnergy} → ${finalEnergy}`);
+      
+      // Apply side hustle payment
+      if (sideHustlePay > 0) {
+        updates.currentMoney = (updates.currentMoney || 0) + sideHustlePay;
+        console.log(`💰 ${playerData.displayName || playerId}: Side hustle pay +$${sideHustlePay}`);
       }
       
       // ✅ Terminate side hustle contract if expired
       if (sideHustleExpired) {
-        updates.currentSideHustle = null;
-        updates.sideHustlePaymentPerDay = 0;
+        updates.activeSideHustle = null;
         console.log(`✅ Terminated expired side hustle for ${playerData.displayName || playerId}`);
+      }
+      
+      // REMOVE OLD FIELD if it exists
+      if (playerData.currentSideHustle) {
+        updates.currentSideHustle = null;
+        updates.sideHustlePaymentPerDay = null;
       }
       
       // ✅ CREATE NOTIFICATION for daily royalties (only if earning money)

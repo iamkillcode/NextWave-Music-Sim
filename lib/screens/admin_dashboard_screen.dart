@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../services/admin_service.dart';
+import 'side_hustle_migration_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -328,6 +329,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             description: 'Create new job contracts for players',
             color: Colors.deepPurple,
             onPressed: _showGenerateContractsDialog,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.construction,
+            label: 'Side Hustle Migration Tools',
+            description: 'Fix contract IDs, cleanup, and view stats',
+            color: Colors.deepOrange,
+            onPressed: _navigateToMigrationScreen,
           ),
           const SizedBox(height: 12),
           _buildActionButton(
@@ -1111,6 +1120,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _showError('Error', e.toString());
       }
     }
+  }
+
+  void _navigateToMigrationScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SideHustleMigrationScreen(),
+      ),
+    );
   }
 
   void _showForceNPCReleaseDialog() {

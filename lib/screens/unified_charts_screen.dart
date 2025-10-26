@@ -602,13 +602,24 @@ class _UnifiedChartsScreenState extends State<UnifiedChartsScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
-                        style: TextStyle(
-                          color: Colors.white38,
-                          fontSize: _getResponsiveSize(context, 11.0),
+                      // Show track count for albums, or total streams for singles
+                      if (_selectedType == 'albums' &&
+                          entry['trackCount'] != null)
+                        Text(
+                          '${entry['trackCount']} tracks',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: _getResponsiveSize(context, 11.0),
+                          ),
+                        )
+                      else
+                        Text(
+                          '${_chartService.formatStreams(entry['totalStreams'] ?? 0)} total',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: _getResponsiveSize(context, 11.0),
+                          ),
                         ),
-                      ),
                     ],
                   ),
 

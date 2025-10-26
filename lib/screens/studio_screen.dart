@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
+import '../services/game_time_service.dart';
 import 'release_manager_screen.dart';
 
 class StudioScreen extends StatefulWidget {
@@ -470,6 +471,12 @@ class _StudioScreenState extends State<StudioScreen>
   }
 
   void _releaseSong(Song song) {
+    // Switch to in-game date for release timestamp
+    _releaseSongInternal(song);
+  }
+
+  Future<void> _releaseSongInternal(Song song) async {
+    final currentGameDate = await GameTimeService().getCurrentGameDate();
     final updatedSongs = _currentStats.songs.map((s) {
       if (s.id == song.id) {
         // Generate initial streams based on quality and genre
@@ -479,7 +486,7 @@ class _StudioScreenState extends State<StudioScreen>
 
         return s.copyWith(
           state: SongState.released,
-          releasedDate: DateTime.now(),
+          releasedDate: currentGameDate,
           streams: initialStreams,
           likes: initialLikes,
         );
@@ -494,7 +501,7 @@ class _StudioScreenState extends State<StudioScreen>
         songsWritten:
             _currentStats.songsWritten + 1, // ✅ Increment when released!
         songs: updatedSongs,
-        lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
+        lastActivityDate: currentGameDate, // ✅ Update activity for fame decay
       );
     });
 
