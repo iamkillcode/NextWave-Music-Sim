@@ -47,11 +47,14 @@ Future<void> _initializeFirebase() async {
 
     // Set persistence to LOCAL for web to keep user signed in
     // This ensures auth state persists across hot reloads and app restarts
-    await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    // Note: setPersistence() is only supported on web platforms
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+      print('✅ Auth persistence set to LOCAL');
+    }
 
     FirebaseStatus.setInitialized(true);
     print('✅ Firebase initialization successful');
-    print('✅ Auth persistence set to LOCAL');
   } catch (e) {
     FirebaseStatus.setInitialized(false, e.toString());
     print('❌ Firebase initialization failed: $e');
