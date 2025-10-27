@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/album.dart';
 import '../models/song.dart';
 import '../services/game_time_service.dart';
+import '../services/nexttube_service.dart';
+import 'nexttube_video_detail_screen.dart';
 
 /// Screen showing detailed information about a released album
 /// Displays tracklist with individual song streams
@@ -311,7 +313,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               ],
             ),
           ),
-          // Streams
+          // Streams + Official link
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -332,6 +334,32 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  if ((song.hasOfficialVideo) ||
+                      ((song.officialVideoId ?? '').isNotEmpty))
+                    Tooltip(
+                      message: 'View Official Video',
+                      child: IconButton(
+                        icon: const Icon(Icons.ondemand_video_rounded,
+                            color: Colors.redAccent, size: 20),
+                        onPressed: () async {
+                          final id = song.officialVideoId;
+                          if (id == null || id.isEmpty) return;
+                          final video =
+                              await NextTubeService().getVideoById(id);
+                          if (video == null) return;
+                          if (!mounted) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => NextTubeVideoDetailScreen(
+                                video: video,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 2),

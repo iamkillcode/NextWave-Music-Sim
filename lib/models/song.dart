@@ -19,6 +19,9 @@ class Song {
   final List<String>
       streamingPlatforms; // List of platform IDs like ['tunify', 'maple_music']
   final String? coverArtUrl; // Uploaded cover art image URL
+  // NexTube linkage
+  final String? officialVideoId; // NexTube id for the official music video
+  final bool hasOfficialVideo; // True if an official video exists
 
   // Stream growth tracking
   final double
@@ -69,6 +72,8 @@ class Song {
     this.coverArtColor,
     this.streamingPlatforms = const [],
     this.coverArtUrl,
+    this.officialVideoId,
+    this.hasOfficialVideo = false,
     this.viralityScore = 0.5, // Default mid-range virality
     this.peakDailyStreams = 0,
     this.daysOnChart = 0,
@@ -101,6 +106,8 @@ class Song {
     String? coverArtColor,
     List<String>? streamingPlatforms,
     String? coverArtUrl,
+    String? officialVideoId,
+    bool? hasOfficialVideo,
     double? viralityScore,
     int? peakDailyStreams,
     int? daysOnChart,
@@ -133,6 +140,8 @@ class Song {
       coverArtColor: coverArtColor ?? this.coverArtColor,
       streamingPlatforms: streamingPlatforms ?? this.streamingPlatforms,
       coverArtUrl: coverArtUrl ?? this.coverArtUrl,
+      officialVideoId: officialVideoId ?? this.officialVideoId,
+      hasOfficialVideo: hasOfficialVideo ?? this.hasOfficialVideo,
       viralityScore: viralityScore ?? this.viralityScore,
       peakDailyStreams: peakDailyStreams ?? this.peakDailyStreams,
       daysOnChart: daysOnChart ?? this.daysOnChart,
@@ -170,6 +179,8 @@ class Song {
       'coverArtColor': coverArtColor,
       'streamingPlatforms': streamingPlatforms,
       'coverArtUrl': coverArtUrl,
+      'officialVideoId': officialVideoId,
+      'hasOfficialVideo': hasOfficialVideo,
       'viralityScore': viralityScore,
       'peakDailyStreams': peakDailyStreams,
       'daysOnChart': daysOnChart,
@@ -214,6 +225,8 @@ class Song {
         json['streamingPlatforms'] as List? ?? [],
       ),
       coverArtUrl: json['coverArtUrl'] as String?,
+      officialVideoId: json['officialVideoId'] as String?,
+      hasOfficialVideo: json['hasOfficialVideo'] as bool? ?? false,
       viralityScore: safeParseDouble(json['viralityScore'], fallback: 0.5),
       peakDailyStreams: safeParseInt(json['peakDailyStreams'], fallback: 0),
       daysOnChart: safeParseInt(json['daysOnChart'], fallback: 0),

@@ -6,6 +6,7 @@ import 'tunify_screen.dart';
 import 'maple_music_screen.dart';
 import 'echox_screen.dart';
 import 'player_directory_screen.dart';
+import 'nexttube_home_screen.dart';
 
 class MediaHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
@@ -186,6 +187,28 @@ class MediaHubScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (context) => MapleMusicScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: onStatsUpdated,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppIcon(
+                    context,
+                    name: 'NexTube',
+                    icon: Icons.ondemand_video_rounded,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFF0000), Color(0xFFFF6B6B)],
+                    ),
+                    badge: '',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NextTubeHomeScreen(
                             artistStats: artistStats,
                             onStatsUpdated: onStatsUpdated,
                           ),

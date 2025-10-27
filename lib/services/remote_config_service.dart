@@ -78,6 +78,24 @@ class RemoteConfigService {
         'enable_debug_mode': false,
         'enable_analytics': true,
         'show_beta_features': false,
+
+        // NexTube Upload Limits
+        'nexttube_cooldown_minutes': 10,
+        'nexttube_daily_upload_limit': 5,
+        'nexttube_duplicate_window_days': 60,
+        'nexttube_similarity_threshold': 0.92,
+
+        // NexTube Simulation Parameters (Backend)
+        'nexRPMMinCents': 60,
+        'nexRPMMaxCents': 240,
+        'nexFameMultCap': 2.0,
+        'nexDailyViewCap': 200000,
+        'nexSubsGainCap': 10000,
+        'nexSubsMonetize': 1000,
+        'nexWeightOfficial': 1.0,
+        'nexWeightLyrics': 0.7,
+        'nexWeightLive': 0.5,
+        'nexNoveltyHalfLifeDays': 14,
       });
 
       // Fetch and activate config
@@ -231,6 +249,34 @@ class RemoteConfigService {
   bool get enableDebugMode => _getBool('enable_debug_mode');
   bool get enableAnalytics => _getBool('enable_analytics', defaultValue: true);
   bool get showBetaFeatures => _getBool('show_beta_features');
+
+  // =============================================================================
+  // NEXTUBE UPLOAD LIMITS
+  // =============================================================================
+
+  int get nexTubeCooldownMinutes =>
+      _getInt('nexttube_cooldown_minutes', defaultValue: 10);
+  int get nexTubeDailyUploadLimit =>
+      _getInt('nexttube_daily_upload_limit', defaultValue: 5);
+  int get nexTubeDuplicateWindowDays =>
+      _getInt('nexttube_duplicate_window_days', defaultValue: 60);
+  double get nexTubeSimilarityThreshold =>
+      _getDouble('nexttube_similarity_threshold', defaultValue: 0.92);
+
+  // NexTube Simulation Parameters (for display/debugging only - backend uses own config)
+  int get nexRPMMinCents => _getInt('nexRPMMinCents', defaultValue: 60);
+  int get nexRPMMaxCents => _getInt('nexRPMMaxCents', defaultValue: 240);
+  double get nexFameMultCap => _getDouble('nexFameMultCap', defaultValue: 2.0);
+  int get nexDailyViewCap => _getInt('nexDailyViewCap', defaultValue: 200000);
+  int get nexSubsGainCap => _getInt('nexSubsGainCap', defaultValue: 10000);
+  int get nexSubsMonetize => _getInt('nexSubsMonetize', defaultValue: 1000);
+  double get nexWeightOfficial =>
+      _getDouble('nexWeightOfficial', defaultValue: 1.0);
+  double get nexWeightLyrics =>
+      _getDouble('nexWeightLyrics', defaultValue: 0.7);
+  double get nexWeightLive => _getDouble('nexWeightLive', defaultValue: 0.5);
+  int get nexNoveltyHalfLifeDays =>
+      _getInt('nexNoveltyHalfLifeDays', defaultValue: 14);
 
   // =============================================================================
   // HELPER METHODS

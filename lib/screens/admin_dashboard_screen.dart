@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../services/admin_service.dart';
+import '../services/remote_config_service.dart';
 import 'side_hustle_migration_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -143,6 +144,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _buildAdminManagementCard(),
             const SizedBox(height: 24),
 
+            // NexTube Configuration Section
+            _buildSectionHeader('NexTube Configuration', Icons.ondemand_video),
+            _buildNexTubeConfigCard(),
+            const SizedBox(height: 24),
+
             // Error Logs Section
             _buildSectionHeader('Recent Error Logs', Icons.bug_report),
             _buildErrorLogsCard(),
@@ -156,6 +162,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _runNexTubeNowSelf() async {
+    _showLoadingDialog('Simulating NexTube for your account...');
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('runNextTubeNow');
+      final result = await callable.call({});
+      _safePopNavigator();
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final views = data['totalViewsAdded'] ?? 0;
+      final earningsCents = data['totalEarningsCents'] ?? 0;
+      final dollars = (earningsCents is num)
+          ? (earningsCents / 100).toStringAsFixed(2)
+          : '0.00';
+      final subs = data['subscribersAdded'] ?? 0;
+      final processed = data['processed'] ?? 0;
+      _showSuccessDialog(
+        'NexTube Simulated',
+        'Processed videos: $processed\n+Views: +$views\n+Earnings: +\$$dollars\n+Subscribers: +$subs',
+      );
+    } catch (e) {
+      _safePopNavigator();
+      _showError('Failed to run NexTube', e.toString());
+    }
+  }
+
+  Future<void> _runNexTubeForAllAdmin() async {
+    _showLoadingDialog('Simulating NexTube for all players...');
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('runNextTubeForAllAdmin');
+      final result = await callable.call({});
+      _safePopNavigator();
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final views = data['totalViewsAdded'] ?? 0;
+      final earningsCents = data['totalEarningsCents'] ?? 0;
+      final dollars = (earningsCents is num)
+          ? (earningsCents / 100).toStringAsFixed(2)
+          : '0.00';
+      final pages = data['pages'] ?? 0;
+      final processed = data['processed'] ?? 0;
+      _showSuccessDialog(
+        'NexTube Simulated (All Players)',
+        'Processed videos: $processed\nPages: $pages\nViews: +$views\nEarnings: +\$$dollars',
+      );
+    } catch (e) {
+      _safePopNavigator();
+      _showError('Failed to run NexTube (All)', e.toString());
+    }
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
@@ -631,6 +687,244 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Clipboard.setData(ClipboardData(text: admin['userId']));
               _showSnackBar('User ID copied to clipboard');
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNexTubeConfigCard() {
+    final config = RemoteConfigService();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFF6B6B).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.ondemand_video, color: Color(0xFFFF6B6B)),
+              const SizedBox(width: 8),
+              const Text(
+                'Upload Limits & Anti-Abuse',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Current NexTube upload restrictions (from Remote Config):',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildConfigRow(
+            '⏱️ Cooldown Period',
+            '${config.nexTubeCooldownMinutes} minutes',
+            'Minimum time between uploads',
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            '📊 Daily Upload Limit',
+            '${config.nexTubeDailyUploadLimit} uploads per 24h',
+            'Maximum videos per player per day',
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            '🔍 Duplicate Window',
+            '${config.nexTubeDuplicateWindowDays} days',
+            'Period to check for duplicate titles',
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            '🎯 Similarity Threshold',
+            '${(config.nexTubeSimilarityThreshold * 100).toStringAsFixed(0)}%',
+            'Near-duplicate detection sensitivity',
+          ),
+          const Divider(height: 32, color: Colors.white10),
+          const Text(
+            'Backend Simulation Parameters:',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            '💰 RPM Range',
+            '\$${(config.nexRPMMinCents / 100).toStringAsFixed(2)} - \$${(config.nexRPMMaxCents / 100).toStringAsFixed(2)}',
+            'Revenue per 1000 views (cents)',
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            '📈 Daily View Cap',
+            '${config.nexDailyViewCap ~/ 1000}K views',
+            'Maximum views per video per day',
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            '👥 Subscriber Threshold',
+            '${config.nexSubsMonetize} subs',
+            'Minimum for monetization',
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/remote-config-debug');
+                  },
+                  icon: const Icon(Icons.settings, size: 16),
+                  label: const Text('View Full Config'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B6B).withOpacity(0.2),
+                    foregroundColor: const Color(0xFFFF6B6B),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await config.refresh();
+                      _showSnackBar('Remote Config refreshed successfully');
+                      setState(() {});
+                    } catch (e) {
+                      _showSnackBar('Failed to refresh: $e');
+                    }
+                  },
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Refresh Config'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D9FF).withOpacity(0.2),
+                    foregroundColor: const Color(0xFF00D9FF),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'To modify these values, update Remote Config in Firebase Console. Changes take effect on next app fetch (up to 1 hour).',
+                    style: TextStyle(
+                      color: Colors.blue.shade200,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _runNexTubeNowSelf,
+                  icon: const Icon(Icons.play_circle_fill, size: 18),
+                  label: const Text('Run NexTube Now (You)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00D9FF).withOpacity(0.15),
+                    foregroundColor: const Color(0xFF00D9FF),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _runNexTubeForAllAdmin,
+                  icon: const Icon(Icons.public, size: 18),
+                  label: const Text('Run NexTube Now (All Players)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF6B6B).withOpacity(0.15),
+                    foregroundColor: const Color(0xFFFF6B6B),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfigRow(String label, String value, String description) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00D9FF).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6),
+              border:
+                  Border.all(color: const Color(0xFF00D9FF).withOpacity(0.3)),
+            ),
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF00D9FF),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),

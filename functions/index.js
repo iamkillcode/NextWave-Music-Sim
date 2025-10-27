@@ -4977,3 +4977,674 @@ exports.syncAllPlayerStreams = functions.https.onCall(async (data, context) => {
   }
 });
 
+// ============================================================================
+// NEXTUBE UPLOAD VALIDATION
+// Server-side enforcement of upload rate limits and anti-abuse measures
+// ============================================================================
+
+/**
+ * Server-side NexTube upload validation callable function
+ * Enforces cooldown, daily limits, and duplicate title checks server-side
+ * Returns {allowed: boolean, reason?: string}
+ */
+exports.validateNexTubeUpload = functions.https.onCall(async (data, context) => {
+  // Authentication check
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+  const { title, songId, videoType } = data;
+
+  // Validate required fields
+  if (!title || !songId || !videoType) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
+  }
+
+  // Get config from environment or use defaults
+  const getEnvInt = (key, defaultValue) => {
+    const val = process.env[key] || functions.config()[key];
+    const parsed = parseInt(val, 10);
+    return isFinite(parsed) ? parsed : defaultValue;
+  };
+
+  const getEnvDouble = (key, defaultValue) => {
+    const val = process.env[key] || functions.config()[key];
+    const parsed = parseFloat(val);
+    return isFinite(parsed) ? parsed : defaultValue;
+  };
+
+  const COOLDOWN_MINUTES = getEnvInt('NEXTTUBE_COOLDOWN_MINUTES', 10);
+  const DAILY_LIMIT = getEnvInt('NEXTTUBE_DAILY_LIMIT', 5);
+  const DUPLICATE_WINDOW_DAYS = getEnvInt('NEXTTUBE_DUPLICATE_WINDOW_DAYS', 60);
+  const SIMILARITY_THRESHOLD = getEnvDouble('NEXTTUBE_SIMILARITY_THRESHOLD', 0.92);
+
+  try {
+    const now = admin.firestore.Timestamp.now();
+    const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
+    const dailyMs = 24 * 60 * 60 * 1000;
+    const duplicateMs = DUPLICATE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+    const videosRef = db.collection('nexttube_videos');
+
+    // Check cooldown
+    const cooldownCutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - cooldownMs);
+    const recentSnap = await videosRef
+      .where('ownerId', '==', userId)
+      .where('createdAt', '>=', cooldownCutoff)
+      .limit(1)
+      .get();
+
+    if (!recentSnap.empty) {
+      return {
+        allowed: false,
+        reason: `Please wait ${COOLDOWN_MINUTES} minutes between uploads`,
+      };
+    }
+
+    // Check daily limit
+    const dailyCutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - dailyMs);
+    const dailySnap = await videosRef
+      .where('ownerId', '==', userId)
+      .where('createdAt', '>=', dailyCutoff)
+      .limit(DAILY_LIMIT + 1)
+      .get();
+
+    if (dailySnap.size >= DAILY_LIMIT) {
+      return {
+        allowed: false,
+        reason: `Daily upload limit reached (${DAILY_LIMIT} per day)`,
+      };
+    }
+
+    // Check for official video duplicate (one per song)
+    if (videoType === 'official') {
+      const officialSnap = await videosRef
+        .where('ownerId', '==', userId)
+        .where('songId', '==', songId)
+        .where('type', '==', 'official')
+        .limit(1)
+        .get();
+
+      if (!officialSnap.empty) {
+        return {
+          allowed: false,
+          reason: 'Song already has an official video',
+        };
+      }
+    }
+
+    // Check same song/type recently
+    const duplicateCutoff = admin.firestore.Timestamp.fromMillis(now.toMillis() - duplicateMs);
+    const songTypeSnap = await videosRef
+      .where('ownerId', '==', userId)
+      .where('songId', '==', songId)
+      .where('type', '==', videoType)
+      .where('createdAt', '>=', duplicateCutoff)
+      .limit(1)
+      .get();
+
+    if (!songTypeSnap.empty) {
+      return {
+        allowed: false,
+        reason: `You already uploaded a ${videoType} video for this song recently`,
+      };
+    }
+
+    // Helper: normalize title
+    const normalizeTitle = (str) => {
+      return str
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    // Helper: Jaccard similarity
+    const jaccardSimilarity = (a, b) => {
+      const setA = new Set(a.split(' ').filter(w => w.length > 0));
+      const setB = new Set(b.split(' ').filter(w => w.length > 0));
+      if (setA.size === 0 && setB.size === 0) return 1.0;
+
+      const intersection = new Set([...setA].filter(x => setB.has(x)));
+      const union = new Set([...setA, ...setB]);
+
+      return union.size === 0 ? 0.0 : intersection.size / union.size;
+    };
+
+    // Check title duplication
+    const normalizedTitle = normalizeTitle(title);
+    const titleSnap = await videosRef
+      .where('ownerId', '==', userId)
+      .where('normalizedTitle', '==', normalizedTitle)
+      .where('createdAt', '>=', duplicateCutoff)
+      .limit(1)
+      .get();
+
+    if (!titleSnap.empty) {
+      return {
+        allowed: false,
+        reason: 'You already used a very similar title recently',
+      };
+    }
+
+    // Check near-duplicate titles via similarity
+    const recentTitlesSnap = await videosRef
+      .where('ownerId', '==', userId)
+      .where('createdAt', '>=', duplicateCutoff)
+      .limit(100)
+      .get();
+
+    for (const doc of recentTitlesSnap.docs) {
+      const existingTitle = doc.get('title') || '';
+      const existingNorm = normalizeTitle(existingTitle);
+      const similarity = jaccardSimilarity(normalizedTitle, existingNorm);
+      if (similarity > SIMILARITY_THRESHOLD) {
+        return {
+          allowed: false,
+          reason: 'Title looks like a near-duplicate of a recent upload',
+        };
+      }
+    }
+
+    // All checks passed
+    return { allowed: true };
+
+  } catch (error) {
+    console.error('Error in validateNexTubeUpload:', error);
+    throw new functions.https.HttpsError('internal', 'Upload validation failed');
+  }
+});
+
+// NEXTUBE DAILY SIMULATION (v1 API)
+// Runs every 60 minutes (1h == 1 in-game day).
+// For each video, computes viewsToday based on owner stats, video type, novelty, and randomness.
+// Updates dailyViews, totalViews, earningsTotal and credits player's money; also grows channel subscribers.
+exports.updateNextTubeDaily = functions
+  .runWith({ timeoutSeconds: 240, memory: '512MB' })
+  .pubsub
+  // Run at :55 every hour (5 minutes before the top-of-hour dailyGameUpdate)
+  .schedule('55 * * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const db = admin.firestore();
+
+    // Load Remote Config parameters if available; otherwise fall back to env or defaults
+    let rc = {};
+    try {
+      if (admin.remoteConfig) {
+        const tmpl = await admin.remoteConfig().getTemplate();
+        rc = (tmpl && tmpl.parameters) ? tmpl.parameters : {};
+      }
+    } catch (e) {
+      console.warn('Remote Config unavailable for updateNextTubeDaily, using defaults');
+    }
+
+    const numOr = (v, def) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : def;
+    };
+    const getParam = (key, def) => {
+      try {
+        const rcVal = rc && rc[key] && rc[key].defaultValue && rc[key].defaultValue.value;
+        return numOr(rcVal ?? process.env[key], def);
+      } catch (e) {
+        return def;
+      }
+    };
+
+    const RPM_MIN = getParam('nexRPMMinCents', 60);
+    const RPM_MAX = getParam('nexRPMMaxCents', 240);
+    const FAME_MULT_CAP = getParam('nexFameMultCap', 2.0);
+    const DAILY_VIEW_CAP = getParam('nexDailyViewCap', 200000);
+    const SUBS_GAIN_CAP = getParam('nexSubsGainCap', 10000);
+    const SUBS_MONETIZE_THRESHOLD = getParam('nexSubsMonetize', 1000);
+    const TYPE_WEIGHT_OFFICIAL = getParam('nexWeightOfficial', 1.0);
+    const TYPE_WEIGHT_LYRICS = getParam('nexWeightLyrics', 0.7);
+    const TYPE_WEIGHT_LIVE = getParam('nexWeightLive', 0.5);
+    const NOVELTY_HALF_LIFE_DAYS = getParam('nexNoveltyHalfLifeDays', 14);
+
+    const safeInt = (v, fb = 0) => {
+      if (typeof v === 'number') return Math.floor(v);
+      const p = parseInt(String(v ?? ''), 10);
+      return Number.isFinite(p) ? p : fb;
+    };
+    const toDate = (v) => {
+      if (!v) return new Date();
+      if (v.toDate) return v.toDate();
+      const d = new Date(String(v));
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const pageSize = 250;
+    let lastDoc = null;
+    let processed = 0;
+
+    while (true) {
+      let query = db.collection('nexttube_videos').orderBy('createdAt').limit(pageSize);
+      if (lastDoc) query = query.startAfter(lastDoc);
+      const snap = await query.get();
+      if (snap.empty) break;
+
+      const batch = db.batch();
+
+      for (const doc of snap.docs) {
+        const data = doc.data() || {};
+        const ownerId = String(data.ownerId || '');
+        if (!ownerId) continue;
+
+        const playerRef = db.collection('players').doc(ownerId);
+        const playerSnap = await playerRef.get();
+        const player = playerSnap.exists ? (playerSnap.data() || {}) : {};
+
+        const channelRef = playerRef.collection('nexTubeChannel').doc('main');
+        const channelSnap = await channelRef.get();
+        const channel = channelSnap.exists ? (channelSnap.data() || {}) : {};
+
+        const fanbase = safeInt(player.fanbase, 100);
+        const loyalFanbase = safeInt(player.loyalFanbase, 0);
+        const fame = safeInt(player.currentFame, 0);
+        const createdAt = toDate(data.createdAt);
+        const type = String(data.type || 'official');
+
+        const channelSubs = safeInt(channel.subscribers, 0);
+        const channelMonetized = channel.isMonetized === true || channelSubs >= SUBS_MONETIZE_THRESHOLD;
+        const channelRpm = safeInt(channel.rpmCents, 250);
+        const isMonetized = channelMonetized || data.isMonetized === true;
+        const rpmCentsRaw = channelMonetized ? channelRpm : safeInt(data.rpmCents, 200);
+        const rpmCents = Math.max(RPM_MIN, Math.min(RPM_MAX, rpmCentsRaw));
+
+        const ageDays = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
+
+        let base = fanbase * 0.5 + loyalFanbase * 2;
+        const fameMult = 1 + Math.min(FAME_MULT_CAP, fame / 300);
+        const typeWeight = type === 'official' ? TYPE_WEIGHT_OFFICIAL : (type === 'lyrics' ? TYPE_WEIGHT_LYRICS : TYPE_WEIGHT_LIVE);
+        const novelty = Math.pow(0.5, ageDays / Math.max(1, NOVELTY_HALF_LIFE_DAYS));
+        const rand = 0.8 + Math.random() * 0.4;
+        const cap = Math.max(300, Math.min(DAILY_VIEW_CAP, Math.floor(fanbase * 3)));
+
+        let viewsToday = Math.floor(base * fameMult * typeWeight * novelty * rand);
+        if (!Number.isFinite(viewsToday) || viewsToday < 0) viewsToday = 0;
+        viewsToday = Math.max(0, Math.min(cap, viewsToday));
+
+        const earningsCents = isMonetized ? Math.floor((rpmCents * viewsToday) / 1000) : 0;
+
+        batch.update(doc.ref, {
+          dailyViews: viewsToday,
+          totalViews: admin.firestore.FieldValue.increment(viewsToday),
+          earningsTotal: admin.firestore.FieldValue.increment(earningsCents),
+          updatedAt: admin.firestore.Timestamp.now(),
+        });
+
+        if (earningsCents > 0) {
+          const dollars = Math.floor(earningsCents / 100);
+          if (dollars > 0) {
+            batch.update(playerRef, {
+              currentMoney: admin.firestore.FieldValue.increment(dollars),
+            });
+          }
+        }
+
+        const subBase = fanbase * 0.002 + loyalFanbase * 0.01;
+        const subFameMult = 1 + Math.min(1.5, fame / 400);
+        const subRand = 0.8 + Math.random() * 0.4;
+        let subsGain = Math.floor(subBase * subFameMult * subRand);
+        subsGain = Math.max(0, Math.min(SUBS_GAIN_CAP, subsGain));
+
+        const channelUpdate = {
+          ownerId,
+          last28DaysViews: admin.firestore.FieldValue.increment(viewsToday),
+          isMonetized: channelMonetized,
+          rpmCents: channelRpm,
+          updatedAt: admin.firestore.Timestamp.now(),
+        };
+        if (subsGain > 0) {
+          channelUpdate.isMonetized = channelMonetized || (channelSubs + subsGain >= SUBS_MONETIZE_THRESHOLD);
+          channelUpdate.subscribers = admin.firestore.FieldValue.increment(subsGain);
+        }
+        batch.set(channelRef, channelUpdate, { merge: true });
+
+        processed++;
+      }
+
+      await batch.commit();
+      lastDoc = snap.docs[snap.docs.length - 1];
+      if (snap.size < pageSize) break;
+    }
+
+    console.log(`NexTube daily simulation finished. Processed videos=${processed}`);
+    return null;
+  });
+
+// Manual test trigger: simulate one NexTube day for the authenticated user
+// Usage (client): FirebaseFunctions.instance.httpsCallable('runNextTubeNow').call({})
+exports.runNextTubeNow = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    const userId = context.auth && context.auth.uid;
+    if (!userId) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    const db = admin.firestore();
+    let rc = {};
+    try {
+      if (admin.remoteConfig) {
+        const tmpl = await admin.remoteConfig().getTemplate();
+        rc = (tmpl && tmpl.parameters) ? tmpl.parameters : {};
+      }
+    } catch (e) {
+      console.warn('Remote Config unavailable for runNextTubeNow, using defaults');
+    }
+
+    const numOr = (v, def) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : def;
+    };
+    const getParam = (key, def) => {
+      try {
+        const rcVal = rc && rc[key] && rc[key].defaultValue && rc[key].defaultValue.value;
+        return numOr(rcVal ?? process.env[key], def);
+      } catch (e) {
+        return def;
+      }
+    };
+
+    const RPM_MIN = getParam('nexRPMMinCents', 60);
+    const RPM_MAX = getParam('nexRPMMaxCents', 240);
+    const FAME_MULT_CAP = getParam('nexFameMultCap', 2.0);
+    const DAILY_VIEW_CAP = getParam('nexDailyViewCap', 200000);
+    const SUBS_GAIN_CAP = getParam('nexSubsGainCap', 10000);
+    const SUBS_MONETIZE_THRESHOLD = getParam('nexSubsMonetize', 1000);
+    const TYPE_WEIGHT_OFFICIAL = getParam('nexWeightOfficial', 1.0);
+    const TYPE_WEIGHT_LYRICS = getParam('nexWeightLyrics', 0.7);
+    const TYPE_WEIGHT_LIVE = getParam('nexWeightLive', 0.5);
+    const NOVELTY_HALF_LIFE_DAYS = getParam('nexNoveltyHalfLifeDays', 14);
+
+    const safeInt = (v, fb = 0) => {
+      if (typeof v === 'number') return Math.floor(v);
+      const p = parseInt(String(v ?? ''), 10);
+      return Number.isFinite(p) ? p : fb;
+    };
+    const toDate = (v) => {
+      if (!v) return new Date();
+      if (v.toDate) return v.toDate();
+      const d = new Date(String(v));
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    // Fetch only this user's videos
+    const snap = await db
+      .collection('nexttube_videos')
+      .where('ownerId', '==', userId)
+      .orderBy('createdAt')
+      .limit(500)
+      .get();
+
+    if (snap.empty) {
+      return { processed: 0, message: 'No videos for this user' };
+    }
+
+    const batch = db.batch();
+    let processed = 0;
+    let totalViewsAdded = 0;
+    let totalEarningsCents = 0;
+    let totalSubs = 0;
+
+    // Load player + channel once
+    const playerRef = db.collection('players').doc(userId);
+    const playerSnap = await playerRef.get();
+    const player = playerSnap.exists ? (playerSnap.data() || {}) : {};
+
+    const channelRef = playerRef.collection('nexTubeChannel').doc('main');
+    const channelSnap = await channelRef.get();
+    const channel = channelSnap.exists ? (channelSnap.data() || {}) : {};
+
+    const fanbase = safeInt(player.fanbase, 100);
+    const loyalFanbase = safeInt(player.loyalFanbase, 0);
+    const fame = safeInt(player.currentFame, 0);
+
+    const channelSubs = safeInt(channel.subscribers, 0);
+    const channelMonetized = channel.isMonetized === true || channelSubs >= SUBS_MONETIZE_THRESHOLD;
+    const channelRpm = safeInt(channel.rpmCents, 250);
+
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      const createdAt = toDate(data.createdAt);
+      const type = String(data.type || 'official');
+
+      const isMonetized = channelMonetized || data.isMonetized === true;
+      const rpmCentsRaw = channelMonetized ? channelRpm : safeInt(data.rpmCents, 200);
+      const rpmCents = Math.max(RPM_MIN, Math.min(RPM_MAX, rpmCentsRaw));
+
+      const ageDays = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
+
+      let base = fanbase * 0.5 + loyalFanbase * 2;
+      const fameMult = 1 + Math.min(FAME_MULT_CAP, fame / 300);
+      const typeWeight = type === 'official' ? TYPE_WEIGHT_OFFICIAL : (type === 'lyrics' ? TYPE_WEIGHT_LYRICS : TYPE_WEIGHT_LIVE);
+      const novelty = Math.pow(0.5, ageDays / Math.max(1, NOVELTY_HALF_LIFE_DAYS));
+      const rand = 0.8 + Math.random() * 0.4;
+      const cap = Math.max(300, Math.min(DAILY_VIEW_CAP, Math.floor(fanbase * 3)));
+
+      let viewsToday = Math.floor(base * fameMult * typeWeight * novelty * rand);
+      if (!Number.isFinite(viewsToday) || viewsToday < 0) viewsToday = 0;
+      viewsToday = Math.max(0, Math.min(cap, viewsToday));
+
+      const earningsCents = isMonetized ? Math.floor((rpmCents * viewsToday) / 1000) : 0;
+
+      batch.update(doc.ref, {
+        dailyViews: viewsToday,
+        totalViews: admin.firestore.FieldValue.increment(viewsToday),
+        earningsTotal: admin.firestore.FieldValue.increment(earningsCents),
+        updatedAt: admin.firestore.Timestamp.now(),
+      });
+
+      totalViewsAdded += viewsToday;
+      totalEarningsCents += earningsCents;
+      processed++;
+    }
+
+    // Subscriber growth for this owner (single update)
+    const subBase = fanbase * 0.002 + loyalFanbase * 0.01;
+    const subFameMult = 1 + Math.min(1.5, fame / 400);
+    const subRand = 0.8 + Math.random() * 0.4;
+    let subsGain = Math.floor(subBase * subFameMult * subRand);
+    subsGain = Math.max(0, Math.min(SUBS_GAIN_CAP, subsGain));
+    totalSubs = subsGain;
+
+    const channelUpdate = {
+      ownerId: userId,
+      last28DaysViews: admin.firestore.FieldValue.increment(totalViewsAdded),
+      isMonetized: channelMonetized,
+      rpmCents: channelRpm,
+      updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (subsGain > 0) {
+      channelUpdate.isMonetized = channelMonetized || (channelSubs + subsGain >= SUBS_MONETIZE_THRESHOLD);
+      channelUpdate.subscribers = admin.firestore.FieldValue.increment(subsGain);
+    }
+    batch.set(channelRef, channelUpdate, { merge: true });
+
+    // Credit money if earnings
+    const dollars = Math.floor(totalEarningsCents / 100);
+    if (dollars > 0) {
+      batch.update(playerRef, {
+        currentMoney: admin.firestore.FieldValue.increment(dollars),
+      });
+    }
+
+    await batch.commit();
+
+    return {
+      processed,
+      totalViewsAdded,
+      totalEarningsCents,
+      subscribersAdded: totalSubs,
+      message: 'NexTube day simulated for your account',
+    };
+  });
+
+// Admin-only: simulate one NexTube day for ALL players immediately
+exports.runNextTubeForAllAdmin = functions
+  .runWith({ timeoutSeconds: 300, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    await validateAdminAccess(context);
+
+    const db = admin.firestore();
+    let rc = {};
+    try {
+      if (admin.remoteConfig) {
+        const tmpl = await admin.remoteConfig().getTemplate();
+        rc = (tmpl && tmpl.parameters) ? tmpl.parameters : {};
+      }
+    } catch (e) {
+      console.warn('Remote Config unavailable for runNextTubeForAllAdmin, using defaults');
+    }
+
+    const numOr = (v, def) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : def;
+    };
+    const getParam = (key, def) => {
+      try {
+        const rcVal = rc && rc[key] && rc[key].defaultValue && rc[key].defaultValue.value;
+        return numOr(rcVal ?? process.env[key], def);
+      } catch (e) {
+        return def;
+      }
+    };
+
+    const RPM_MIN = getParam('nexRPMMinCents', 60);
+    const RPM_MAX = getParam('nexRPMMaxCents', 240);
+    const FAME_MULT_CAP = getParam('nexFameMultCap', 2.0);
+    const DAILY_VIEW_CAP = getParam('nexDailyViewCap', 200000);
+    const SUBS_GAIN_CAP = getParam('nexSubsGainCap', 10000);
+    const SUBS_MONETIZE_THRESHOLD = getParam('nexSubsMonetize', 1000);
+    const TYPE_WEIGHT_OFFICIAL = getParam('nexWeightOfficial', 1.0);
+    const TYPE_WEIGHT_LYRICS = getParam('nexWeightLyrics', 0.7);
+    const TYPE_WEIGHT_LIVE = getParam('nexWeightLive', 0.5);
+    const NOVELTY_HALF_LIFE_DAYS = getParam('nexNoveltyHalfLifeDays', 14);
+
+    const safeInt = (v, fb = 0) => {
+      if (typeof v === 'number') return Math.floor(v);
+      const p = parseInt(String(v ?? ''), 10);
+      return Number.isFinite(p) ? p : fb;
+    };
+    const toDate = (v) => {
+      if (!v) return new Date();
+      if (v.toDate) return v.toDate();
+      const d = new Date(String(v));
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const pageSize = 250;
+    let lastDoc = null;
+    let processed = 0;
+    let totalViewsAdded = 0;
+    let totalEarningsCents = 0;
+    let pages = 0;
+
+    while (true) {
+      let query = db.collection('nexttube_videos').orderBy('createdAt').limit(pageSize);
+      if (lastDoc) query = query.startAfter(lastDoc);
+      const snap = await query.get();
+      if (snap.empty) break;
+
+      const batch = db.batch();
+
+      for (const doc of snap.docs) {
+        const data = doc.data() || {};
+        const ownerId = String(data.ownerId || '');
+        if (!ownerId) continue;
+
+        const playerRef = db.collection('players').doc(ownerId);
+        const playerSnap = await playerRef.get();
+        const player = playerSnap.exists ? (playerSnap.data() || {}) : {};
+
+        const channelRef = playerRef.collection('nexTubeChannel').doc('main');
+        const channelSnap = await channelRef.get();
+        const channel = channelSnap.exists ? (channelSnap.data() || {}) : {};
+
+        const fanbase = safeInt(player.fanbase, 100);
+        const loyalFanbase = safeInt(player.loyalFanbase, 0);
+        const fame = safeInt(player.currentFame, 0);
+        const createdAt = toDate(data.createdAt);
+        const type = String(data.type || 'official');
+
+        const channelSubs = safeInt(channel.subscribers, 0);
+        const channelMonetized = channel.isMonetized === true || channelSubs >= SUBS_MONETIZE_THRESHOLD;
+        const channelRpm = safeInt(channel.rpmCents, 250);
+        const isMonetized = channelMonetized || data.isMonetized === true;
+        const rpmCentsRaw = channelMonetized ? channelRpm : safeInt(data.rpmCents, 200);
+        const rpmCents = Math.max(RPM_MIN, Math.min(RPM_MAX, rpmCentsRaw));
+
+        const ageDays = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 86400000));
+
+        let base = fanbase * 0.5 + loyalFanbase * 2;
+        const fameMult = 1 + Math.min(FAME_MULT_CAP, fame / 300);
+        const typeWeight = type === 'official' ? TYPE_WEIGHT_OFFICIAL : (type === 'lyrics' ? TYPE_WEIGHT_LYRICS : TYPE_WEIGHT_LIVE);
+        const novelty = Math.pow(0.5, ageDays / Math.max(1, NOVELTY_HALF_LIFE_DAYS));
+        const rand = 0.8 + Math.random() * 0.4;
+        const cap = Math.max(300, Math.min(DAILY_VIEW_CAP, Math.floor(fanbase * 3)));
+
+        let viewsToday = Math.floor(base * fameMult * typeWeight * novelty * rand);
+        if (!Number.isFinite(viewsToday) || viewsToday < 0) viewsToday = 0;
+        viewsToday = Math.max(0, Math.min(cap, viewsToday));
+
+        const earningsCents = isMonetized ? Math.floor((rpmCents * viewsToday) / 1000) : 0;
+
+        batch.update(doc.ref, {
+          dailyViews: viewsToday,
+          totalViews: admin.firestore.FieldValue.increment(viewsToday),
+          earningsTotal: admin.firestore.FieldValue.increment(earningsCents),
+          updatedAt: admin.firestore.Timestamp.now(),
+        });
+
+        // Credit dollars to player's balance if any
+        const dollars = Math.floor(earningsCents / 100);
+        if (dollars > 0) {
+          batch.update(playerRef, {
+            currentMoney: admin.firestore.FieldValue.increment(dollars),
+          });
+        }
+
+        // Channel growth approximation per video iteration
+        const subBase = fanbase * 0.002 + loyalFanbase * 0.01;
+        const subFameMult = 1 + Math.min(1.5, fame / 400);
+        const subRand = 0.8 + Math.random() * 0.4;
+        let subsGain = Math.floor(subBase * subFameMult * subRand);
+        subsGain = Math.max(0, Math.min(SUBS_GAIN_CAP, subsGain));
+
+        const channelUpdate = {
+          ownerId,
+          last28DaysViews: admin.firestore.FieldValue.increment(viewsToday),
+          isMonetized: channelMonetized,
+          rpmCents: channelRpm,
+          updatedAt: admin.firestore.Timestamp.now(),
+        };
+        if (subsGain > 0) {
+          channelUpdate.isMonetized = channelMonetized || (channelSubs + subsGain >= SUBS_MONETIZE_THRESHOLD);
+          channelUpdate.subscribers = admin.firestore.FieldValue.increment(subsGain);
+        }
+        batch.set(channelRef, channelUpdate, { merge: true });
+
+        processed++;
+        totalViewsAdded += viewsToday;
+        totalEarningsCents += earningsCents;
+      }
+
+      await batch.commit();
+      pages++;
+      lastDoc = snap.docs[snap.docs.length - 1];
+      if (snap.size < pageSize) break;
+    }
+
+    return {
+      processed,
+      totalViewsAdded,
+      totalEarningsCents,
+      pages,
+      message: 'NexTube day simulated for all players (admin)'
+    };
+  });
+
