@@ -1,0 +1,153 @@
+{
+  "parameters": {
+    "certEnabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Enable RIAN-style certifications system",
+      "valueType": "BOOLEAN"
+    },
+    "certStreamsPerUnit": {
+      "defaultValue": { "value": "150" },
+      "description": "Number of streams that count as 1 certification unit",
+      "valueType": "NUMBER"
+    },
+    "certSilverUnits": {
+      "defaultValue": { "value": "50000" },
+      "description": "Units required for Silver certification",
+      "valueType": "NUMBER"
+    },
+    "certGoldUnits": {
+      "defaultValue": { "value": "100000" },
+      "description": "Units required for Gold certification",
+      "valueType": "NUMBER"
+    },
+    "certPlatinumUnits": {
+      "defaultValue": { "value": "250000" },
+      "description": "Units required for Platinum certification",
+      "valueType": "NUMBER"
+    },
+    "certMultiPlatinumStepUnits": {
+      "defaultValue": { "value": "250000" },
+      "description": "Additional units per extra Multi-Platinum level",
+      "valueType": "NUMBER"
+    },
+    "certDiamondUnits": {
+      "defaultValue": { "value": "1000000" },
+      "description": "Units required for Diamond certification",
+      "valueType": "NUMBER"
+    },
+    "certSongRewardMoney": {
+      "defaultValue": { "value": "5000" },
+      "description": "Money reward (in-game) for each song certification tier",
+      "valueType": "NUMBER"
+    },
+    "certAlbumRewardMoney": {
+      "defaultValue": { "value": "10000" },
+      "description": "Money reward (in-game) for each album certification tier",
+      "valueType": "NUMBER"
+    },
+    "certSongRewardFame": {
+      "defaultValue": { "value": "5" },
+      "description": "Fame reward for each song certification tier",
+      "valueType": "NUMBER"
+    },
+    "certAlbumRewardFame": {
+      "defaultValue": { "value": "10" },
+      "description": "Fame reward for each album certification tier",
+      "valueType": "NUMBER"
+    },
+    "certNexViewsBoostPerTier": {
+      "defaultValue": { "value": "0.03" },
+      "description": "NexTube views multiplier bonus per certification tier (e.g., +3% per tier)",
+      "valueType": "NUMBER"
+    },
+    "certNexRpmBoostPerTier": {
+      "defaultValue": { "value": "0.005" },
+      "description": "NexTube RPM additive bias per certification tier (e.g., +0.5 cents per tier)",
+      "valueType": "NUMBER"
+    },
+    "nexQualityCoef": {
+      "defaultValue": {
+        "value": "0.01"
+      },
+      "description": "Quality coefficient for NexTube views multiplier (0.005-0.05 recommended)",
+      "valueType": "NUMBER"
+    },
+    "nexRPMQualityBias": {
+      "defaultValue": {
+        "value": "0.002"
+      },
+      "description": "Quality bias for NexTube RPM adjustment (0-0.01 recommended)",
+      "valueType": "NUMBER"
+    },
+    "nexRPMMinCents": {
+      "defaultValue": {
+        "value": "60"
+      },
+      "description": "Minimum RPM in cents (floor for quality adjustments)",
+      "valueType": "NUMBER"
+    },
+    "nexRPMMaxCents": {
+      "defaultValue": {
+        "value": "240"
+      },
+      "description": "Maximum RPM in cents (ceiling for quality adjustments)",
+      "valueType": "NUMBER"
+    },
+    "nexFameMultCap": {
+      "defaultValue": {
+        "value": "2.0"
+      },
+      "description": "Fame multiplier cap for NexTube views",
+      "valueType": "NUMBER"
+    },
+    "nexDailyViewCap": {
+      "defaultValue": {
+        "value": "200000"
+      },
+      "description": "Maximum daily views per video",
+      "valueType": "NUMBER"
+    },
+    "nexSubsGainCap": {
+      "defaultValue": {
+        "value": "10000"
+      },
+      "description": "Maximum subscribers gained per day",
+      "valueType": "NUMBER"
+    },
+    "nexSubsMonetize": {
+      "defaultValue": {
+        "value": "1000"
+      },
+      "description": "Subscriber threshold for monetization",
+      "valueType": "NUMBER"
+    },
+    "nexWeightOfficial": {
+      "defaultValue": {
+        "value": "1.0"
+      },
+      "description": "Type weight for official videos",
+      "valueType": "NUMBER"
+    },
+    "nexWeightLyrics": {
+      "defaultValue": {
+        "value": "0.7"
+      },
+      "description": "Type weight for lyrics videos",
+      "valueType": "NUMBER"
+    },
+    "nexWeightLive": {
+      "defaultValue": {
+        "value": "0.5"
+      },
+      "description": "Type weight for live videos",
+      "valueType": "NUMBER"
+    },
+    "nexNoveltyHalfLifeDays": {
+      "defaultValue": {
+        "value": "14"
+      },
+      "description": "Half-life in days for novelty decay",
+      "valueType": "NUMBER"
+    }
+  }
+}

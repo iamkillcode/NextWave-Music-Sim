@@ -29,6 +29,8 @@ import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
 import 'dart:ui';
 import '../widgets/glassmorphic_bottom_nav.dart';
+import '../services/admin_service.dart';
+import '../services/certifications_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final dynamic initialStats;
@@ -74,6 +76,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _hasPendingSave = false; // Track if we have pending changes to save
   List<PendingPractice> pendingPractices =
       []; // Track ongoing training programs
+  bool _isAdmin = false; // Admin quick-actions
+  final _certificationsService = CertificationsService();
+  final _adminService = AdminService();
 
   @override
   void initState() {
@@ -127,6 +132,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     // Initialize Firebase authentication
     _initializeOnlineMode();
+
+    // Check admin access (non-blocking)
+    _adminService.isAdmin().then((isAdmin) {
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+        });
+      }
+    });
 
     // Date-only system: Check for day changes every 5 minutes (much more efficient!)
     gameTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
@@ -1954,6 +1968,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Notification and Settings Buttons
           Row(
             children: [
+              if (_isAdmin)
+                Tooltip(
+                  message: 'Admin Tools',
+                  child: IconButton(
+                    icon: const Icon(Icons.shield_outlined,
+                        color: Colors.amberAccent),
+                    onPressed: _openAdminQuickActions,
+                  ),
+                ),
               // Notification Button
               Stack(
                 children: [
@@ -2017,6 +2040,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _openAdminQuickActions() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final controller = TextEditingController(text: userId);
+    bool running = false;
+    MigrationResult? result;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF161B22),
+            title: const Text('Admin: Certifications',
+                style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Run certifications migration for a player (retro-awards song tiers).',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                const Text('Player ID',
+                    style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: controller,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Enter player UID',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: const Color(0xFF0D1117),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white24),
+                    ),
+                  ),
+                ),
+                if (result != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Changed: ${result!.changed} • Awarded: ${result!.awarded}',
+                    style: const TextStyle(color: Colors.greenAccent),
+                  ),
+                ]
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: running ? null : () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+              ElevatedButton.icon(
+                onPressed: running
+                    ? null
+                    : () async {
+                        setState(() => running = true);
+                        try {
+                          final r = await _certificationsService
+                              .runMigrationForPlayer(controller.text.trim());
+                          setState(() => result = r);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Migration done: changed ${r.changed}, awarded ${r.awarded}'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Migration failed: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        } finally {
+                          setState(() => running = false);
+                        }
+                      },
+                icon: running
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.play_arrow_rounded),
+                label: const Text('Run Migration'),
+              ),
+            ],
+          );
+        });
+      },
     );
   }
 

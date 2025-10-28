@@ -12,6 +12,13 @@ class Album {
   final DateTime? scheduledDate; // Future release date
   final String? coverArtUrl;
   final int totalStreams; // Combined streams of all songs
+  // Certifications tracking
+  final int totalSales; // Albums sold (units)
+  final int eligibleUnits; // streams/RC_streams_per_unit + totalSales
+  final String
+      highestCertification; // none, silver, gold, platinum, multi_platinum, diamond
+  final int certificationLevel; // 0 if none
+  final DateTime? lastCertifiedAt;
   final AlbumState state; // planned, scheduled, released
   final List<String> streamingPlatforms; // Where it's available
   final bool isDeluxe; // True if this is a deluxe edition
@@ -26,6 +33,11 @@ class Album {
     this.scheduledDate,
     this.coverArtUrl,
     this.totalStreams = 0,
+    this.totalSales = 0,
+    this.eligibleUnits = 0,
+    this.highestCertification = 'none',
+    this.certificationLevel = 0,
+    this.lastCertifiedAt,
     this.state = AlbumState.planned,
     this.streamingPlatforms = const [],
     this.isDeluxe = false,
@@ -41,6 +53,11 @@ class Album {
     DateTime? scheduledDate,
     String? coverArtUrl,
     int? totalStreams,
+    int? totalSales,
+    int? eligibleUnits,
+    String? highestCertification,
+    int? certificationLevel,
+    DateTime? lastCertifiedAt,
     AlbumState? state,
     List<String>? streamingPlatforms,
     bool? isDeluxe,
@@ -55,6 +72,11 @@ class Album {
       scheduledDate: scheduledDate ?? this.scheduledDate,
       coverArtUrl: coverArtUrl ?? this.coverArtUrl,
       totalStreams: totalStreams ?? this.totalStreams,
+      totalSales: totalSales ?? this.totalSales,
+      eligibleUnits: eligibleUnits ?? this.eligibleUnits,
+      highestCertification: highestCertification ?? this.highestCertification,
+      certificationLevel: certificationLevel ?? this.certificationLevel,
+      lastCertifiedAt: lastCertifiedAt ?? this.lastCertifiedAt,
       state: state ?? this.state,
       streamingPlatforms: streamingPlatforms ?? this.streamingPlatforms,
       isDeluxe: isDeluxe ?? this.isDeluxe,
@@ -72,6 +94,11 @@ class Album {
       'scheduledDate': scheduledDate?.toIso8601String(),
       'coverArtUrl': coverArtUrl,
       'totalStreams': totalStreams,
+      'totalSales': totalSales,
+      'eligibleUnits': eligibleUnits,
+      'highestCertification': highestCertification,
+      'certificationLevel': certificationLevel,
+      'lastCertifiedAt': lastCertifiedAt?.toIso8601String(),
       'state': state.name,
       'streamingPlatforms': streamingPlatforms,
       'isDeluxe': isDeluxe,
@@ -96,6 +123,13 @@ class Album {
           : null,
       coverArtUrl: json['coverArtUrl'] as String?,
       totalStreams: safeParseInt(json['totalStreams'], fallback: 0),
+      totalSales: safeParseInt(json['totalSales'], fallback: 0),
+      eligibleUnits: safeParseInt(json['eligibleUnits'], fallback: 0),
+      highestCertification: json['highestCertification'] as String? ?? 'none',
+      certificationLevel: safeParseInt(json['certificationLevel'], fallback: 0),
+      lastCertifiedAt: json['lastCertifiedAt'] != null
+          ? DateTime.parse(json['lastCertifiedAt'] as String)
+          : null,
       state: AlbumState.values.firstWhere(
         (e) => e.name == json['state'],
         orElse: () => AlbumState.planned,

@@ -12,6 +12,14 @@ class Song {
   final DateTime? releasedDate;
   final int streams;
   final int likes;
+  // Certifications tracking
+  final int eligibleUnits; // streams/RC_streams_per_unit + totalSales
+  final String
+      highestCertification; // none, silver, gold, platinum, multi_platinum, diamond
+  final int certificationLevel; // 0 if none; >1 for multi-platinum levels
+  final DateTime? lastCertifiedAt;
+  final int
+      totalSales; // manual/earned sales units contributing to certifications
   final Map<String, dynamic> metadata;
   final String?
       coverArtStyle; // e.g., 'minimalist', 'abstract', 'photo', 'illustration'
@@ -67,6 +75,11 @@ class Song {
     this.releasedDate,
     this.streams = 0,
     this.likes = 0,
+    this.eligibleUnits = 0,
+    this.highestCertification = 'none',
+    this.certificationLevel = 0,
+    this.lastCertifiedAt,
+    this.totalSales = 0,
     this.metadata = const {},
     this.coverArtStyle,
     this.coverArtColor,
@@ -101,6 +114,11 @@ class Song {
     DateTime? releasedDate,
     int? streams,
     int? likes,
+    int? eligibleUnits,
+    String? highestCertification,
+    int? certificationLevel,
+    DateTime? lastCertifiedAt,
+    int? totalSales,
     Map<String, dynamic>? metadata,
     String? coverArtStyle,
     String? coverArtColor,
@@ -135,6 +153,11 @@ class Song {
       releasedDate: releasedDate ?? this.releasedDate,
       streams: streams ?? this.streams,
       likes: likes ?? this.likes,
+      eligibleUnits: eligibleUnits ?? this.eligibleUnits,
+      highestCertification: highestCertification ?? this.highestCertification,
+      certificationLevel: certificationLevel ?? this.certificationLevel,
+      lastCertifiedAt: lastCertifiedAt ?? this.lastCertifiedAt,
+      totalSales: totalSales ?? this.totalSales,
       metadata: metadata ?? this.metadata,
       coverArtStyle: coverArtStyle ?? this.coverArtStyle,
       coverArtColor: coverArtColor ?? this.coverArtColor,
@@ -174,6 +197,11 @@ class Song {
       'releasedDate': releasedDate?.toIso8601String(),
       'streams': streams,
       'likes': likes,
+      'eligibleUnits': eligibleUnits,
+      'highestCertification': highestCertification,
+      'certificationLevel': certificationLevel,
+      'lastCertifiedAt': lastCertifiedAt?.toIso8601String(),
+      'totalSales': totalSales,
       'metadata': metadata,
       'coverArtStyle': coverArtStyle,
       'coverArtColor': coverArtColor,
@@ -218,6 +246,13 @@ class Song {
           : null,
       streams: safeParseInt(json['streams'], fallback: 0),
       likes: safeParseInt(json['likes'], fallback: 0),
+      eligibleUnits: safeParseInt(json['eligibleUnits'], fallback: 0),
+      highestCertification: json['highestCertification'] as String? ?? 'none',
+      certificationLevel: safeParseInt(json['certificationLevel'], fallback: 0),
+      lastCertifiedAt: json['lastCertifiedAt'] != null
+          ? DateTime.parse(json['lastCertifiedAt'] as String)
+          : null,
+      totalSales: safeParseInt(json['totalSales'], fallback: 0),
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? {}),
       coverArtStyle: json['coverArtStyle'] as String?,
       coverArtColor: json['coverArtColor'] as String?,

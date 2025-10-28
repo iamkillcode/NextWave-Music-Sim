@@ -13,7 +13,7 @@ const db = admin.firestore();
 // Set global options for all v2 functions
 setGlobalOptions({
   region: 'us-central1',
-  maxInstances: 10,
+  maxInstances: 100,
   timeoutSeconds: 540,
   memory: '512MiB',
 });
@@ -354,25 +354,25 @@ exports.validateSongRelease = onCall(async (request) => {
   
   const data = request.data;
   
-  const playerId = request.auth.uid;
+  const playerId = context.auth.uid;
   const { song, productionCost } = data;
   // Validate numeric inputs
   if (typeof productionCost !== 'number' || !Number.isFinite(productionCost)) {
-    throw new HttpsError('invalid-argument', 'Invalid productionCost');
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid productionCost');
   }
   // Validate nested numeric fields in the song payload
   try {
     validateNestedNumbers(song, 'song');
   } catch (err) {
     console.warn('Invalid numeric in song payload:', err.message || err);
-    throw new HttpsError('invalid-argument', 'Invalid numeric value in song payload');
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid numeric value in song payload');
   }
   
   try {
     // Get player data
     const playerDoc = await db.collection('players').doc(playerId).get();
     if (!playerDoc.exists) {
-      throw new HttpsError('not-found', 'Player not found');
+      throw new functions.https.HttpsError('not-found', 'Player not found');
     }
     
     const playerData = playerDoc.data();
@@ -402,7 +402,7 @@ exports.validateSongRelease = onCall(async (request) => {
     };
   } catch (error) {
     console.error('❌ Error validating song release:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -411,13 +411,11 @@ exports.validateSongRelease = onCall(async (request) => {
 // In-game: 1 week = 7 real-world hours
 // ============================================================================
 
-exports.triggerSpecialEvent = onSchedule({
-  schedule: '0 */7 * * *', // Every 7 hours (1 in-game week)
-  timeZone: 'UTC',
-  timeoutSeconds: 540,
-  memory: '512MiB',
-}, async (event) => {
-  console.log('🎪 Triggering weekly special event...');
+exports.triggerSpecialEvent = functions.pubsub
+  .schedule('0 */7 * * *') // Every 7 hours (1 in-game week)
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🎪 Triggering weekly special event...');
     
     try {
       const events = [
@@ -1880,7 +1878,7 @@ function validateNestedNumbers(obj, path = '') {
     }
   } else if (typeof obj === 'number') {
     if (!Number.isFinite(obj)) {
-      throw new HttpsError('invalid-argument', `Invalid numeric value at ${path}: ${obj}`);
+      throw new functions.https.HttpsError('invalid-argument', `Invalid numeric value at ${path}: ${obj}`);
     }
   }
 }
@@ -1922,17 +1920,16 @@ async function logSuspiciousActivity(playerId, activity, flags, additionalData =
 // SECURE GAME ACTIONS - Server-side validation for all critical operations
 // ============================================================================
 
-exports.secureSongCreation = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.secureSongCreation = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
   
-  const playerId = request.auth.uid;
+  const playerId = context.auth.uid;
   const { title, genre, effort } = data;
   // Validate 'effort' is a finite number
   if (typeof effort !== 'number' || !Number.isFinite(effort)) {
-    throw new HttpsError('invalid-argument', 'Invalid effort value');
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid effort value');
   }
   
   try {
@@ -1941,14 +1938,14 @@ exports.secureSongCreation = onCall(async (request) => {
       const playerDoc = await transaction.get(playerRef);
       
       if (!playerDoc.exists) {
-        throw new HttpsError('not-found', 'Player not found');
+        throw new functions.https.HttpsError('not-found', 'Player not found');
       }
       
       const playerData = playerDoc.data();
       
       // Validate effort level
       if (effort < 1 || effort > 4) {
-        throw new HttpsError('invalid-argument', 'Invalid effort level');
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid effort level');
       }
       
       // Calculate energy cost
@@ -1957,7 +1954,7 @@ exports.secureSongCreation = onCall(async (request) => {
       
       // Validate player has enough energy
       if ((playerData.energy || 100) < energyCost) {
-        throw new HttpsError('failed-precondition', 'Insufficient energy');
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient energy');
       }
       
       // Calculate song quality server-side (prevents manipulation)
@@ -1991,7 +1988,7 @@ exports.secureSongCreation = onCall(async (request) => {
       const oldMoney = playerData.currentMoney || 1000;
       const newMoney = oldMoney + moneyGain;
       if (!validateMoneyChange(oldMoney, newMoney, 'song_creation')) {
-        throw new HttpsError('invalid-argument', 'Suspicious money gain detected');
+        throw new functions.https.HttpsError('invalid-argument', 'Suspicious money gain detected');
       }
       
       // Create song object
@@ -2054,20 +2051,19 @@ exports.secureSongCreation = onCall(async (request) => {
   }
 });
 
-exports.secureStatUpdate = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.secureStatUpdate = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
   
   const { updates, action, context: actionContext, playerId } = data;
   
   // Determine which player to update
-  let targetPlayerId = request.auth.uid; // Default: update self
+  let targetPlayerId = context.auth.uid; // Default: update self
   
   // Admin can update other players
-  if (playerId && playerId !== request.auth.uid) {
-    await validateAdminAccess(request); // Throws if not admin
+  if (playerId && playerId !== context.auth.uid) {
+    await validateAdminAccess(context); // Throws if not admin
     targetPlayerId = playerId;
   }
   
@@ -2087,7 +2083,7 @@ exports.secureStatUpdate = onCall(async (request) => {
       const playerDoc = await transaction.get(playerRef);
       
       if (!playerDoc.exists) {
-        throw new HttpsError('not-found', 'Player not found');
+        throw new functions.https.HttpsError('not-found', 'Player not found');
       }
       
       const playerData = playerDoc.data();
@@ -2100,7 +2096,7 @@ exports.secureStatUpdate = onCall(async (request) => {
 
         // Reject any direct non-finite numeric values immediately
         if (typeof newValue === 'number' && !Number.isFinite(newValue)) {
-          throw new HttpsError('invalid-argument', `Invalid numeric value for ${stat}: ${newValue}`);
+          throw new functions.https.HttpsError('invalid-argument', `Invalid numeric value for ${stat}: ${newValue}`);
         }
 
         // For compound payloads (songs/albums/regionalFanbase) ensure nested numbers are finite
@@ -2109,7 +2105,7 @@ exports.secureStatUpdate = onCall(async (request) => {
             validateNestedNumbers(newValue, stat);
           } catch (err) {
             console.warn('Payload validation failed for', stat, err.message || err);
-            throw new HttpsError('invalid-argument', `Invalid numeric value inside ${stat}`);
+            throw new functions.https.HttpsError('invalid-argument', `Invalid numeric value inside ${stat}`);
           }
         }
 
@@ -2117,7 +2113,7 @@ exports.secureStatUpdate = onCall(async (request) => {
           switch (stat) {
           case 'currentMoney':
             if (!validateMoneyChange(oldValue, newValue, action, actionContext)) {
-              throw new HttpsError('invalid-argument', `Invalid money change: ${oldValue} -> ${newValue}`);
+              throw new functions.https.HttpsError('invalid-argument', `Invalid money change: ${oldValue} -> ${newValue}`);
             }
             validatedUpdates[stat] = Math.max(0, newValue); // No negative money
             break;
@@ -2128,7 +2124,7 @@ exports.secureStatUpdate = onCall(async (request) => {
             
           case 'currentFame':
             if (!validateStatChange(oldValue, newValue, stat, 50)) {
-              throw new HttpsError('invalid-argument', `Invalid ${stat} change`);
+              throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
             }
             validatedUpdates[stat] = Math.max(0, newValue);
             break;
@@ -2137,7 +2133,7 @@ exports.secureStatUpdate = onCall(async (request) => {
             // Fanbase can grow more rapidly from daily streams (multiple songs × conversion rates)
             // Allow up to 2000 new fans per save (accounts for viral hits, multiple albums, campaigns)
             if (!validateStatChange(oldValue, newValue, stat, 2000)) {
-              throw new HttpsError('invalid-argument', `Invalid ${stat} change`);
+              throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
             }
             validatedUpdates[stat] = Math.max(0, newValue);
             break;
@@ -2147,7 +2143,7 @@ exports.secureStatUpdate = onCall(async (request) => {
           case 'compositionSkill':
             // Allow up to 30 points per save (accounts for practice sessions, writing multiple songs, daily progression)
             if (!validateStatChange(oldValue, newValue, stat, 30)) {
-              throw new HttpsError('invalid-argument', `Invalid skill change`);
+              throw new functions.https.HttpsError('invalid-argument', `Invalid skill change`);
             }
             validatedUpdates[stat] = Math.max(0, Math.min(100, newValue));
             break;
@@ -2155,7 +2151,7 @@ exports.secureStatUpdate = onCall(async (request) => {
           case 'experience':
             // XP can grow rapidly from writing songs, performing, etc.
             if (!validateStatChange(oldValue, newValue, stat, 200)) {
-              throw new HttpsError('invalid-argument', `Invalid experience change`);
+              throw new functions.https.HttpsError('invalid-argument', `Invalid experience change`);
             }
             validatedUpdates[stat] = Math.max(0, newValue); // No upper limit
             break;
@@ -2164,7 +2160,7 @@ exports.secureStatUpdate = onCall(async (request) => {
           case 'inspirationLevel':
             // 🎨 Creativity (Hype) and Inspiration - can grow significantly from activities
             if (!validateStatChange(oldValue, newValue, stat, 100)) {
-              throw new HttpsError('invalid-argument', `Invalid ${stat} change`);
+              throw new functions.https.HttpsError('invalid-argument', `Invalid ${stat} change`);
             }
             validatedUpdates[stat] = Math.max(0, newValue); // No upper limit
             break;
@@ -2453,7 +2449,7 @@ exports.secureStatUpdate = onCall(async (request) => {
         } catch (statErr) {
           console.error(`Error processing stat ${stat}:`, statErr && statErr.stack ? statErr.stack : statErr);
           // Convert unexpected errors to an HttpsError so the client gets a controlled error code
-          throw new HttpsError('internal', `Failed processing ${stat}: ${statErr && statErr.message ? statErr.message : String(statErr)}`);
+          throw new functions.https.HttpsError('internal', `Failed processing ${stat}: ${statErr && statErr.message ? statErr.message : String(statErr)}`);
         }
       }
       
@@ -2473,7 +2469,7 @@ exports.secureStatUpdate = onCall(async (request) => {
           
           // Block update if too many flags
           if (detectedFlags.length > 3) {
-            throw new HttpsError('permission-denied', 'Suspicious activity detected');
+            throw new functions.https.HttpsError('permission-denied', 'Suspicious activity detected');
           }
         }
       }
@@ -2506,7 +2502,7 @@ exports.secureStatUpdate = onCall(async (request) => {
         }
 
         console.error('Transaction update error:', updateErr && updateErr.stack ? updateErr.stack : updateErr);
-        throw new HttpsError('internal', 'Failed to persist player updates');
+        throw new functions.https.HttpsError('internal', 'Failed to persist player updates');
       }
       
       return {
@@ -2521,13 +2517,12 @@ exports.secureStatUpdate = onCall(async (request) => {
   }
 });
 
-exports.secureSideHustleReward = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.secureSideHustleReward = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
   
-  const playerId = request.auth.uid;
+  const playerId = context.auth.uid;
   const { sideHustleId, currentGameDate } = data;
   
   try {
@@ -2536,14 +2531,14 @@ exports.secureSideHustleReward = onCall(async (request) => {
       const playerDoc = await transaction.get(playerRef);
       
       if (!playerDoc.exists) {
-        throw new HttpsError('not-found', 'Player not found');
+        throw new functions.https.HttpsError('not-found', 'Player not found');
       }
       
       const playerData = playerDoc.data();
       const sideHustle = playerData.activeSideHustle;
       
       if (!sideHustle || sideHustle.id !== sideHustleId) {
-        throw new HttpsError('not-found', 'No matching active side hustle');
+        throw new functions.https.HttpsError('not-found', 'No matching active side hustle');
       }
       
       // Validate the side hustle hasn't been exploited
@@ -2551,7 +2546,7 @@ exports.secureSideHustleReward = onCall(async (request) => {
       const gameDate = toDateSafe(currentGameDate);
       
       if (lastRewardDate && gameDate && gameDate <= lastRewardDate) {
-        throw new HttpsError('failed-precondition', 'Side hustle already rewarded for this date');
+        throw new functions.https.HttpsError('failed-precondition', 'Side hustle already rewarded for this date');
       }
       
       // Validate reward amounts
@@ -2565,7 +2560,7 @@ exports.secureSideHustleReward = onCall(async (request) => {
       
       // Validate money change
       if (!validateMoneyChange(oldMoney, newMoney, 'side_hustle')) {
-        throw new HttpsError('invalid-argument', 'Invalid side hustle reward');
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid side hustle reward');
       }
       
       // Check if contract expired
@@ -2613,10 +2608,9 @@ exports.secureSideHustleReward = onCall(async (request) => {
  * This runs in a transaction and ensures songs and album objects are updated atomically
  * with platform availability, release dates, and stat gains.
  */
-exports.secureReleaseAlbum = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.secureReleaseAlbum = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
 
   const albumId = data.albumId;
@@ -2624,13 +2618,13 @@ exports.secureReleaseAlbum = onCall(async (request) => {
   const playerId = data.playerId; // optional, admin-only
 
   if (!albumId || typeof albumId !== 'string') {
-    throw new HttpsError('invalid-argument', 'albumId is required');
+    throw new functions.https.HttpsError('invalid-argument', 'albumId is required');
   }
 
-  let targetPlayerId = request.auth.uid;
-  if (playerId && playerId !== request.auth.uid) {
+  let targetPlayerId = context.auth.uid;
+  if (playerId && playerId !== context.auth.uid) {
     // Allow admins to release on behalf of other players
-    await validateAdminAccess(request);
+    await validateAdminAccess(context);
     targetPlayerId = playerId;
   }
 
@@ -2649,7 +2643,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
       const playerRef = db.collection('players').doc(targetPlayerId);
       const playerDoc = await transaction.get(playerRef);
       if (!playerDoc.exists) {
-        throw new HttpsError('not-found', 'Player not found');
+        throw new functions.https.HttpsError('not-found', 'Player not found');
       }
 
       const playerData = playerDoc.data();
@@ -2661,7 +2655,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
         const albumRef = playerRef.collection('albums').doc(String(albumId));
         const albumDoc = await transaction.get(albumRef);
         if (!albumDoc.exists) {
-          throw new HttpsError('not-found', 'Album not found (migrated)');
+          throw new functions.https.HttpsError('not-found', 'Album not found (migrated)');
         }
 
         const album = albumDoc.data();
@@ -2752,7 +2746,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
           transaction.update(playerRef, validatedUpdates);
         } catch (uErr) {
           console.error('Failed to write player stats during migrated album release', uErr);
-          throw new HttpsError('internal', 'Failed to persist release stats');
+          throw new functions.https.HttpsError('internal', 'Failed to persist release stats');
         }
 
         return {
@@ -2773,7 +2767,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
       const albumIdStr = String(albumId);
       const albumIndex = existingAlbums.findIndex((a) => String(a?.id) === albumIdStr);
       if (albumIndex === -1) {
-        throw new HttpsError('not-found', 'Album not found');
+        throw new functions.https.HttpsError('not-found', 'Album not found');
       }
 
       const album = { ...existingAlbums[albumIndex] };
@@ -2859,7 +2853,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
         if (flags.length > 0) {
           // Avoid logging inside the transaction; if needed, do best-effort logging after commit elsewhere
           if (flags.length > 3) {
-            throw new HttpsError('permission-denied', 'Suspicious activity detected');
+            throw new functions.https.HttpsError('permission-denied', 'Suspicious activity detected');
           }
         }
 
@@ -2868,7 +2862,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
         transaction.update(playerRef, validatedUpdates);
       } catch (updateErr) {
         console.error('Failed to commit release transaction for album', albumId, updateErr && updateErr.stack ? updateErr.stack : updateErr);
-        throw new HttpsError('internal', 'Failed to write release updates');
+        throw new functions.https.HttpsError('internal', 'Failed to write release updates');
       }
 
       return {
@@ -2899,7 +2893,7 @@ exports.secureReleaseAlbum = onCall(async (request) => {
       targetPlayerId: targetPlayerId,
     };
     console.error('Error in secureReleaseAlbum:', details);
-    throw new HttpsError('internal', errMsg, details);
+    throw new functions.https.HttpsError('internal', errMsg, details);
   }
 });
 
@@ -2908,14 +2902,13 @@ exports.secureReleaseAlbum = onCall(async (request) => {
  * into per-player subcollections (players/{uid}/songs and players/{uid}/albums).
  * Call this for specific players (admin only) or run over the user collection in batches.
  */
-exports.migratePlayerContentToSubcollections = onCall(async (request) => {
-  const data = request.data;
+exports.migratePlayerContentToSubcollections = functions.https.onCall(async (data, context) => {
   // Only admin may run this
-  await validateAdminAccess(request);
+  await validateAdminAccess(context);
 
   const playerId = data.playerId;
   if (!playerId) {
-    throw new HttpsError('invalid-argument', 'playerId is required');
+    throw new functions.https.HttpsError('invalid-argument', 'playerId is required');
   }
 
   try {
@@ -2971,7 +2964,7 @@ exports.migratePlayerContentToSubcollections = onCall(async (request) => {
     return { success: true, songsWritten: writes, albumsWritten: awrites };
   } catch (migErr) {
     console.error('Migration error for player', playerId, migErr);
-    throw new HttpsError('internal', 'Migration failed');
+    throw new functions.https.HttpsError('internal', 'Migration failed');
   }
 });
 
@@ -3038,10 +3031,9 @@ function selectRandomRegion() {
 // MANUAL TESTING FUNCTIONS (Keep from v1)
 // ============================================================================
 
-exports.triggerDailyUpdate = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.triggerDailyUpdate = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
   
   console.log('🔧 Manual trigger: Daily update started');
@@ -3112,14 +3104,13 @@ exports.triggerDailyUpdate = onCall(async (request) => {
     };
   } catch (error) {
     console.error('❌ Error in manual trigger:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
-exports.catchUpMissedDays = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.catchUpMissedDays = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
   
   const { startDate, endDate } = data;
@@ -3130,12 +3121,12 @@ exports.catchUpMissedDays = onCall(async (request) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new HttpsError('invalid-argument', 'Invalid start or end date');
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid start or end date');
     }
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     
     if (days > 30) {
-      throw new HttpsError('invalid-argument', 'Maximum 30 days allowed');
+      throw new functions.https.HttpsError('invalid-argument', 'Maximum 30 days allowed');
     }
     
     let totalProcessed = 0;
@@ -3180,7 +3171,7 @@ exports.catchUpMissedDays = onCall(async (request) => {
     };
   } catch (error) {
     console.error('❌ Error in catch-up:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -3343,8 +3334,7 @@ const SIGNATURE_NPCS = [
 ];
 
 // Initialize NPC artists in database (ONE-TIME SETUP)
-exports.initializeNPCArtists = onCall(async (request) => {
-  const data = request.data;
+exports.initializeNPCArtists = functions.https.onCall(async (data, context) => {
   try {
     console.log('🤖 Initializing NPC artists...');
     
@@ -3434,18 +3424,16 @@ exports.initializeNPCArtists = onCall(async (request) => {
     };
   } catch (error) {
     console.error('❌ Error initializing NPCs:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
 // Simulate NPC activity (runs with hourly update)
-exports.simulateNPCActivity = onSchedule({
-  schedule: '0 * * * *', // Every hour with daily update
-  timeZone: 'UTC',
-  timeoutSeconds: 540,
-  memory: '512MiB',
-}, async (event) => {
-  console.log('🤖 Simulating NPC artist activity...');
+exports.simulateNPCActivity = functions.pubsub
+  .schedule('0 * * * *') // Every hour with daily update
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🤖 Simulating NPC artist activity...');
     
     try {
       const npcsSnapshot = await db.collection('npc_artists')
@@ -3829,17 +3817,16 @@ async function createNPCEchoXPost(npc, postType = 'general', songTitle = null) {
  * Admin endpoint to force a specific NPC to release a new song
  * Useful for testing and content management
  */
-exports.forceNPCRelease = onCall(async (request) => {
-  const data = request.data;
+exports.forceNPCRelease = functions.https.onCall(async (data, context) => {
   // Verify admin authentication
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
 
   const { npcId } = data;
 
   if (!npcId) {
-    throw new HttpsError('invalid-argument', 'npcId is required');
+    throw new functions.https.HttpsError('invalid-argument', 'npcId is required');
   }
 
   console.log(`🎵 Admin force release for NPC: ${npcId}`);
@@ -3849,7 +3836,7 @@ exports.forceNPCRelease = onCall(async (request) => {
     const npc = SIGNATURE_NPCS.find(n => n.id === npcId);
 
     if (!npc) {
-      throw new HttpsError('not-found', `NPC ${npcId} not found`);
+      throw new functions.https.HttpsError('not-found', `NPC ${npcId} not found`);
     }
 
     // Get or create NPC document
@@ -3941,7 +3928,7 @@ exports.forceNPCRelease = onCall(async (request) => {
       metadata: {
         npcGenerated: true,
         forcedRelease: true,
-        releasedBy: request.auth.uid,
+        releasedBy: context.auth.uid,
       }
     };
 
@@ -3980,7 +3967,7 @@ exports.forceNPCRelease = onCall(async (request) => {
 
   } catch (error) {
     console.error('❌ Error forcing NPC release:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -3992,12 +3979,12 @@ exports.forceNPCRelease = onCall(async (request) => {
  * Server-side admin validation - centralizes all admin checks
  * Never trust client-side admin claims
  */
-async function validateAdminAccess(request) {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+async function validateAdminAccess(context) {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
 
-  const userId = request.auth.uid;
+  const userId = context.auth.uid;
   
   // Define admin user IDs server-side only
   const ADMIN_USER_IDS = [
@@ -4021,16 +4008,15 @@ async function validateAdminAccess(request) {
   }
 
   // Not an admin
-  throw new HttpsError('permission-denied', 'Admin access required');
+  throw new functions.https.HttpsError('permission-denied', 'Admin access required');
 }
 
 // =============================================================================
 // ADMIN: Check Admin Status (Secure)
 // =============================================================================
-exports.checkAdminStatus = onCall(async (request) => {
-  const data = request.data;
+exports.checkAdminStatus = functions.https.onCall(async (data, context) => {
   try {
-    await validateAdminAccess(request);
+    await validateAdminAccess(context);
     return { isAdmin: true };
   } catch (error) {
     return { isAdmin: false };
@@ -4040,15 +4026,14 @@ exports.checkAdminStatus = onCall(async (request) => {
 // =============================================================================
 // ADMIN: Send Gift to Player (Secure)
 // =============================================================================
-exports.sendGiftToPlayer = onCall(async (request) => {
-  const data = request.data;
+exports.sendGiftToPlayer = functions.https.onCall(async (data, context) => {
   // Validate admin access server-side
-  await validateAdminAccess(request);
+  await validateAdminAccess(context);
 
   const { recipientId, giftType, amount, message } = data;
 
   if (!recipientId || !giftType) {
-    throw new HttpsError('invalid-argument', 'recipientId and giftType are required');
+    throw new functions.https.HttpsError('invalid-argument', 'recipientId and giftType are required');
   }
 
   console.log(`🎁 Admin gift: ${giftType} (${amount}) to player ${recipientId}`);
@@ -4059,7 +4044,7 @@ exports.sendGiftToPlayer = onCall(async (request) => {
     const recipientDoc = await recipientRef.get();
 
     if (!recipientDoc.exists) {
-      throw new HttpsError('not-found', 'Player not found');
+      throw new functions.https.HttpsError('not-found', 'Player not found');
     }
 
     const recipientData = recipientDoc.data();
@@ -4127,7 +4112,7 @@ exports.sendGiftToPlayer = onCall(async (request) => {
         break;
 
       default:
-        throw new HttpsError('invalid-argument', 'Invalid gift type');
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid gift type');
     }
 
     // Update player data
@@ -4146,7 +4131,7 @@ exports.sendGiftToPlayer = onCall(async (request) => {
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       read: false,
       fromAdmin: true,
-      adminId: request.auth.uid,
+      adminId: context.auth.uid,
     });
 
     // Log the gift in a separate collection for audit
@@ -4157,7 +4142,7 @@ exports.sendGiftToPlayer = onCall(async (request) => {
       amount: amount,
       giftDescription: giftDescription,
       message: message,
-      adminId: request.auth.uid,
+      adminId: context.auth.uid,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -4172,18 +4157,17 @@ exports.sendGiftToPlayer = onCall(async (request) => {
 
   } catch (error) {
     console.error('❌ Error sending gift:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
 // =============================================================================
 // ADMIN: Manually Trigger Weekly Leaderboard Update
 // =============================================================================
-exports.triggerWeeklyLeaderboardUpdate = onCall(async (request) => {
-  const data = request.data;
+exports.triggerWeeklyLeaderboardUpdate = functions.https.onCall(async (data, context) => {
   // Verify admin authentication
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
 
   const { weeksAhead = 1 } = data;
@@ -4223,7 +4207,7 @@ exports.triggerWeeklyLeaderboardUpdate = onCall(async (request) => {
 
   } catch (error) {
     console.error('❌ Error triggering weekly update:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -4235,15 +4219,14 @@ exports.triggerWeeklyLeaderboardUpdate = onCall(async (request) => {
  * Distribute a global notification to all players
  * This creates individual notification documents in each player's subcollection
  */
-exports.sendGlobalNotificationToPlayers = onCall(async (request) => {
-  const data = request.data;
+exports.sendGlobalNotificationToPlayers = functions.https.onCall(async (data, context) => {
   // Validate admin access
-  await validateAdminAccess(request);
+  await validateAdminAccess(context);
 
   const { title, message } = data;
 
   if (!title || !message) {
-    throw new HttpsError('invalid-argument', 'Title and message are required');
+    throw new functions.https.HttpsError('invalid-argument', 'Title and message are required');
   }
 
   console.log(`📢 Distributing global notification: "${title}"`);
@@ -4302,7 +4285,7 @@ exports.sendGlobalNotificationToPlayers = onCall(async (request) => {
     };
   } catch (error) {
     console.error('❌ Error distributing global notification:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -4314,13 +4297,11 @@ exports.sendGlobalNotificationToPlayers = onCall(async (request) => {
  * Gandalf The Black - A notorious music critic who posts controversial takes
  * Runs twice a day to stir up drama in The Scoop
  */
-exports.gandalfTheBlackPosts = onSchedule({
-  schedule: '0 */12 * * *', // Every 12 hours (twice a day)
-  timeZone: 'UTC',
-  timeoutSeconds: 540,
-  memory: '512MiB',
-}, async (event) => {
-  console.log('🧙‍♂️ Gandalf The Black is stirring up controversy...');
+exports.gandalfTheBlackPosts = functions.pubsub
+  .schedule('0 */12 * * *') // Every 12 hours (twice a day)
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🧙‍♂️ Gandalf The Black is stirring up controversy...');
     
     try {
       // Decide what type of post to create
@@ -4348,9 +4329,8 @@ exports.gandalfTheBlackPosts = onSchedule({
 /**
  * Manual trigger for Gandalf posts (Admin only)
  */
-exports.triggerGandalfPost = onCall(async (request) => {
-  const data = request.data;
-  await validateAdminAccess(request);
+exports.triggerGandalfPost = functions.https.onCall(async (data, context) => {
+  await validateAdminAccess(context);
   
   console.log('🧙‍♂️ Manually triggering Gandalf The Black post...');
   
@@ -4367,7 +4347,7 @@ exports.triggerGandalfPost = onCall(async (request) => {
     return { success: true, message: 'Gandalf has stirred up drama!' };
   } catch (error) {
     console.error('❌ Error triggering Gandalf:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -4375,28 +4355,25 @@ exports.triggerGandalfPost = onCall(async (request) => {
  * Side Hustle Contract Generation - Runs daily at midnight
  * Maintains a pool of 15-20 available contracts
  */
-exports.dailySideHustleGeneration = onSchedule({
-  schedule: '0 0 * * *', // Every day at midnight UTC
-  timeZone: 'UTC',
-  timeoutSeconds: 540,
-  memory: '512MiB',
-}, async (event) => {
-  console.log('💼 Daily side hustle contract generation triggered');
-  try {
-    await generateDailySideHustleContracts();
-    return null;
-  } catch (error) {
-    console.error('❌ Error in daily side hustle generation:', error);
-    return null;
-  }
-});
+exports.dailySideHustleGeneration = functions.pubsub
+  .schedule('0 0 * * *') // Every day at midnight UTC
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('💼 Daily side hustle contract generation triggered');
+    try {
+      await generateDailySideHustleContracts();
+      return null;
+    } catch (error) {
+      console.error('❌ Error in daily side hustle generation:', error);
+      return null;
+    }
+  });
 
 /**
  * Manual trigger for side hustle generation (Admin only)
  */
-exports.triggerSideHustleGeneration = onCall(async (request) => {
-  const data = request.data;
-  await validateAdminAccess(request);
+exports.triggerSideHustleGeneration = functions.https.onCall(async (data, context) => {
+  await validateAdminAccess(context);
   
   console.log('💼 Manually triggering side hustle contract generation...');
   
@@ -4409,7 +4386,7 @@ exports.triggerSideHustleGeneration = onCall(async (request) => {
     };
   } catch (error) {
     console.error('❌ Error triggering side hustle generation:', error);
-    throw new HttpsError('internal', error.message);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
@@ -4815,12 +4792,12 @@ async function sendPushNotification(playerId, title, body, data = {}) {
  * Monitor EchoX posts for viral engagement
  * Triggered when a post document is updated
  */
-exports.onPostEngagement = onDocumentWritten('echox_posts/{postId}', async (event) => {
-  const change = { before: event.data?.before, after: event.data?.after };
-  if (!change.before || !change.after) return null;
+exports.onPostEngagement = functions.firestore
+  .document('echox_posts/{postId}')
+  .onUpdate(async (change, context) => {
     const before = change.before.data();
     const after = change.after.data();
-    const postId = event.params.postId;
+    const postId = context.params.postId;
     
     const authorId = after.authorId;
     const authorName = after.authorName;
@@ -4923,12 +4900,11 @@ exports.onPostEngagement = onDocumentWritten('echox_posts/{postId}', async (even
  * Monitor chart positions and notify players
  * Runs after weekly chart updates
  */
-exports.onChartUpdate = onDocumentWritten('leaderboard_history/{chartId}', async (event) => {
-  const snapshot = event.data?.after;
-  if (!snapshot || !snapshot.exists) return null;
-  
-  const chartData = snapshot.data();
-  const chartId = event.params.chartId;
+exports.onChartUpdate = functions.firestore
+  .document('leaderboard_history/{chartId}')
+  .onCreate(async (snapshot, context) => {
+    const chartData = snapshot.data();
+    const chartId = context.params.chartId;
     
     // Parse chart type (e.g., "songs_global_2025W42")
     const chartParts = chartId.split('_');
@@ -5006,13 +4982,11 @@ exports.onChartUpdate = onDocumentWritten('leaderboard_history/{chartId}', async
  * Monitor chart positions for rivalry notifications
  * Runs daily to check if rivals have overtaken player
  */
-exports.checkRivalChartPositions = onSchedule({
-  schedule: '0 */6 * * *', // Every 6 hours
-  timeZone: 'UTC',
-  timeoutSeconds: 540,
-  memory: '512MiB',
-}, async (event) => {
-  console.log('🔍 Checking for rival chart overtakes...');
+exports.checkRivalChartPositions = functions.pubsub
+  .schedule('0 */6 * * *') // Every 6 hours
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('🔍 Checking for rival chart overtakes...');
     
     try {
       // Get latest global song chart
@@ -5107,10 +5081,9 @@ exports.checkRivalChartPositions = onSchedule({
  * Sync player totalStreams from their artistStats
  * Call this to update all players' stream counts from their actual song data
  */
-exports.syncAllPlayerStreams = onCall(async (request) => {
-  const data = request.data;
+exports.syncAllPlayerStreams = functions.https.onCall(async (data, context) => {
   // Require admin access
-  await validateAdminAccess(request);
+  await validateAdminAccess(context);
   
   try {
     console.log('Starting player streams sync...');
@@ -5181,7 +5154,7 @@ exports.syncAllPlayerStreams = onCall(async (request) => {
     
   } catch (error) {
     console.error('Error syncing player streams:', error);
-    throw new HttpsError('internal', 'Failed to sync player streams');
+    throw new functions.https.HttpsError('internal', 'Failed to sync player streams');
   }
 });
 
@@ -5195,19 +5168,18 @@ exports.syncAllPlayerStreams = onCall(async (request) => {
  * Enforces cooldown, daily limits, and duplicate title checks server-side
  * Returns {allowed: boolean, reason?: string}
  */
-exports.validateNexTubeUpload = onCall(async (request) => {
-  const data = request.data;
+exports.validateNexTubeUpload = functions.https.onCall(async (data, context) => {
   // Authentication check
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
 
-  const userId = request.auth.uid;
+  const userId = context.auth.uid;
   const { title, songId, videoType } = data;
 
   // Validate required fields
   if (!title || !songId || !videoType) {
-    throw new HttpsError('invalid-argument', 'Missing required fields');
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
   }
 
   // Get config from environment or use defaults
@@ -5361,7 +5333,7 @@ exports.validateNexTubeUpload = onCall(async (request) => {
 
   } catch (error) {
     console.error('Error in validateNexTubeUpload:', error);
-    throw new HttpsError('internal', 'Upload validation failed');
+    throw new functions.https.HttpsError('internal', 'Upload validation failed');
   }
 });
 
@@ -5369,13 +5341,14 @@ exports.validateNexTubeUpload = onCall(async (request) => {
 // Runs every 60 minutes (1h == 1 in-game day).
 // For each video, computes viewsToday based on owner stats, video type, novelty, and randomness.
 // Updates dailyViews, totalViews, earningsTotal and credits player's money; also grows channel subscribers.
-exports.updateNextTubeDaily = onSchedule({
-  schedule: '55 * * * *', // Run at :55 every hour (5 minutes before dailyGameUpdate)
-  timeZone: 'UTC',
-  timeoutSeconds: 240,
-  memory: '512MiB',
-}, async (event) => {
-  const db = admin.firestore();
+exports.updateNextTubeDaily = functions
+  .runWith({ timeoutSeconds: 240, memory: '512MB' })
+  .pubsub
+  // Run at :55 every hour (5 minutes before the top-of-hour dailyGameUpdate)
+  .schedule('55 * * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const db = admin.firestore();
 
     // Load Remote Config parameters if available; otherwise fall back to env or defaults
     let rc = {};
@@ -5576,16 +5549,15 @@ exports.updateNextTubeDaily = onSchedule({
 
 // Manual test trigger: simulate one NexTube day for the authenticated user
 // Usage (client): FirebaseFunctions.instance.httpsCallable('runNextTubeNow').call({})
-exports.runNextTubeNow = onCall({
-  timeoutSeconds: 120,
-  memory: '512MiB',
-}, async (request) => {
-  const userId = request.auth && request.auth.uid;
-  if (!userId) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated');
-  }
+exports.runNextTubeNow = functions
+  .runWith({ timeoutSeconds: 120, memory: '512MB' })
+  .https.onCall(async (data, context) => {
+    const userId = context.auth && context.auth.uid;
+    if (!userId) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
 
-  const db = admin.firestore();
+    const db = admin.firestore();
     let rc = {};
     try {
       if (admin.remoteConfig) {
@@ -5784,13 +5756,12 @@ exports.runNextTubeNow = onCall({
   });
 
 // ===== Certifications: Album eligibility listing (manual submit flow) =====
-exports.listAlbumCertificationEligibility = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Must be authenticated');
+exports.listAlbumCertificationEligibility = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
 
-  const playerId = request.auth.uid;
+  const playerId = context.auth.uid;
   // Load RC for thresholds
   let rc = {};
   try {
@@ -5816,7 +5787,7 @@ exports.listAlbumCertificationEligibility = onCall(async (request) => {
 
   const playerRef = db.collection('players').doc(playerId);
   const snap = await playerRef.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'Player not found');
+  if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Player not found');
   const player = snap.data() || {};
   const albums = Array.isArray(player.albums) ? player.albums : [];
 
@@ -5860,12 +5831,11 @@ exports.listAlbumCertificationEligibility = onCall(async (request) => {
 });
 
 // ===== Certifications: Manual submit for Album certification =====
-exports.submitAlbumForCertification = onCall(async (request) => {
-  const data = request.data;
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Must be authenticated');
-  const playerId = request.auth.uid;
+exports.submitAlbumForCertification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
+  const playerId = context.auth.uid;
   const albumId = String((data && data.albumId) || '');
-  if (!albumId) throw new HttpsError('invalid-argument', 'albumId required');
+  if (!albumId) throw new functions.https.HttpsError('invalid-argument', 'albumId required');
 
   // RC
   let rc = {};
@@ -5874,20 +5844,20 @@ exports.submitAlbumForCertification = onCall(async (request) => {
   const boolOr = (v, def) => { if (typeof v === 'boolean') return v; if (v === 'true') return true; if (v === 'false') return false; return def; };
   const getParam = (key, def, type='number') => { try { const rcVal = rc && rc[key] && rc[key].defaultValue && rc[key].defaultValue.value; return type==='bool' ? boolOr(rcVal ?? process.env[key], def) : numOr(rcVal ?? process.env[key], def);} catch { return def; } };
   const enabled = getParam('certEnabled', true, 'bool');
-  if (!enabled) throw new HttpsError('failed-precondition', 'Certifications disabled');
+  if (!enabled) throw new functions.https.HttpsError('failed-precondition', 'Certifications disabled');
   const streamsPerUnit = getParam('certStreamsPerUnit', 150);
   const thresholds = { silver: getParam('certSilverUnits', 50000), gold: getParam('certGoldUnits', 100000), platinum: getParam('certPlatinumUnits', 250000), diamond: getParam('certDiamondUnits', 1000000), multiStep: getParam('certMultiPlatinumStepUnits', 250000) };
   const rewards = { money: getParam('certAlbumRewardMoney', 10000), fame: getParam('certAlbumRewardFame', 10) };
 
   const playerRef = db.collection('players').doc(playerId);
   const snap = await playerRef.get();
-  if (!snap.exists) throw new HttpsError('not-found', 'Player not found');
+  if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Player not found');
   const player = snap.data() || {};
   const albums = Array.isArray(player.albums) ? player.albums : [];
   const idx = albums.findIndex((x) => x && (String(x.id || x.albumId || '') === albumId));
-  if (idx < 0) throw new HttpsError('not-found', 'Album not found');
+  if (idx < 0) throw new functions.https.HttpsError('not-found', 'Album not found');
   const a = albums[idx];
-  if (a.state !== 'released') throw new HttpsError('failed-precondition', 'Album not released');
+  if (a.state !== 'released') throw new functions.https.HttpsError('failed-precondition', 'Album not released');
 
   const totalStreams = Number(a.totalStreams || 0);
   const sales = Number(a.totalSales || 0);
@@ -5954,11 +5924,10 @@ exports.submitAlbumForCertification = onCall(async (request) => {
 });
 
 // ===== Certifications: Admin migration for a single player (retroactive) =====
-exports.runCertificationsMigrationAdmin = onCall(async (request) => {
-  const data = request.data;
-  await validateAdminAccess(request);
+exports.runCertificationsMigrationAdmin = functions.https.onCall(async (data, context) => {
+  await validateAdminAccess(context);
   const targetPlayerId = String((data && data.playerId) || '');
-  if (!targetPlayerId) throw new HttpsError('invalid-argument', 'playerId required');
+  if (!targetPlayerId) throw new functions.https.HttpsError('invalid-argument', 'playerId required');
 
   // RC config
   let rc = {};
@@ -5967,14 +5936,14 @@ exports.runCertificationsMigrationAdmin = onCall(async (request) => {
   const boolOr = (v, def) => { if (typeof v === 'boolean') return v; if (v === 'true') return true; if (v === 'false') return false; return def; };
   const getParam = (key, def, type='number') => { try { const rcVal = rc && rc[key] && rc[key].defaultValue && rc[key].defaultValue.value; return type==='bool' ? boolOr(rcVal ?? process.env[key], def) : numOr(rcVal ?? process.env[key], def);} catch { return def; } };
   const enabled = getParam('certEnabled', true, 'bool');
-  if (!enabled) throw new HttpsError('failed-precondition', 'Certifications disabled');
+  if (!enabled) throw new functions.https.HttpsError('failed-precondition', 'Certifications disabled');
   const streamsPerUnit = getParam('certStreamsPerUnit', 150);
   const thresholds = { silver: getParam('certSilverUnits', 50000), gold: getParam('certGoldUnits', 100000), platinum: getParam('certPlatinumUnits', 250000), diamond: getParam('certDiamondUnits', 1000000), multiStep: getParam('certMultiPlatinumStepUnits', 250000) };
   const rewards = { songMoney: getParam('certSongRewardMoney', 5000), songFame: getParam('certSongRewardFame', 5) };
 
   const playerRef = db.collection('players').doc(targetPlayerId);
   const doc = await playerRef.get();
-  if (!doc.exists) throw new HttpsError('not-found', 'Player not found');
+  if (!doc.exists) throw new functions.https.HttpsError('not-found', 'Player not found');
   const player = doc.data() || {};
   const songs = Array.isArray(player.songs) ? player.songs : [];
   const determine = (u) => {
@@ -6049,13 +6018,12 @@ exports.runCertificationsMigrationAdmin = onCall(async (request) => {
 });
 
 // Admin-only: simulate one NexTube day for ALL players immediately
-exports.runNextTubeForAllAdmin = onCall({
-  timeoutSeconds: 300,
-  memory: '1GiB',
-}, async (request) => {
-  await validateAdminAccess(request);
+exports.runNextTubeForAllAdmin = functions
+  .runWith({ timeoutSeconds: 300, memory: '1GB' })
+  .https.onCall(async (data, context) => {
+    await validateAdminAccess(context);
 
-  const db = admin.firestore();
+    const db = admin.firestore();
     let rc = {};
     try {
       if (admin.remoteConfig) {

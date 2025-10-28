@@ -1,0 +1,47 @@
+{
+  "parameters": {
+    "nexttube_cooldown_minutes": {
+      "defaultValue": {
+        "value": "10"
+      },
+      "valueType": "NUMBER"
+    },
+    "nexttube_daily_upload_limit": {
+      "defaultValue": {
+        "value": "5"
+      },
+      "valueType": "NUMBER"
+    },
+    "nexttube_duplicate_window_days": {
+      "defaultValue": {
+        "value": "60"
+      },
+      "valueType": "NUMBER"
+    },
+    "nexttube_similarity_threshold": {
+      "defaultValue": {
+        "value": "0.92"
+      },
+      "valueType": "NUMBER"
+    },
+    "energy_restore_amount": {
+      "defaultValue": {
+        "value": "100"
+      },
+      "valueType": "NUMBER"
+    },
+    "maintenance_mode": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Enable or disable maintenance mode",
+      "valueType": "BOOLEAN"
+    },
+    "enable_energy_restore_fix": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN"
+    }
+  }
+}

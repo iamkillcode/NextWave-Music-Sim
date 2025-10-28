@@ -1078,6 +1078,10 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                               ))
                           .toList(),
                     ),
+                    const SizedBox(height: 6),
+                    if (album.highestCertification.toLowerCase() != 'none' &&
+                        album.certificationLevel > 0)
+                      _buildCertificationBadge(album, compact: true),
                   ],
                 ),
               ),
@@ -1102,6 +1106,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                       ),
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  _buildCertificationBadge(album, compact: true),
                   // Show "Create Deluxe" button if not already deluxe and is a full album
                   if (!album.isDeluxe && album.type == AlbumType.album) ...[
                     const SizedBox(height: 8),
@@ -1259,6 +1265,72 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCertificationBadge(Album album, {bool compact = false}) {
+    final tier = album.highestCertification.toLowerCase();
+    final level = album.certificationLevel;
+    if (tier == 'none' || level <= 0) return const SizedBox.shrink();
+
+    Color color;
+    String label;
+    switch (tier) {
+      case 'silver':
+        color = Colors.grey.shade300;
+        label = 'Silver';
+        break;
+      case 'gold':
+        color = Colors.amberAccent;
+        label = 'Gold';
+        break;
+      case 'platinum':
+        color = Colors.lightBlueAccent;
+        label = level > 1 ? 'Platinum x$level' : 'Platinum';
+        break;
+      case 'multi_platinum':
+        color = Colors.purpleAccent;
+        label = level > 1 ? 'Multi-Platinum x$level' : 'Multi-Platinum';
+        break;
+      case 'diamond':
+        color = Colors.cyanAccent;
+        label = level > 1 ? 'Diamond x$level' : 'Diamond';
+        break;
+      default:
+        color = Colors.white70;
+        label = tier;
+    }
+
+    final padding = compact
+        ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
+        : const EdgeInsets.symmetric(horizontal: 12, vertical: 6);
+
+    return Tooltip(
+      message:
+          'Units: ${album.eligibleUnits} • Level: ${album.certificationLevel}',
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.6)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🏆', style: TextStyle(fontSize: 12)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: compact ? 11 : 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
