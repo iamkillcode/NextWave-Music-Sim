@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_sanitizer.dart';
 
 class Song {
@@ -225,6 +226,14 @@ class Song {
     };
   }
 
+  /// Helper to parse date fields that may be Timestamp or String
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.parse(value);
+    return null;
+  }
+
   // Create Song from JSON (Firebase load)
   factory Song.fromJson(Map<String, dynamic> json) {
     return Song(
@@ -232,26 +241,20 @@ class Song {
       title: json['title'] as String,
       genre: json['genre'] as String,
       quality: safeParseInt(json['quality'], fallback: 0),
-      createdDate: DateTime.parse(json['createdDate'] as String),
+      createdDate: _parseDate(json['createdDate']) ?? DateTime.now(),
       state: SongState.values.firstWhere(
         (e) => e.name == json['state'],
         orElse: () => SongState.written,
       ),
       recordingQuality: json['recordingQuality'] as int?,
-      recordedDate: json['recordedDate'] != null
-          ? DateTime.parse(json['recordedDate'] as String)
-          : null,
-      releasedDate: json['releasedDate'] != null
-          ? DateTime.parse(json['releasedDate'] as String)
-          : null,
+      recordedDate: _parseDate(json['recordedDate']),
+      releasedDate: _parseDate(json['releasedDate']),
       streams: safeParseInt(json['streams'], fallback: 0),
       likes: safeParseInt(json['likes'], fallback: 0),
       eligibleUnits: safeParseInt(json['eligibleUnits'], fallback: 0),
       highestCertification: json['highestCertification'] as String? ?? 'none',
       certificationLevel: safeParseInt(json['certificationLevel'], fallback: 0),
-      lastCertifiedAt: json['lastCertifiedAt'] != null
-          ? DateTime.parse(json['lastCertifiedAt'] as String)
-          : null,
+      lastCertifiedAt: _parseDate(json['lastCertifiedAt']),
       totalSales: safeParseInt(json['totalSales'], fallback: 0),
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? {}),
       coverArtStyle: json['coverArtStyle'] as String?,
@@ -268,18 +271,12 @@ class Song {
       lastDayStreams: safeParseInt(json['lastDayStreams'], fallback: 0),
       last7DaysStreams: safeParseInt(json['last7DaysStreams'], fallback: 0),
       isAlbum: json['isAlbum'] as bool? ?? false,
-      lastStreamUpdateDate: json['lastStreamUpdateDate'] != null
-          ? DateTime.parse(json['lastStreamUpdateDate'] as String)
-          : null,
+      lastStreamUpdateDate: _parseDate(json['lastStreamUpdateDate']),
       albumId: json['albumId'] as String?,
       releaseType: json['releaseType'] as String? ?? 'single',
       promoBuffer: json['promoBuffer'] as int?,
-      promoEndDate: json['promoEndDate'] != null
-          ? DateTime.parse(json['promoEndDate'] as String)
-          : null,
-      scheduledReleaseDate: json['scheduledReleaseDate'] != null
-          ? DateTime.parse(json['scheduledReleaseDate'] as String)
-          : null,
+      promoEndDate: _parseDate(json['promoEndDate']),
+      scheduledReleaseDate: _parseDate(json['scheduledReleaseDate']),
     );
   }
 

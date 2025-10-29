@@ -1,6 +1,7 @@
 /// Represents an Album or EP - a collection of songs released together
 library;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_sanitizer.dart';
 
 class Album {
@@ -106,6 +107,14 @@ class Album {
     };
   }
 
+  /// Helper to parse date fields that may be Timestamp or String
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.parse(value);
+    return null;
+  }
+
   factory Album.fromJson(Map<String, dynamic> json) {
     return Album(
       id: json['id'] as String,
@@ -115,21 +124,15 @@ class Album {
         orElse: () => AlbumType.album,
       ),
       songIds: List<String>.from(json['songIds'] as List? ?? []),
-      releasedDate: json['releasedDate'] != null
-          ? DateTime.parse(json['releasedDate'] as String)
-          : null,
-      scheduledDate: json['scheduledDate'] != null
-          ? DateTime.parse(json['scheduledDate'] as String)
-          : null,
+      releasedDate: _parseDate(json['releasedDate']),
+      scheduledDate: _parseDate(json['scheduledDate']),
       coverArtUrl: json['coverArtUrl'] as String?,
       totalStreams: safeParseInt(json['totalStreams'], fallback: 0),
       totalSales: safeParseInt(json['totalSales'], fallback: 0),
       eligibleUnits: safeParseInt(json['eligibleUnits'], fallback: 0),
       highestCertification: json['highestCertification'] as String? ?? 'none',
       certificationLevel: safeParseInt(json['certificationLevel'], fallback: 0),
-      lastCertifiedAt: json['lastCertifiedAt'] != null
-          ? DateTime.parse(json['lastCertifiedAt'] as String)
-          : null,
+      lastCertifiedAt: _parseDate(json['lastCertifiedAt']),
       state: AlbumState.values.firstWhere(
         (e) => e.name == json['state'],
         orElse: () => AlbumState.planned,

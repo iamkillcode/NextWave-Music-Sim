@@ -62,6 +62,9 @@ dependencies:
   
   # Audio player for tap sounds and rewards
   audioplayers: ^6.1.0
+  
+  # Logging framework
+  logger: ^2.0.2
 
 dev_dependencies:
   flutter_test:

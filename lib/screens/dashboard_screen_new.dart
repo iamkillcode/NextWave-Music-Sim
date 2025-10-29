@@ -13,6 +13,7 @@ import '../services/game_time_service.dart';
 import '../services/stream_growth_service.dart';
 import '../services/side_hustle_service.dart';
 import '../models/pending_practice.dart';
+import '../utils/app_logger.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
 import 'studios_list_screen.dart';
@@ -598,8 +599,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .map((songData) =>
                     Song.fromJson(Map<String, dynamic>.from(songData)))
                 .toList();
-          } catch (e) {
-            print('⚠️ Error loading songs in real-time update: $e');
+          } catch (e, stackTrace) {
+            AppLogger.warning('Error loading songs in real-time update', 
+              error: e, stackTrace: stackTrace);
           }
         }
 
@@ -616,11 +618,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Song.fromJson(Map<String, dynamic>.from(d.data() as Map)))
                 .toList();
             if (loadedSongs.isNotEmpty) {
-              print(
-                  'ℹ️ [RT] Loaded ${loadedSongs.length} songs from subcollection');
+              AppLogger.info('[RT] Loaded ${loadedSongs.length} songs from subcollection');
             }
-          } catch (e) {
-            print('⚠️ [RT] Fallback songs subcollection load failed: $e');
+          } catch (e, stackTrace) {
+            AppLogger.warning('[RT] Fallback songs subcollection load failed', 
+              error: e, stackTrace: stackTrace);
           }
         }
 
@@ -633,8 +635,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .map((albumData) =>
                     Album.fromJson(Map<String, dynamic>.from(albumData)))
                 .toList();
-          } catch (e) {
-            print('⚠️ Error loading albums in real-time update: $e');
+          } catch (e, stackTrace) {
+            AppLogger.warning('Error loading albums in real-time update', 
+              error: e, stackTrace: stackTrace);
           }
         }
 
