@@ -213,8 +213,9 @@ class ArtistStats {
   // FAME BONUSES - Fame impacts multiple game systems
   // ============================================================================
 
-  /// Stream growth multiplier based on fame (1.0 = no bonus, 2.0 = double)
+  /// Stream growth multiplier based on fame (1.0 = no bonus, 1.8 = max)
   /// Higher fame = more people discover your music
+  /// 🔧 BALANCED: Reduced from 2.0x to 1.8x to prevent exponential growth loop
   double get fameStreamBonus {
     if (fame < 10) return 1.0; // No bonus
     if (fame < 25) return 1.05; // +5%
@@ -225,23 +226,24 @@ class ArtistStats {
     if (fame < 200) return 1.40; // +40%
     if (fame < 300) return 1.50; // +50%
     if (fame < 400) return 1.65; // +65%
-    if (fame < 500) return 1.80; // +80%
-    return 2.0; // +100% (double streams!)
+    if (fame < 500) return 1.75; // +75%
+    return 1.8; // +80% (max - prevents runaway exponential growth)
   }
 
   /// Fan conversion rate multiplier (how likely listeners become fans)
   /// Higher fame = people more likely to follow you
+  /// 🔧 BALANCED: Reduced from 2.5x to 2.0x to prevent exponential growth loop
   double get fameFanConversionBonus {
     if (fame < 10) return 1.0; // 15% base rate
     if (fame < 25) return 1.1; // +10% conversion
     if (fame < 50) return 1.2; // +20%
     if (fame < 100) return 1.35; // +35%
     if (fame < 150) return 1.5; // +50%
-    if (fame < 200) return 1.7; // +70%
-    if (fame < 300) return 1.9; // +90%
-    if (fame < 400) return 2.1; // +110%
-    if (fame < 500) return 2.3; // +130%
-    return 2.5; // +150%
+    if (fame < 200) return 1.65; // +65%
+    if (fame < 300) return 1.80; // +80%
+    if (fame < 400) return 1.90; // +90%
+    if (fame < 500) return 1.95; // +95%
+    return 2.0; // +100% (max - balanced to prevent unstoppable momentum)
   }
 
   /// Concert ticket price multiplier
@@ -286,6 +288,61 @@ class ArtistStats {
   bool get canHostConcertTour => fame >= 150;
   bool get canReleaseDeluxeEditions => fame >= 125;
   bool get canCreateMerchandise => fame >= 175;
+
+  // ============================================================================
+  // HYPE/INSPIRATION SYSTEM - Dual mechanics
+  // - HYPE: Temporary momentum from releases (shown to public, decays daily)
+  // - INSPIRATION: Creative fuel (internal, increases daily, consumed when writing)
+  // Both use the same inspirationLevel field but represent different aspects
+  // ============================================================================
+
+  /// Get current hype/inspiration level (uses inspirationLevel as canonical field)
+  /// - Increases: +10/day (passive regeneration), releases give big boost
+  /// - Decreases: -10 × effort when writing songs, -5 to -8/day from hype decay
+  int get hype => inspirationLevel.clamp(0, 150);
+
+  /// Stream discovery bonus from hype (temporary boost)
+  /// Represents "buzz" and trending momentum
+  double get hypeStreamBonus {
+    final currentHype = hype;
+    if (currentHype <= 0) return 1.0;
+    if (currentHype < 50) {
+      return 1.0 + (currentHype / 50 * 0.2); // 1.0-1.2x
+    }
+    if (currentHype < 100) {
+      return 1.2 + ((currentHype - 50) / 50 * 0.2); // 1.2-1.4x
+    }
+    return 1.4 + ((currentHype - 100) / 50 * 0.1); // 1.4-1.5x at 150 hype (cap)
+  }
+
+  /// Fan conversion bonus from hype (people want to follow trending artists)
+  double get hypeFanConversionBonus {
+    final currentHype = hype;
+    if (currentHype <= 0) return 1.0;
+    return 1.0 + (currentHype / 100 * 0.3); // 1.0-1.45x at 150 hype
+  }
+
+  /// Calculate hype gain from song release (quality-based)
+  int calculateHypeFromRelease(int songQuality) {
+    if (songQuality >= 80) return 40;
+    if (songQuality >= 60) return 25;
+    if (songQuality >= 40) return 15;
+    return 5; // Minimal hype for low quality
+  }
+
+  /// Calculate hype gain from viral spike
+  int get hypeFromViralMoment => 25;
+
+  /// Calculate hype gain from social media post
+  int get hypeFromPost => 8;
+
+  /// Calculate hype gain from chart entry
+  int hypeFromChartPosition(int? position) {
+    if (position == null) return 0;
+    if (position <= 10) return 30; // Top 10 = major buzz
+    if (position <= 50) return 15; // Top 50 = decent buzz
+    return 5; // Charted but lower
+  }
   bool get canStreamOnAllPlatforms => fame >= 50;
 
   /// Regional unlock based on fame (expands market reach)
@@ -415,7 +472,7 @@ class ArtistStats {
       'experience': (effortLevel * 10) + (songQuality / 10).round(),
       'lyricsSkill': 0,
       'compositionSkill': 0,
-      'inspirationLevel': -5, // Using inspiration reduces it
+      'inspirationLevel': -10 * effortLevel, // Writing consumes inspiration (more effort = more consumption)
     };
     // Genre-specific skill gains
     switch (genre.toLowerCase()) {

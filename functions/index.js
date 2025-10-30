@@ -706,6 +706,25 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         console.log(`⚠️ ${playerData.name}: ${inactiveDays} inactive days, -${famePenalty} fame`);
       }
     }
+
+    // 🔥 HYPE DECAY - Hype (inspirationLevel) decreases daily without activity
+    let hypeDecay = 0;
+    const currentHype = playerData.inspirationLevel || 0;
+    if (currentHype > 0) {
+      const daysSinceActivity = lastActivityDate 
+        ? Math.floor((currentGameDate - lastActivityDate) / (1000 * 60 * 60 * 24))
+        : 0;
+      
+      let decayRate = 5; // Base: -5 hype/day
+      
+      // Accelerated decay for inactivity
+      if (daysSinceActivity > 3) {
+        decayRate = 8; // -8 hype/day if no activity for 3+ days
+      }
+      
+      hypeDecay = Math.min(currentHype, decayRate); // Can't go below 0
+      console.log(`📉 ${playerData.displayName || playerData.name}: -${hypeDecay} hype (${currentHype} → ${currentHype - hypeDecay})`);
+    }
     
     if (totalNewStreams > 0 || famePenalty > 0 || sideHustleExpired) {
       
@@ -734,14 +753,41 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         fameGrowth = Math.max(0, Math.min(10, fameGrowth)); // Cap at 10 per day
         
         // Convert casual fans to loyal fans based on consistent streaming
-        // Every 5,000 streams converts 1 casual fan to loyal
+        // 🔧 BALANCED: 2,500 streams = 1 loyal (2x faster than before)
         const casualFans = Math.max(0, currentFanbase - currentLoyalFans);
         if (casualFans > 0) {
-          const baseLoyalGrowth = Math.floor(totalNewStreams / 5000);
+          const baseLoyalGrowth = Math.floor(totalNewStreams / 2500); // Changed from 5000
           const loyalDiminishing = 1.0 / (1.0 + currentLoyalFans / 5000);
-          const maxConvertible = Math.round(casualFans * 0.05); // Max 5% of casual fans per day
-          loyalFanGrowth = Math.round(baseLoyalGrowth * loyalDiminishing);
+          
+          // Quality multiplier: Average quality of recent releases
+          const recentSongs = (playerData.songs || [])
+            .filter(s => {
+              const releaseDate = toDateSafe(s.releaseDate);
+              if (!releaseDate) return false;
+              const daysSince = Math.floor((currentGameDate - releaseDate) / (1000 * 60 * 60 * 24));
+              return daysSince <= 7; // Last week
+            })
+            .slice(0, 3); // Last 3 releases
+          
+          const avgQuality = recentSongs.length > 0
+            ? recentSongs.reduce((sum, s) => sum + (s.quality || 50), 0) / recentSongs.length
+            : 50;
+          
+          const qualityMultiplier = avgQuality / 100; // 0.5-1.0x
+          
+          // Engagement boost: EchoX posts help convert fans
+          const socialBoost = 1.0; // Can be extended with post tracking later
+          
+          // Cap at 10% of casual fans per day (increased from 5%)
+          const maxConvertible = Math.round(casualFans * 0.10);
+          
+          loyalFanGrowth = Math.round(baseLoyalGrowth * loyalDiminishing * qualityMultiplier * socialBoost);
           loyalFanGrowth = Math.max(0, Math.min(maxConvertible, loyalFanGrowth));
+          
+          // Minimum guarantee for active artists
+          if (totalNewStreams > 10000 && recentSongs.length > 0) {
+            loyalFanGrowth = Math.max(loyalFanGrowth, 5); // At least 5/day if active
+          }
         }
       }
       
@@ -764,6 +810,13 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         console.log(`💎 ${playerData.displayName || playerId}: +${loyalFanGrowth} loyal fans (total: ${updates.loyalFanbase})`);
       }
       
+      // Apply hype decay
+      if (hypeDecay > 0) {
+        const newHype = Math.max(0, Math.min(150, (playerData.inspirationLevel || 0) - hypeDecay));
+        updates.inspirationLevel = newHype;
+        updates.creativity = newHype; // Keep creativity field in sync
+      }
+
       // Apply fame growth and decay
       const currentFame = playerData.fame || 0;
       const netFameChange = fameGrowth - famePenalty;
@@ -784,6 +837,18 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       
       updates.energy = finalEnergy;
       console.log(`🔋 ${playerData.displayName || playerId}: Energy ${currentEnergy} → ${restoredEnergy} → ${finalEnergy}`);
+
+      // 💡 INSPIRATION RESTORATION - Increases daily (opposite of hype which decays)
+      // Inspiration = creative fuel that accumulates when NOT working
+      const currentInspiration = playerData.inspirationLevel || 0;
+      const inspirationGain = 10; // +10 inspiration per day
+      const newInspiration = Math.min(150, currentInspiration + inspirationGain); // Cap at 150
+      
+      if (newInspiration !== currentInspiration) {
+        updates.inspirationLevel = newInspiration;
+        updates.creativity = newInspiration; // Keep creativity field in sync
+        console.log(`💡 ${playerData.displayName || playerId}: Inspiration ${currentInspiration} → ${newInspiration} (+${inspirationGain})`);
+      }
       
       // Apply side hustle payment
       if (sideHustlePay > 0) {

@@ -802,17 +802,19 @@ class _EchoXScreenState extends State<EchoXScreen>
           .add(postData);
 
       // Update stats
+      final hypeGain = _currentStats.hypeFromPost; // 8 hype per post
       _currentStats = _currentStats.copyWith(
         energy: _currentStats.energy - 5,
         fame: _currentStats.fame + 1,
-        creativity: _currentStats.creativity + 2,
+        creativity: _currentStats.creativity + hypeGain, // Update old field too
+        inspirationLevel: (_currentStats.inspirationLevel + hypeGain).clamp(0, 150), // 🔥 Add hype
         lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
       widget.onStatsUpdated(_currentStats);
 
       _postController.clear();
       if (mounted) {
-        _showMessage('📢 Posted on EchoX! +1 Fame, +2 Hype');
+        _showMessage('📢 Posted on EchoX! +1 Fame, +$hypeGain Hype');
       }
     } catch (e) {
       _showMessage('❌ Failed to post: $e');

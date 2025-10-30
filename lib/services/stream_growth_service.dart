@@ -99,17 +99,37 @@ class StreamGrowthService {
     final masteryStreamBonus = 1.0 + (genreMastery / 100.0 * 0.5);
     totalDailyStreams = (totalDailyStreams * masteryStreamBonus).round();
 
+    // 🔥 HYPE BONUS - Temporary momentum boost
+    // Rewards recent activity and creates "trending" feeling
+    // Decays automatically in Cloud Functions
+    final hypeStreamBonus = artistStats.hypeStreamBonus; // 1.0-1.5x
+    totalDailyStreams = (totalDailyStreams * hypeStreamBonus).round();
+
     // Add randomness (±20% variance)
     final variance = 0.8 + (_random.nextDouble() * 0.4);
     var finalStreams = (totalDailyStreams * variance).round();
 
-    // 🔥 FIX: Guarantee minimum streams for released songs
-    // Even with 0 fans, songs should get SOME organic discovery
-    // Quality-based minimum: 50-500 streams per day for new artists
-    if (finalStreams < 50) {
-      final qualityBonus =
-          (song.finalQuality / 100 * 450).round(); // 0-450 based on quality
-      final minimumStreams = 50 + qualityBonus; // 50-500 range
+    // � BALANCED: Fanbase-dependent minimum (prevents passive income exploit)
+    // Artists with no fans get very few streams (realistic algorithm behavior)
+    final fanbase = artistStats.fanbase;
+    final quality = song.finalQuality;
+    
+    int minimumStreams;
+    if (fanbase == 0) {
+      // No fans = almost no streams (only viral discovery possible)
+      minimumStreams = (quality / 100 * 10).round(); // 0-10 streams/day
+    } else if (fanbase < 100) {
+      // Small fanbase = small guarantee
+      minimumStreams = (fanbase * 0.5 + quality / 100 * 20).round(); // 20-70 range
+    } else if (fanbase < 1000) {
+      // Growing fanbase = moderate guarantee
+      minimumStreams = (fanbase * 0.3 + quality / 100 * 50).round(); // 50-350 range
+    } else {
+      // Established artist = quality-based guarantee
+      minimumStreams = (fanbase * 0.1 + quality / 100 * 100).round();
+    }
+    
+    if (finalStreams < minimumStreams) {
       finalStreams = minimumStreams;
     }
 
@@ -243,16 +263,24 @@ class StreamGrowthService {
   }) {
     final growth = <String, int>{};
 
-    // Base fan gain from quality (10-100 fans per quality point above 50)
+    // 🔧 BALANCED: Exponential quality curve (rewards quality, punishes spam)
     int baseFanGrowth = 0;
-    if (songQuality >= 80) {
-      baseFanGrowth = 100 + (songQuality - 80) * 10; // 100-300 fans
+    if (songQuality >= 90) {
+      baseFanGrowth = 300; // Masterpiece
+    } else if (songQuality >= 80) {
+      baseFanGrowth = 200; // Great song
+    } else if (songQuality >= 70) {
+      baseFanGrowth = 100; // Good song
     } else if (songQuality >= 60) {
-      baseFanGrowth = 50 + (songQuality - 60) * 2; // 50-90 fans
+      baseFanGrowth = 50; // Decent song
+    } else if (songQuality >= 50) {
+      baseFanGrowth = 20; // Average song
     } else if (songQuality >= 40) {
-      baseFanGrowth = 20 + (songQuality - 40) * 1; // 20-40 fans
+      baseFanGrowth = 8; // Below average
+    } else if (songQuality >= 30) {
+      baseFanGrowth = 3; // Poor quality
     } else {
-      baseFanGrowth = 10; // Minimal growth for poor quality
+      baseFanGrowth = 0; // Terrible songs lose reputation, no fans gained
     }
 
     // Distribute fan growth across regions

@@ -494,6 +494,9 @@ class _StudioScreenState extends State<StudioScreen>
       return s;
     }).toList();
 
+    // Calculate hype gain from release
+    final hypeGain = _currentStats.calculateHypeFromRelease(song.finalQuality);
+
     setState(() {
       _currentStats = _currentStats.copyWith(
         money: _currentStats.money - 5000,
@@ -501,6 +504,7 @@ class _StudioScreenState extends State<StudioScreen>
         songsWritten:
             _currentStats.songsWritten + 1, // ✅ Increment when released!
         songs: updatedSongs,
+        inspirationLevel: (_currentStats.inspirationLevel + hypeGain).clamp(0, 150), // 🔥 Add hype from release
         lastActivityDate: currentGameDate, // ✅ Update activity for fame decay
       );
     });
@@ -508,7 +512,7 @@ class _StudioScreenState extends State<StudioScreen>
     widget.onStatsUpdated(_currentStats);
 
     _showMessage(
-        '🎵 "${song.title}" is now live on Tunify!\n+${song.finalQuality ~/ 10} Fame');
+        '🎵 "${song.title}" is now live on Tunify!\n+${song.finalQuality ~/ 10} Fame, +$hypeGain Hype');
   }
 
   Color _getStateColor(SongState state) {
