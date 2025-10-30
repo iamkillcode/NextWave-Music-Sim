@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/artist_stats.dart';
 import '../models/pending_practice.dart';
 import '../widgets/app_navigation_wrapper.dart';
+import '../theme/app_theme.dart';
 import 'practice_screen.dart';
 import 'unified_charts_screen.dart';
 import 'side_hustle_screen.dart';
@@ -23,10 +25,16 @@ class ActivityHubScreen extends StatelessWidget {
     required this.onPracticeStarted,
   });
 
+  String _formatMoney(int amount) {
+    final formatter = NumberFormat('#,###');
+    return '\$${formatter.format(amount)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWideScreen = screenWidth > 600;
+    final isSmallScreen = screenWidth < 450; // Increased from 400 to support 430x932 screens
 
     return AppNavigationWrapper(
       currentIndex: 1, // Activity Hub is index 1
@@ -36,36 +44,36 @@ class ActivityHubScreen extends StatelessWidget {
       pendingPractices: pendingPractices,
       onPracticeStarted: onPracticeStarted,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             '⚡ Activity Hub',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 24,
+              fontSize: isSmallScreen ? 20 : 24,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: const Color(0xFF21262D),
+          backgroundColor: AppTheme.surfaceDark,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header section
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(isSmallScreen ? 12 : 20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E2329), Color(0xFF0D1117)],
+                  gradient: LinearGradient(
+                    colors: [AppTheme.backgroundElevated, AppTheme.backgroundDark],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF30363D), width: 1),
+                  border: Border.all(color: AppTheme.borderDefault, width: 1.5),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,19 +81,19 @@ class ActivityHubScreen extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0A84FF).withOpacity(0.2),
+                            color: AppTheme.neonGreen.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.flash_on,
-                            color: Color(0xFF0A84FF),
-                            size: 28,
+                            color: AppTheme.neonGreen,
+                            size: isSmallScreen ? 24 : 28,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        const Expanded(
+                        SizedBox(width: isSmallScreen ? 12 : 16),
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -93,36 +101,39 @@ class ActivityHubScreen extends StatelessWidget {
                                 'Grow Your Career',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 20,
+                                  fontSize: isSmallScreen ? 16 : 20,
                                   fontWeight: FontWeight.bold,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
                                 'Practice, promote, compete, and earn',
                                 style: TextStyle(
-                                  color: Colors.white60,
-                                  fontSize: 14,
+                                  color: AppTheme.textSecondary,
+                                  fontSize: isSmallScreen ? 12 : 14,
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isSmallScreen ? 12 : 16),
                     // Stats row
                     Row(
                       children: [
-                        _buildQuickStat('⚡', '${artistStats.energy}', 'Energy'),
-                        const SizedBox(width: 16),
-                        _buildQuickStat(
-                            '💰', '\$${artistStats.money}', 'Money'),
-                        const SizedBox(width: 16),
+                        _buildQuickStat('⚡', '${artistStats.energy}', 'Energy', isSmallScreen),
+                        SizedBox(width: isSmallScreen ? 8 : 16),
+                        _buildQuickStat('💰', _formatMoney(artistStats.money), 'Money', isSmallScreen),
+                        SizedBox(width: isSmallScreen ? 8 : 16),
                         _buildQuickStat(
                           '🎵',
                           '${artistStats.songs.length}',
                           'Songs',
+                          isSmallScreen,
                         ),
                       ],
                     ),
@@ -130,38 +141,39 @@ class ActivityHubScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              SizedBox(height: isSmallScreen ? 20 : 32),
 
               // Apps grid
-              const Text(
+              Text(
                 'Choose an Activity',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16 : 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12 : 16),
 
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: isWideScreen ? 4 : 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+                crossAxisSpacing: isSmallScreen ? 12 : 16,
+                mainAxisSpacing: isSmallScreen ? 12 : 16,
                 childAspectRatio: 1.0,
                 children: [
                   _buildAppCard(
                     context,
                     name: 'Practice',
                     emoji: '🎸',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFF39C12), Color(0xFFE67E22)],
+                    gradient: LinearGradient(
+                      colors: [AppTheme.warningOrange, AppTheme.warningOrange.withOpacity(0.8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     badge: '15 ⚡',
                     description: 'Improve your skills',
+                    isSmallScreen: isSmallScreen,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -181,13 +193,10 @@ class ActivityHubScreen extends StatelessWidget {
                     context,
                     name: 'Spotlight Charts',
                     emoji: '📊',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF4CAF50), Color(0xFF388E3C)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    gradient: AppTheme.neonGreenGradient,
                     badge: 'Top 100',
                     description: 'View leaderboards',
+                    isSmallScreen: isSmallScreen,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -201,8 +210,8 @@ class ActivityHubScreen extends StatelessWidget {
                     context,
                     name: 'Side Hustle',
                     emoji: '💼',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD60A), Color(0xFFFF9F0A)],
+                    gradient: LinearGradient(
+                      colors: [AppTheme.warningOrange, AppTheme.warningOrange.withOpacity(0.8)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -210,6 +219,7 @@ class ActivityHubScreen extends StatelessWidget {
                         ? 'Active'
                         : 'Jobs',
                     description: 'Earn extra money',
+                    isSmallScreen: isSmallScreen,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -227,13 +237,10 @@ class ActivityHubScreen extends StatelessWidget {
                     context,
                     name: 'ViralWave',
                     emoji: '📱',
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B9D), Color(0xFFFF1744)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    gradient: AppTheme.neonPurpleGradient,
                     badge: 'Promote',
                     description: 'Boost your music',
+                    isSmallScreen: isSmallScreen,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -256,33 +263,43 @@ class ActivityHubScreen extends StatelessWidget {
     ); // Close AppNavigationWrapper
   }
 
-  Widget _buildQuickStat(String emoji, String value, String label) {
+  Widget _buildQuickStat(String emoji, String value, String label, bool isSmallScreen) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          color: AppTheme.surfaceDark,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF30363D), width: 1),
+          border: Border.all(color: AppTheme.borderDefault, width: 1.5),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(height: 4),
             Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              emoji,
+              style: TextStyle(fontSize: isSmallScreen ? 16 : 20),
+            ),
+            SizedBox(height: isSmallScreen ? 2 : 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 14 : 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
             Text(
               label,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.6),
-                fontSize: 11,
+                fontSize: isSmallScreen ? 10 : 11,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -297,15 +314,16 @@ class ActivityHubScreen extends StatelessWidget {
     required Gradient gradient,
     required String badge,
     required String description,
+    required bool isSmallScreen,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF161B22),
+          color: AppTheme.surfaceDark,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF30363D), width: 1.5),
+          border: Border.all(color: AppTheme.borderDefault, width: 1.5),
         ),
         child: Material(
           color: Colors.transparent,
@@ -313,7 +331,7 @@ class ActivityHubScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -322,11 +340,11 @@ class ActivityHubScreen extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       Container(
-                        width: 70,
-                        height: 70,
+                        width: isSmallScreen ? 60 : 70,
+                        height: isSmallScreen ? 60 : 70,
                         decoration: BoxDecoration(
                           gradient: gradient,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 14 : 16),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.3),
@@ -338,7 +356,7 @@ class ActivityHubScreen extends StatelessWidget {
                         child: Center(
                           child: Text(
                             emoji,
-                            style: const TextStyle(fontSize: 36),
+                            style: TextStyle(fontSize: isSmallScreen ? 30 : 36),
                           ),
                         ),
                       ),
@@ -347,23 +365,23 @@ class ActivityHubScreen extends StatelessWidget {
                         top: -8,
                         right: -8,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 4 : 6,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF453A),
+                            color: AppTheme.errorRed,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: const Color(0xFF161B22),
+                              color: AppTheme.surfaceDark,
                               width: 2,
                             ),
                           ),
                           child: Text(
                             badge,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 10,
+                              fontSize: isSmallScreen ? 9 : 10,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -371,26 +389,30 @@ class ActivityHubScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isSmallScreen ? 8 : 12),
                   // App name
                   Text(
                     name,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: isSmallScreen ? 12 : 14,
                       fontWeight: FontWeight.bold,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: isSmallScreen ? 2 : 4),
                   // Description
                   Text(
                     description,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.6),
-                      fontSize: 11,
+                      fontSize: isSmallScreen ? 10 : 11,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ],
               ),

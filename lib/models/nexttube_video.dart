@@ -13,7 +13,8 @@ class NextTubeVideo {
   final String? description;
   final String? thumbnailUrl;
   final DateTime createdAt;
-  final String status; // e.g., 'published'
+  final DateTime? releaseDate; // Scheduled in-game release date
+  final String status; // 'scheduled', 'published', 'processing'
   final int totalViews;
   final int dailyViews;
   final int earningsTotal; // cents
@@ -31,6 +32,7 @@ class NextTubeVideo {
     this.description,
     this.thumbnailUrl,
     required this.createdAt,
+    this.releaseDate,
     this.status = 'published',
     this.totalViews = 0,
     this.dailyViews = 0,
@@ -56,6 +58,7 @@ class NextTubeVideo {
     String? description,
     String? thumbnailUrl,
     DateTime? createdAt,
+    DateTime? releaseDate,
     String? status,
     int? totalViews,
     int? dailyViews,
@@ -74,6 +77,7 @@ class NextTubeVideo {
       description: description ?? this.description,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       createdAt: createdAt ?? this.createdAt,
+      releaseDate: releaseDate ?? this.releaseDate,
       status: status ?? this.status,
       totalViews: totalViews ?? this.totalViews,
       dailyViews: dailyViews ?? this.dailyViews,
@@ -95,6 +99,7 @@ class NextTubeVideo {
       'description': description,
       'thumbnailUrl': thumbnailUrl,
       'createdAt': Timestamp.fromDate(createdAt),
+      'releaseDate': releaseDate != null ? Timestamp.fromDate(releaseDate!) : null,
       'status': status,
       'totalViews': totalViews,
       'dailyViews': dailyViews,
@@ -126,6 +131,11 @@ class NextTubeVideo {
           ? (json['createdAt'] as Timestamp).toDate()
           : DateTime.tryParse((json['createdAt'] ?? '').toString()) ??
               DateTime.now(),
+      releaseDate: json['releaseDate'] != null
+          ? (json['releaseDate'] is Timestamp
+              ? (json['releaseDate'] as Timestamp).toDate()
+              : DateTime.tryParse((json['releaseDate'] ?? '').toString()))
+          : null,
       status: (json['status'] ?? 'published').toString(),
       totalViews: (json['totalViews'] ?? 0) is int
           ? json['totalViews'] as int

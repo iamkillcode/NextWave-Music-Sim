@@ -1,66 +1,122 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
-class StatCard extends StatelessWidget {
-  final String icon;
+/// Reusable metric card component for displaying key stats
+/// Used in dashboard "Current Progress" section
+class StatCard extends StatefulWidget {
   final String title;
   final String value;
-  final Color color;
+  final IconData icon;
+  final String? changeValue;
+  final bool? isPositive;
+  final Color? accentColor;
+  final VoidCallback? onTap;
 
   const StatCard({
     super.key,
-    required this.icon,
     required this.title,
     required this.value,
-    required this.color,
+    required this.icon,
+    this.changeValue,
+    this.isPositive,
+    this.accentColor,
+    this.onTap,
   });
 
   @override
+  State<StatCard> createState() => _StatCardState();
+}
+
+class _StatCardState extends State<StatCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.8), color.withOpacity(0.6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    final effectiveColor = widget.accentColor ?? AppTheme.primaryCyan;
+    final changeColor = widget.isPositive == true
+        ? AppTheme.successGreen
+        : widget.isPositive == false
+            ? AppTheme.errorRed
+            : AppTheme.textSecondary;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppTheme.animationFast,
+          curve: AppTheme.animationCurve,
+          padding: const EdgeInsets.all(AppTheme.space20),
+          decoration: AppTheme.cardDecoration(
+            boxShadow: _isHovered ? AppTheme.shadowMedium : AppTheme.shadowSmall,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon and title row
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppTheme.space8),
+                    decoration: BoxDecoration(
+                      color: effectiveColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                    ),
+                    child: Icon(
+                      widget.icon,
+                      color: effectiveColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.space12),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: AppTheme.labelLarge.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.space16),
+              // Value
+              Text(
+                widget.value,
+                style: AppTheme.headingMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              // Change indicator (optional)
+              if (widget.changeValue != null) ...[
+                const SizedBox(height: AppTheme.space8),
+                Row(
+                  children: [
+                    Icon(
+                      widget.isPositive == true
+                          ? Icons.arrow_upward
+                          : widget.isPositive == false
+                              ? Icons.arrow_downward
+                              : Icons.remove,
+                      color: changeColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: AppTheme.space4),
+                    Text(
+                      widget.changeValue!,
+                      style: AppTheme.labelMedium.copyWith(
+                        color: changeColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            icon,
-            style: const TextStyle(fontSize: 32),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }

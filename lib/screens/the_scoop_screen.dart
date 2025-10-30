@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/news_item.dart';
 import '../models/artist_stats.dart';
@@ -86,7 +87,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
       artistStats: widget.artistStats,
       onStatsUpdated: widget.onStatsUpdated,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
           title: const Row(
             children: [
@@ -95,7 +96,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
               Text('The Scoop', style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
-          backgroundColor: const Color(0xFFF44336),
+          backgroundColor: AppTheme.errorRed,
           actions: [
             IconButton(
               icon: const Icon(Icons.filter_list),
@@ -468,7 +469,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppTheme.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -565,7 +566,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppTheme.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -652,7 +653,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppTheme.surfaceDark,
         border: Border(
           bottom: BorderSide(color: Colors.grey[800]!),
         ),
@@ -684,7 +685,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF44336),
+              color: AppTheme.errorRed,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text(
@@ -806,8 +807,8 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: isGandalf
-          ? const Color(0xFF1A0A0A) // Darker red tint for Gandalf
-          : const Color(0xFF161B22),
+          ? AppTheme.backgroundDark // Darker red tint for Gandalf
+          : AppTheme.surfaceDark,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
@@ -1018,7 +1019,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
   void _showNewsDetail(NewsItem news) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppTheme.surfaceDark,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1170,7 +1171,7 @@ class _TheScoopScreenState extends State<TheScoopScreen> {
   void _showCategoryFilter() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppTheme.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../services/side_hustle_migration.dart';
 
 /// Admin screen for side hustle contract management and migration
@@ -120,7 +121,7 @@ class _SideHustleMigrationScreenState extends State<SideHustleMigrationScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C2128),
+        backgroundColor: AppTheme.surfaceElevated,
         title: const Text(
           'Clean Up Old Contracts',
           style: TextStyle(color: Colors.white),
@@ -181,10 +182,10 @@ class _SideHustleMigrationScreenState extends State<SideHustleMigrationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text('Side Hustle Migration'),
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppTheme.surfaceDark,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -196,7 +197,7 @@ class _SideHustleMigrationScreenState extends State<SideHustleMigrationScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF161B22),
+                color: AppTheme.surfaceDark,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Colors.white.withOpacity(0.1),
@@ -226,7 +227,7 @@ class _SideHustleMigrationScreenState extends State<SideHustleMigrationScreen> {
                   const SizedBox(height: 12),
                   if (_isLoading)
                     const LinearProgressIndicator(
-                      backgroundColor: Color(0xFF1C2128),
+                      backgroundColor: AppTheme.surfaceElevated,
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
                     ),
                   const SizedBox(height: 12),
@@ -247,7 +248,7 @@ class _SideHustleMigrationScreenState extends State<SideHustleMigrationScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF161B22),
+                  color: AppTheme.surfaceDark,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: Colors.white.withOpacity(0.1),
@@ -338,7 +339,7 @@ class _SideHustleMigrationScreenState extends State<SideHustleMigrationScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF161B22),
+                color: AppTheme.surfaceDark,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: Colors.yellow.withOpacity(0.3),

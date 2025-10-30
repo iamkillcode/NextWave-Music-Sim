@@ -28,6 +28,7 @@ class NextTubeService {
     required String title,
     String? description,
     String? thumbnailUrl,
+    DateTime? releaseDate, // Scheduled in-game release date
     int rpmCents = 200,
   }) async {
     final userId = _auth.currentUser?.uid;
@@ -36,6 +37,15 @@ class NextTubeService {
     }
 
     final docRef = _videosCol.doc();
+    
+    // Determine status based on release date
+    String status;
+    if (releaseDate != null) {
+      status = 'scheduled';
+    } else {
+      status = 'published';
+    }
+    
     final video = NextTubeVideo(
       id: docRef.id,
       ownerId: userId,
@@ -47,7 +57,8 @@ class NextTubeService {
       description: description,
       thumbnailUrl: thumbnailUrl,
       createdAt: DateTime.now(),
-      status: 'published',
+      releaseDate: releaseDate,
+      status: status,
       totalViews: 0,
       dailyViews: 0,
       earningsTotal: 0,
@@ -165,19 +176,19 @@ class NextTubeService {
     return snap.docs.length;
   }
 
-  /// Check if a video for the same song and type already exists by current user (optionally within days)
-  Future<bool> hasVideoForSongAndType(
-      {required String songId,
-      required NextTubeVideoType type,
-      int withinDays = 30}) async {
+  /// Check if a video for the same song and type already exists by current user
+  /// Returns true if ANY video (published or scheduled) exists for that song+type combo
+  Future<bool> hasVideoForSongAndType({
+    required String songId,
+    required NextTubeVideoType type,
+  }) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
-    final since = DateTime.now().subtract(Duration(days: withinDays));
+    
     final snap = await _videosCol
         .where('ownerId', isEqualTo: userId)
         .where('songId', isEqualTo: songId)
         .where('type', isEqualTo: _typeId(type))
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(since))
         .limit(1)
         .get();
     return snap.docs.isNotEmpty;

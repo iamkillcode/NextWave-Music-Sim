@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
@@ -64,7 +65,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
         widget.onStatsUpdated(updatedStats);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
           title: const Row(
             children: [
@@ -80,7 +81,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF21262D),
+          backgroundColor: AppTheme.surfaceDark,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           actions: [
@@ -92,8 +93,8 @@ class _MusicHubScreenState extends State<MusicHubScreen>
           ],
           bottom: TabBar(
             controller: _tabController,
-            indicatorColor: const Color(0xFF00D9FF),
-            labelColor: const Color(0xFF00D9FF),
+            indicatorColor: AppTheme.accentBlue,
+            labelColor: AppTheme.accentBlue,
             unselectedLabelColor: Colors.white60,
             tabs: const [
               Tab(text: 'Create'),
@@ -133,7 +134,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             title: 'Write a Song',
             subtitle: 'Create new music with your creativity',
             icon: Icons.edit_rounded,
-            color: const Color(0xFF00D9FF),
+            color: AppTheme.accentBlue,
             energyCost: 15,
             onTap: () => _navigateToWriteSong(),
           ),
@@ -142,7 +143,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             title: 'Record in Studio',
             subtitle: 'Book a studio to record your songs',
             icon: Icons.mic_rounded,
-            color: const Color(0xFFFF6B9D),
+            color: AppTheme.neonPurple,
             energyCost: 0,
             onTap: () => _navigateToStudios(),
           ),
@@ -151,7 +152,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             title: 'Record an Album',
             subtitle: 'Create a full album with multiple tracks',
             icon: Icons.album_rounded,
-            color: const Color(0xFF9B59B6),
+            color: AppTheme.neonPurple,
             energyCost: 40,
             onTap: () => _navigateToRecordAlbum(),
           ),
@@ -160,7 +161,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             title: 'Manage Releases',
             subtitle: 'Bundle songs into EPs and Albums',
             icon: Icons.library_music,
-            color: const Color(0xFFFFD700),
+            color: AppTheme.chartGold,
             energyCost: 0,
             onTap: () => _navigateToReleaseManager(),
           ),
@@ -187,7 +188,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             Row(
               children: [
                 const Icon(Icons.check_circle,
-                    color: Color(0xFF32D74B), size: 20),
+                    color: AppTheme.successGreen, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'Recorded Songs (${recordedSongs.length})',
@@ -207,7 +208,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
           if (writtenSongs.isNotEmpty) ...[
             Row(
               children: [
-                const Icon(Icons.edit, color: Color(0xFF00D9FF), size: 20),
+                Icon(Icons.edit, color: AppTheme.accentBlue, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'Written Songs (${writtenSongs.length})',
@@ -274,7 +275,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
           Row(
             children: [
               const Icon(Icons.rocket_launch,
-                  color: Color(0xFFFFD700), size: 20),
+                  color: AppTheme.chartGold, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Released Songs (${releasedSongs.length})',
@@ -422,11 +423,11 @@ class _MusicHubScreenState extends State<MusicHubScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF21262D),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isRecorded
-              ? const Color(0xFF32D74B).withOpacity(0.3)
+              ? AppTheme.successGreen.withOpacity(0.3)
               : Colors.white.withOpacity(0.1),
         ),
       ),
@@ -455,8 +456,8 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: isRecorded
-                                ? const Color(0xFF32D74B)
-                                : const Color(0xFF00D9FF),
+                                ? AppTheme.successGreen
+                                : AppTheme.accentBlue,
                           ),
                         ),
                       ),
@@ -465,7 +466,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF30363D),
+                        color: AppTheme.borderDefault,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Center(
@@ -481,7 +482,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF30363D),
+                    color: AppTheme.borderDefault,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Center(
@@ -516,7 +517,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             ElevatedButton(
               onPressed: () => _navigateToReleaseSong(song),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD700),
+                backgroundColor: AppTheme.chartGold,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
                 padding:
@@ -534,7 +535,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             ElevatedButton(
               onPressed: () => _navigateToStudios(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B9D),
+                backgroundColor: AppTheme.neonPurple,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
                 padding:
@@ -560,14 +561,14 @@ class _MusicHubScreenState extends State<MusicHubScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFFFD700).withOpacity(0.1),
-            const Color(0xFF9B59B6).withOpacity(0.1),
+            AppTheme.chartGold.withOpacity(0.1),
+            AppTheme.neonPurple.withOpacity(0.1),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3)),
+        border: Border.all(color: AppTheme.chartGold.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,7 +597,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Color(0xFFFFD700),
+                                color: AppTheme.chartGold,
                               ),
                             ),
                           ),
@@ -607,8 +608,8 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                const Color(0xFFFFD700).withOpacity(0.3),
-                                const Color(0xFF9B59B6).withOpacity(0.3),
+                                AppTheme.chartGold.withOpacity(0.3),
+                                AppTheme.neonPurple.withOpacity(0.3),
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -630,8 +631,8 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFFFFD700).withOpacity(0.3),
-                            const Color(0xFF9B59B6).withOpacity(0.3),
+                            AppTheme.chartGold.withOpacity(0.3),
+                            AppTheme.neonPurple.withOpacity(0.3),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -671,18 +672,18 @@ class _MusicHubScreenState extends State<MusicHubScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFD700).withOpacity(0.2),
+                  color: AppTheme.chartGold.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star, color: Color(0xFFFFD700), size: 14),
+                    Icon(Icons.star, color: AppTheme.chartGold, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       '${song.finalQuality}',
                       style: const TextStyle(
-                        color: Color(0xFFFFD700),
+                        color: AppTheme.chartGold,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -718,7 +719,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: const Color(0xFF00D9FF), size: 14),
+        Icon(icon, color: AppTheme.accentBlue, size: 14),
         const SizedBox(width: 4),
         Text(
           text,
@@ -732,7 +733,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF21262D),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
@@ -786,7 +787,7 @@ class _MusicHubScreenState extends State<MusicHubScreen>
         Text(
           value,
           style: const TextStyle(
-            color: Color(0xFF00D9FF),
+            color: AppTheme.accentBlue,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),

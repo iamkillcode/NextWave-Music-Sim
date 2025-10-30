@@ -14,6 +14,7 @@ import '../services/stream_growth_service.dart';
 import '../services/side_hustle_service.dart';
 import '../models/pending_practice.dart';
 import '../utils/app_logger.dart';
+import '../theme/app_theme.dart';
 import 'world_map_screen.dart';
 import 'music_hub_screen.dart';
 import 'studios_list_screen.dart';
@@ -256,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Refreshed!'),
-            backgroundColor: Color(0xFF32D74B),
+            backgroundColor: AppTheme.successGreen,
             duration: Duration(seconds: 1),
           ),
         );
@@ -267,7 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('⚠️ Refresh failed. Please try again.'),
-            backgroundColor: Color(0xFFFF6B9D),
+            backgroundColor: AppTheme.errorRed,
             duration: Duration(seconds: 2),
           ),
         );
@@ -855,19 +856,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     switch (type) {
       case 'admin_gift':
-        backgroundColor = const Color(0xFFFFD700); // Gold
+        backgroundColor = AppTheme.chartGold;
         icon = Icons.card_giftcard;
         break;
       case 'achievement':
-        backgroundColor = const Color(0xFF32D74B); // Green
+        backgroundColor = AppTheme.successGreen; // Green
         icon = Icons.emoji_events;
         break;
       case 'warning':
-        backgroundColor = const Color(0xFFFF9500); // Orange
+        backgroundColor = AppTheme.warningOrange; // Orange
         icon = Icons.warning;
         break;
       default:
-        backgroundColor = const Color(0xFF00D9FF); // Cyan
+        backgroundColor = AppTheme.primaryCyan; // Cyan
         icon = Icons.notifications;
     }
 
@@ -1518,7 +1519,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('🎵 "${song.title}" has been released!'),
-                  backgroundColor: const Color(0xFF32D74B),
+                  backgroundColor: AppTheme.successGreen,
                   behavior: SnackBarBehavior.floating,
                   duration: const Duration(seconds: 3),
                 ),
@@ -1716,7 +1717,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xFF32FF32),
+        backgroundColor: AppTheme.neonGreen,
       ),
     );
   }
@@ -1756,11 +1757,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117), // GitHub dark background
+      backgroundColor: AppTheme.backgroundDark,
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
-        color: const Color(0xFF00D9FF),
-        backgroundColor: const Color(0xFF21262D),
+        color: AppTheme.primaryCyan,
+        backgroundColor: AppTheme.surfaceDark,
         child: SafeArea(
           child: Column(
             children: [
@@ -1770,9 +1771,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   width: double.infinity,
                   padding:
                       const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFFFF6B9D), Color(0xFFE94560)],
+                      colors: [AppTheme.errorRed, AppTheme.errorRed.withOpacity(0.8)],
                     ),
                   ),
                   child: Row(
@@ -1833,216 +1834,257 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildTopStatusBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Date-only display (simplified!)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today,
-                    color: Color(0xFF00D9FF),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    currentGameDate != null
-                        ? _gameTimeService.formatGameDate(currentGameDate!)
-                        : 'Syncing...',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              if (_timeUntilNextDay.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.access_time,
-                        color: Color(0xFFFFD60A),
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Next day in: $_timeUntilNextDay',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmallScreen = constraints.maxWidth < 450; // Increased from 400 to 450
+        final isTinyScreen = constraints.maxWidth < 380; // For very small screens
+        
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isTinyScreen ? 6 : (isSmallScreen ? 8 : 12),
+            vertical: isTinyScreen ? 4 : (isSmallScreen ? 6 : 8),
           ),
-          // Money and Energy Display
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Money
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF32D74B).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: const Color(0xFF32D74B),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
+          decoration: BoxDecoration(
+            color: Colors.black,
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+            ),
+          ),
+          child: Row(
+            children: [
+              // LEFT: Date & Time Section
+              Expanded(
+                flex: isSmallScreen ? 2 : 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Date Display
+                    Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(
+                          Icons.calendar_today,
+                          color: AppTheme.primaryCyan,
+                          size: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16),
+                        ),
+                        SizedBox(width: isTinyScreen ? 3 : (isSmallScreen ? 4 : 6)),
                         Flexible(
                           child: Text(
-                            _formatMoney(artistStats.money.toDouble()),
-                            style: const TextStyle(
-                              color: Color(0xFF32D74B),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                            currentGameDate != null
+                                ? _gameTimeService.formatGameDate(currentGameDate!)
+                                : 'Syncing...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isTinyScreen ? 11 : (isSmallScreen ? 12 : 15),
+                              fontWeight: FontWeight.w600,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                // Energy
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF6B9D).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFFFF6B9D),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.bolt,
-                        color: Color(0xFFFF6B9D),
-                        size: 14,
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${artistStats.energy}',
-                        style: const TextStyle(
-                          color: Color(0xFFFF6B9D),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                    // Next Day Timer
+                    if (_timeUntilNextDay.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          top: isTinyScreen ? 1 : 2,
+                          left: isTinyScreen ? 15 : (isSmallScreen ? 17 : 22),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              color: AppTheme.warningOrange,
+                              size: isTinyScreen ? 9 : (isSmallScreen ? 10 : 12),
+                            ),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                isTinyScreen ? _timeUntilNextDay : (isSmallScreen ? _timeUntilNextDay : 'Next: $_timeUntilNextDay'),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: isTinyScreen ? 8 : (isSmallScreen ? 9 : 11),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          // Notification and Settings Buttons
-          Row(
-            children: [
-              if (_isAdmin)
-                Tooltip(
-                  message: 'Admin Tools',
-                  child: IconButton(
-                    icon: const Icon(Icons.shield_outlined,
-                        color: Colors.amberAccent),
-                    onPressed: _openAdminQuickActions,
-                  ),
-                ),
-              // Notification Button
-              Stack(
+              ),
+              SizedBox(width: isTinyScreen ? 3 : (isSmallScreen ? 4 : 8)),
+              // CENTER: Money & Energy
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.notifications_outlined,
-                      color: Colors.white70,
+                  // Money Badge
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isTinyScreen ? 5 : (isSmallScreen ? 6 : 10),
+                      vertical: isTinyScreen ? 3 : (isSmallScreen ? 4 : 6),
                     ),
-                    onPressed: () {
-                      _showNotifications();
-                    },
-                  ),
-                  if (_unreadNotificationCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF6B9D),
-                          shape: BoxShape.circle,
+                    decoration: BoxDecoration(
+                      color: AppTheme.successGreen.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(isTinyScreen ? 7 : (isSmallScreen ? 8 : 10)),
+                      border: Border.all(
+                        color: AppTheme.successGreen,
+                        width: isSmallScreen ? 1 : 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.attach_money,
+                          color: AppTheme.successGreen,
+                          size: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16),
                         ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '$_unreadNotificationCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
+                        const SizedBox(width: 2),
+                        Text(
+                          _formatMoney(artistStats.money.toDouble()),
+                          style: TextStyle(
+                            color: AppTheme.successGreen,
+                            fontSize: isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
                             fontWeight: FontWeight.bold,
                           ),
-                          textAlign: TextAlign.center,
                         ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: isTinyScreen ? 3 : (isSmallScreen ? 4 : 6)),
+                  // Energy Badge
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isTinyScreen ? 5 : (isSmallScreen ? 6 : 10),
+                      vertical: isTinyScreen ? 3 : (isSmallScreen ? 4 : 6),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.errorRed.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(isTinyScreen ? 7 : (isSmallScreen ? 8 : 10)),
+                      border: Border.all(
+                        color: AppTheme.errorRed,
+                        width: isSmallScreen ? 1 : 1.5,
                       ),
                     ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.bolt,
+                          color: AppTheme.errorRed,
+                          size: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16),
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${artistStats.energy}',
+                          style: TextStyle(
+                            color: AppTheme.errorRed,
+                            fontSize: isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-              // Settings Button
-              IconButton(
-                icon: const Icon(Icons.settings, color: Colors.white70),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SettingsScreen(
-                        artistStats: artistStats,
-                        onStatsUpdated: (updatedStats) {
-                          setState(() {
-                            artistStats = updatedStats;
-                          });
-                          _debouncedSave();
-                        },
+              SizedBox(width: isTinyScreen ? 1 : (isSmallScreen ? 2 : 4)),
+              // RIGHT: Action Buttons
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Admin Button (conditionally shown)
+                  if (_isAdmin)
+                    IconButton(
+                      icon: Icon(
+                        Icons.shield_outlined,
+                        color: Colors.amberAccent,
+                        size: isTinyScreen ? 18 : (isSmallScreen ? 20 : 22),
                       ),
+                      tooltip: 'Admin Tools',
+                      onPressed: _openAdminQuickActions,
+                      padding: EdgeInsets.all(isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                      constraints: const BoxConstraints(),
                     ),
-                  );
-                },
+                  // Notification Button with Badge
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.notifications_outlined,
+                          color: Colors.white70,
+                          size: isTinyScreen ? 18 : (isSmallScreen ? 20 : 22),
+                        ),
+                        onPressed: _showNotifications,
+                        padding: EdgeInsets.all(isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                        constraints: const BoxConstraints(),
+                      ),
+                      if (_unreadNotificationCount > 0)
+                        Positioned(
+                          right: isTinyScreen ? 1 : (isSmallScreen ? 2 : 4),
+                          top: isTinyScreen ? 1 : (isSmallScreen ? 2 : 4),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: AppTheme.errorRed,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 14,
+                              minHeight: 14,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$_unreadNotificationCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  // Settings Button
+                  IconButton(
+                    icon: Icon(
+                      Icons.settings_outlined,
+                      color: Colors.white70,
+                      size: isTinyScreen ? 18 : (isSmallScreen ? 20 : 22),
+                    ),
+                    tooltip: 'Settings',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SettingsScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: (updatedStats) {
+                              setState(() {
+                                artistStats = updatedStats;
+                              });
+                              _debouncedSave();
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    padding: EdgeInsets.all(isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2056,7 +2098,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF161B22),
+            backgroundColor: AppTheme.backgroundElevated,
             title: const Text('Admin: Certifications',
                 style: TextStyle(color: Colors.white)),
             content: Column(
@@ -2078,7 +2120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     hintText: 'Enter player UID',
                     hintStyle: const TextStyle(color: Colors.white38),
                     filled: true,
-                    fillColor: const Color(0xFF0D1117),
+                    fillColor: AppTheme.backgroundDark,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(color: Colors.white24),
@@ -2182,17 +2224,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.all(12),
               textStyle: const TextStyle(fontSize: 12, color: Colors.white),
               decoration: BoxDecoration(
-                color: const Color(0xFF1C2128),
+                color: AppTheme.surfaceDark,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE94560), width: 1),
+                border: Border.all(color: AppTheme.errorRed, width: 1.5),
               ),
               child: _buildAdvancedStatusCard(
                 'Fame',
                 artistStats.fame,
                 100, // Max value for progress bar
                 Icons.stars_rounded,
-                const Color(0xFFE94560), // Red
-                const Color(0xFF16213E), // Dark blue
+                AppTheme.errorRed,
+                AppTheme.backgroundElevated,
                 artistStats
                     .fameTier, // ✨ Show fame tier instead of generic label
               ),
@@ -2205,8 +2247,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               artistStats.creativity,
               500, // Max value for progress bar
               Icons.whatshot_rounded,
-              const Color(0xFF9B59B6), // Purple
-              const Color(0xFF2C3E50), // Dark slate
+              AppTheme.neonPurple,
+              AppTheme.backgroundElevated,
               'Viral',
             ),
           ),
@@ -2217,8 +2259,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               artistStats.fanbase,
               artistStats.fanbase + 1000, // Dynamic max value for progress
               Icons.people_rounded,
-              const Color(0xFF00D9FF), // Cyan
-              const Color(0xFF1A252F), // Dark navy
+              AppTheme.accentBlue,
+              AppTheme.backgroundElevated,
               _formatNumber(artistStats.fanbase),
             ),
           ),
@@ -2277,27 +2319,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             // Main content
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Top row with icon and status
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
                           color: primaryColor.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(icon, color: primaryColor, size: 16),
+                        child: Icon(icon, color: primaryColor, size: 14),
                       ),
                       Flexible(
                         child: Container(
+                          constraints: const BoxConstraints(maxWidth: 60),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
+                            horizontal: 4,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
@@ -2310,64 +2354,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               color: primaryColor,
                               fontSize: 7,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: -0.2,
                             ),
                             overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  // Bottom section with title, value, and progress
-                  Flexible(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 8),
+                  // Title
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  // Show numeric fame for the Fame card; otherwise show status text.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      title == 'Fame' ? _formatNumber(value) : status,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // Progress bar
+                  Container(
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(1.5),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          borderRadius: BorderRadius.circular(1.5),
                         ),
-                        const SizedBox(height: 2),
-                        // Show numeric fame for the Fame card; otherwise show status text.
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            title == 'Fame' ? _formatNumber(value) : status,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        // Progress bar
-                        Container(
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(1.5),
-                          ),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: progress,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: primaryColor,
-                                borderRadius: BorderRadius.circular(1.5),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -2388,11 +2427,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFFFF6B9D)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: AppTheme.mixedNeonGradient,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -2421,27 +2456,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       : null,
                 ),
                 const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      artistStats.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        artistStats.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                    ),
-                    Text(
-                      currentGameDate != null
-                          ? '${artistStats.getCurrentAge(currentGameDate!)} years old • ${artistStats.fameTier}'
-                          : '${artistStats.age} years old • ${artistStats.fameTier}',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 14,
+                      Text(
+                        currentGameDate != null
+                            ? '${artistStats.getCurrentAge(currentGameDate!)} years old • ${artistStats.fameTier}'
+                            : '${artistStats.age} years old • ${artistStats.fameTier}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -2452,10 +2493,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF21262D),
+              color: AppTheme.surfaceDark,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF00D9FF).withOpacity(0.3),
+                color: AppTheme.primaryCyan.withOpacity(0.3),
               ),
             ),
             child: Column(
@@ -2463,7 +2504,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.trending_up, color: Color(0xFF00D9FF), size: 18),
+                    Icon(Icons.trending_up, color: AppTheme.primaryCyan, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'Skills & Experience',
@@ -2481,13 +2522,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildSkillBar(
                       'Songwriting',
                       artistStats.songwritingSkill,
-                      const Color(0xFF00D9FF),
+                      AppTheme.primaryCyan,
                     ),
                     const SizedBox(width: 12),
                     _buildSkillBar(
                       'Lyrics',
                       artistStats.lyricsSkill,
-                      const Color(0xFFFF6B9D),
+                      AppTheme.errorRed,
                     ),
                   ],
                 ),
@@ -2497,13 +2538,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     _buildSkillBar(
                       'Composition',
                       artistStats.compositionSkill,
-                      const Color(0xFF9B59B6),
+                      AppTheme.neonPurple,
                     ),
                     const SizedBox(width: 12),
                     _buildSkillBar(
                       'Inspiration',
                       artistStats.inspirationLevel,
-                      const Color(0xFFF39C12),
+                      AppTheme.warningOrange,
                     ),
                   ],
                 ),
@@ -2516,8 +2557,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFF2ECC71).withOpacity(0.2),
-                        const Color(0xFF27AE60).withOpacity(0.1),
+                        AppTheme.neonGreen.withOpacity(0.2),
+                        AppTheme.neonGreen.withOpacity(0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(8),
@@ -2526,14 +2567,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       const Icon(
                         Icons.star,
-                        color: Color(0xFF2ECC71),
+                        color: AppTheme.neonGreen,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Experience: ${artistStats.experience} XP',
                         style: const TextStyle(
-                          color: Color(0xFF2ECC71),
+                          color: AppTheme.neonGreen,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -2541,7 +2582,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         'Level ${(artistStats.experience / 100).floor() + 1}',
                         style: const TextStyle(
-                          color: Color(0xFF2ECC71),
+                          color: AppTheme.neonGreen,
                           fontSize: 12,
                         ),
                       ),
@@ -2568,12 +2609,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withOpacity(0.2),
+                  color: AppTheme.primaryCyan.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.flash_on,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.primaryCyan,
                   size: 16,
                 ),
               ),
@@ -2621,7 +2662,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildActionCard(
                     'Studio',
                     Icons.album_rounded,
-                    const Color(0xFF9B59B6),
+                    AppTheme.neonPurple,
                     energyCost: -1,
                     onTap: () {
                       Navigator.push(
@@ -2650,7 +2691,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildActionCard(
                     'Releases',
                     Icons.library_music_rounded,
-                    const Color(0xFFE94560),
+                    AppTheme.errorRed,
                     energyCost: -1,
                     onTap: () {
                       Navigator.push(
@@ -2675,7 +2716,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildActionCard(
                     'Spotlight',
                     Icons.bar_chart_rounded,
-                    const Color(0xFF4CAF50),
+                    AppTheme.neonGreen,
                     energyCost: -1,
                     onTap: () {
                       Navigator.push(
@@ -2690,7 +2731,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildActionCard(
                     'The Scoop',
                     Icons.newspaper_rounded,
-                    const Color(0xFFFF9800),
+                    AppTheme.warningOrange,
                     energyCost: -1,
                     onTap: () {
                       Navigator.push(
@@ -2800,7 +2841,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         color: canPerform
                             ? (energyCost < 0
-                                ? const Color(0xFF32D74B)
+                                ? AppTheme.successGreen
                                 : Colors.white.withOpacity(0.7))
                             : Colors.white.withOpacity(0.3),
                         fontSize: 8,
@@ -3004,7 +3045,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Container(
             height: 6,
             decoration: BoxDecoration(
-              color: const Color(0xFF30363D),
+              color: AppTheme.borderDefault,
               borderRadius: BorderRadius.circular(3),
             ),
             child: FractionallySizedBox(

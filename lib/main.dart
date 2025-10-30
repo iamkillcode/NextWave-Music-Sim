@@ -10,7 +10,7 @@ import 'utils/firebase_status.dart';
 import 'services/remote_config_service.dart';
 import 'services/push_notification_service.dart';
 import 'widgets/remote_config_guard.dart';
-import 'theme/nextwave_theme.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,7 +87,7 @@ class _MusicArtistAppState extends State<MusicArtistApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'NextWave',
-      theme: NextWaveTheme.theme,
+      theme: AppTheme.darkTheme,
       home: _getInitialScreen(),
       routes: {
         '/auth': (context) => const AuthScreen(),

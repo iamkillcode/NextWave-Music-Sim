@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../models/artist_stats.dart';
 import '../models/world_region.dart';
 import '../widgets/app_navigation_wrapper.dart';
@@ -36,7 +37,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
         widget.onStatsUpdated(updatedStats);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
           title: const Row(
             children: [
@@ -55,7 +56,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
               ),
             ],
           ),
-          backgroundColor: const Color(0xFF21262D),
+          backgroundColor: AppTheme.surfaceDark,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
         ),
@@ -95,15 +96,15 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
 
     if (money > 50000) {
       statusText = 'Elite Traveler - 20% discount on all flights!';
-      statusColor = const Color(0xFFFFD700); // Gold
+      statusColor = AppTheme.chartGold; // Gold
       statusIcon = '💎';
     } else if (money > 20000) {
       statusText = 'Premium Traveler - 10% discount on flights';
-      statusColor = const Color(0xFF00D9FF); // Cyan
+      statusColor = AppTheme.accentBlue; // Cyan
       statusIcon = '✨';
     } else if (fame > 50) {
       statusText = 'Famous Artist - Travel costs scale with your fame';
-      statusColor = const Color(0xFFFF6B9D); // Pink
+      statusColor = AppTheme.neonPurple; // Pink
       statusIcon = '⭐';
     } else {
       statusText = 'Rising Artist - Affordable travel rates available';
@@ -152,15 +153,15 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF00D9FF).withOpacity(0.2),
-            const Color(0xFF7C3AED).withOpacity(0.2),
+            AppTheme.accentBlue.withOpacity(0.2),
+            AppTheme.neonPurple.withOpacity(0.2),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF00D9FF).withOpacity(0.5),
+          color: AppTheme.accentBlue.withOpacity(0.5),
           width: 2,
         ),
       ),
@@ -200,7 +201,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -273,8 +274,8 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
               gradient: LinearGradient(
                 colors: canAfford
                     ? [
-                        const Color(0xFF21262D),
-                        const Color(0xFF30363D),
+                        AppTheme.surfaceDark,
+                        AppTheme.borderDefault,
                       ]
                     : [
                         Colors.grey.withOpacity(0.2),
@@ -325,7 +326,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                             genre,
                             style: TextStyle(
                               color: canAfford
-                                  ? const Color(0xFF00D9FF)
+                                  ? AppTheme.accentBlue
                                   : Colors.white30,
                               fontSize: 11,
                             ),
@@ -342,7 +343,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                       '\$${_formatNumber(travelCost)}',
                       style: TextStyle(
                         color: canAfford
-                            ? const Color(0xFFFF6B9D)
+                            ? AppTheme.neonPurple
                             : Colors.redAccent,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -352,7 +353,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                     Icon(
                       Icons.flight_takeoff,
                       color:
-                          canAfford ? const Color(0xFF00D9FF) : Colors.white30,
+                          canAfford ? AppTheme.accentBlue : Colors.white30,
                       size: 20,
                     ),
                   ],
@@ -423,7 +424,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF21262D),
+          backgroundColor: AppTheme.surfaceDark,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -457,7 +458,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF30363D),
+                  color: AppTheme.borderDefault,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -475,7 +476,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                         Text(
                           '\$${_formatNumber(cost)}',
                           style: const TextStyle(
-                            color: Color(0xFFFF6B9D),
+                            color: AppTheme.neonPurple,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -492,7 +493,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                                 ? '💎 Elite Traveler: 20% discount applied'
                                 : '✨ Premium: 10% discount applied',
                             style: TextStyle(
-                              color: const Color(0xFF00D9FF).withOpacity(0.8),
+                              color: AppTheme.accentBlue.withOpacity(0.8),
                               fontSize: 10,
                               fontStyle: FontStyle.italic,
                             ),
@@ -507,7 +508,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
               const Text(
                 '✨ New studios and opportunities await!',
                 style: TextStyle(
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                   fontSize: 12,
                   fontStyle: FontStyle.italic,
                 ),
@@ -528,7 +529,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                 _travelToRegion(region, cost);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00D9FF),
+                backgroundColor: AppTheme.accentBlue,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -560,7 +561,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('✈️ Welcome to ${region.name}!'),
-        backgroundColor: const Color(0xFF00D9FF),
+        backgroundColor: AppTheme.accentBlue,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),

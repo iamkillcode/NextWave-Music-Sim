@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -97,7 +98,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Row(
           children: [
@@ -113,12 +114,12 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF21262D),
+        backgroundColor: AppTheme.surfaceDark,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: const Color(0xFF00D9FF),
+          indicatorColor: AppTheme.accentBlue,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           tabs: const [
@@ -185,9 +186,9 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2128),
+        color: AppTheme.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00D9FF).withOpacity(0.3)),
+        border: Border.all(color: AppTheme.accentBlue.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,7 +196,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           Row(
             children: [
               const Icon(Icons.info_outline,
-                  color: Color(0xFF00D9FF), size: 20),
+                  color: AppTheme.accentBlue, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Release Types',
@@ -269,7 +270,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                 AlbumType.ep,
                 '💿 EP',
                 '3-6 songs',
-                const Color(0xFF9B59B6),
+                AppTheme.neonPurple,
               ),
             ),
             const SizedBox(width: 12),
@@ -278,7 +279,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                 AlbumType.album,
                 '💽 Album',
                 '7+ songs',
-                const Color(0xFFE94560),
+                AppTheme.errorRed,
               ),
             ),
           ],
@@ -306,7 +307,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : const Color(0xFF30363D),
+          color: isSelected ? color.withOpacity(0.2) : AppTheme.borderDefault,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : Colors.white30,
@@ -354,7 +355,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
             hintText: 'Enter a title...',
             hintStyle: const TextStyle(color: Colors.white38),
             filled: true,
-            fillColor: const Color(0xFF30363D),
+            fillColor: AppTheme.borderDefault,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -371,7 +372,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       children: [
         Row(
           children: [
-            const Icon(Icons.image, color: Color(0xFF9B59B6), size: 20),
+            Icon(Icons.image, color: AppTheme.neonPurple, size: 20),
             const SizedBox(width: 8),
             const Text(
               'Cover Art',
@@ -387,11 +388,11 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1C2128),
+            color: AppTheme.surfaceElevated,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _uploadedCoverArtUrl != null
-                  ? const Color(0xFF9B59B6)
+                  ? AppTheme.neonPurple
                   : Colors.white24,
               width: 2,
             ),
@@ -407,7 +408,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                   boxShadow: _uploadedCoverArtUrl != null
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF9B59B6).withOpacity(0.3),
+                            color: AppTheme.neonPurple.withOpacity(0.3),
                             blurRadius: 12,
                             spreadRadius: 2,
                           )
@@ -439,7 +440,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                           : 'No Cover Art',
                       style: TextStyle(
                         color: _uploadedCoverArtUrl != null
-                            ? const Color(0xFF9B59B6)
+                            ? AppTheme.neonPurple
                             : Colors.white60,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -463,7 +464,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                     _uploadedCoverArtUrl != null ? Icons.edit : Icons.upload),
                 label: Text(_uploadedCoverArtUrl != null ? 'Change' : 'Upload'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9B59B6),
+                  backgroundColor: AppTheme.neonPurple,
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -524,7 +525,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF30363D),
+              color: AppTheme.borderDefault,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Center(
@@ -565,8 +566,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           color: isSelected
               ? accentColor.withOpacity(0.2)
               : (isDisabled
-                  ? const Color(0xFF1C2128)
-                  : const Color(0xFF30363D)),
+                  ? AppTheme.surfaceElevated
+                  : AppTheme.borderDefault),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isSelected
@@ -606,7 +607,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Color(0xFF00D9FF),
+                              color: AppTheme.accentBlue,
                             ),
                           ),
                         ),
@@ -615,7 +616,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF30363D),
+                          color: AppTheme.borderDefault,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Center(
@@ -631,7 +632,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF30363D),
+                      color: AppTheme.borderDefault,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Center(
@@ -703,9 +704,9 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2128),
+        color: AppTheme.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00D9FF).withOpacity(0.3)),
+        border: Border.all(color: AppTheme.accentBlue.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -730,14 +731,14 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00D9FF).withOpacity(0.2),
+                      color: AppTheme.accentBlue.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Center(
                       child: Text(
                         '${index + 1}',
                         style: const TextStyle(
-                          color: Color(0xFF00D9FF),
+                          color: AppTheme.accentBlue,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -804,7 +805,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
             onPressed: canCreate ? _createAlbum : null,
             style: ElevatedButton.styleFrom(
               backgroundColor:
-                  canCreate ? const Color(0xFF00D9FF) : const Color(0xFF30363D),
+                  canCreate ? AppTheme.accentBlue : AppTheme.borderDefault,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -868,7 +869,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppTheme.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -998,7 +999,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF1C2128),
+            color: AppTheme.surfaceElevated,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Colors.green.withOpacity(0.3),
@@ -1012,7 +1013,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                 height: 64,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  color: const Color(0xFF0D1117),
+                  color: AppTheme.backgroundDark,
                 ),
                 child: album.coverArtUrl != null
                     ? ClipRRect(
@@ -1164,10 +1165,10 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C2128),
+        color: AppTheme.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF00D9FF).withOpacity(0.3),
+          color: AppTheme.accentBlue.withOpacity(0.3),
         ),
       ),
       child: Column(
@@ -1252,7 +1253,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
                   icon: const Icon(Icons.rocket_launch),
                   label: const Text('Release Now'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D9FF),
+                    backgroundColor: AppTheme.accentBlue,
                     foregroundColor: Colors.black,
                   ),
                 ),
@@ -1342,8 +1343,8 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
             ? 'Maple'
             : platform;
     final color = platform == 'tunify'
-        ? const Color(0xFF1DB954)
-        : const Color(0xFFFF6B9D);
+        ? AppTheme.successGreen
+        : AppTheme.neonPurple;
     final icon = platform == 'tunify' ? '🎵' : '🍁';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1387,7 +1388,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
       builder: (context) {
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF161B22),
+            backgroundColor: AppTheme.surfaceDark,
             title: const Text('Confirm Release',
                 style: TextStyle(color: Colors.white)),
             content: Column(
@@ -1537,7 +1538,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppTheme.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -1625,7 +1626,7 @@ class _ReleaseManagerScreenState extends State<ReleaseManagerScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppTheme.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
@@ -1731,7 +1732,7 @@ class _DeluxeEditionDialogState extends State<_DeluxeEditionDialog> {
     }
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF161B22),
+      backgroundColor: AppTheme.surfaceDark,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

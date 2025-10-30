@@ -41,6 +41,70 @@ service cloud.firestore {
       allow delete: if isOwner(resource.data.ownerId);
     }
 
+    // Chat conversations - only participants can access
+    match /chat_conversations/{conversationId} {
+      // Read: Only if user is a participant
+      allow read: if isSignedIn() 
+        && request.auth.uid in resource.data.participants;
+      
+      // Create: Only if user is one of the participants (max 2 participants for DMs)
+      allow create: if isSignedIn() 
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.keys().hasAll(['participants', 'participantNames', 'unreadCount', 'isTyping']);
+      
+      // Update: Only participants can update (for typing indicators, unread counts, etc.)
+      allow update: if isSignedIn() 
+        && request.auth.uid in resource.data.participants;
+      
+      // Delete: Not allowed (conversations should be blocked, not deleted)
+      allow delete: if false;
+      
+      // Messages archive subcollection
+      match /messagesArchive/{messageId} {
+        // Read: Only if user is a conversation participant
+        allow read: if isSignedIn() 
+          && request.auth.uid in get(/databases/$(database)/documents/chat_conversations/$(conversationId)).data.participants;
+        
+        // Create: Only if user is a participant and is the sender
+        allow create: if isSignedIn() 
+          && request.auth.uid in get(/databases/$(database)/documents/chat_conversations/$(conversationId)).data.participants
+          && request.resource.data.senderId == request.auth.uid;
+        
+        // Update: Only sender can update (for reactions)
+        allow update: if isSignedIn() 
+          && request.auth.uid in get(/databases/$(database)/documents/chat_conversations/$(conversationId)).data.participants;
+        
+        // Delete: Not allowed
+        allow delete: if false;
+      }
+    }
+    
+    // Comments collection - public read, authenticated write
+    match /comments/{commentId} {
+      // Anyone can read comments (unless hidden by moderator)
+      allow read: if true;
+      
+      // Only authenticated users can create comments
+      allow create: if isSignedIn() 
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.keys().hasAll(['authorId', 'content', 'timestamp', 'contextType', 'contextId'])
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 500
+        && request.resource.data.contextType in ['video', 'post', 'chart', 'album'];
+      
+      // Only author can update their own comments (for editing or deletion)
+      allow update: if isOwner(resource.data.authorId);
+      
+      // Only author can delete their own comments
+      allow delete: if isOwner(resource.data.authorId);
+    }
+
+    // Poke system rules (in players collection)
+    // Note: Pokes are stored as arrays in player documents: sentPokes and receivedPokes
+    // The general player rules allow authenticated users to update their own poke arrays
+
     // Default rules for other collections (temporary - update before Nov 11, 2025)
     match /{document=**} {
       allow read, write: if request.time < timestamp.date(2025, 11, 11);

@@ -7,6 +7,7 @@ import '../services/cover_art_uploader.dart';
 import 'admin_dashboard_screen.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../utils/genres.dart';
+import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -277,7 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppTheme.surfaceDark,
         title: const Text(
           'Change Artist Name?',
           style: TextStyle(color: Colors.white),
@@ -294,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
+              backgroundColor: AppTheme.accentBlue,
             ),
             child: const Text('CHANGE NAME'),
           ),
@@ -395,7 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppTheme.surfaceDark,
         title: const Text(
           'Delete Account?',
           style: TextStyle(color: Colors.red),
@@ -496,7 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppTheme.surfaceDark,
         title: const Text(
           'Confirm Password',
           style: TextStyle(color: Colors.white),
@@ -519,10 +520,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 labelStyle: const TextStyle(color: Colors.white60),
                 prefixIcon: const Icon(
                   Icons.lock_outline,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -534,7 +535,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -570,7 +571,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppTheme.surfaceDark,
         title: const Text('Logout?', style: TextStyle(color: Colors.white)),
         content: const Text(
           'Are you sure you want to logout?',
@@ -601,7 +602,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -668,7 +669,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(
-          color: Color(0xFF00D9FF),
+          color: AppTheme.accentBlue,
           fontSize: 12,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
@@ -681,7 +682,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -694,7 +695,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor: const Color(0xFF00D9FF),
+                    backgroundColor: AppTheme.accentBlue,
                     backgroundImage:
                         _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
                     child: _avatarUrl == null
@@ -716,10 +717,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00D9FF),
+                          color: AppTheme.accentBlue,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: const Color(0xFF1A1A1A),
+                            color: AppTheme.surfaceDark,
                             width: 2,
                           ),
                         ),
@@ -766,7 +767,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -775,7 +776,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.person, color: Color(0xFF00D9FF), size: 20),
+              Icon(Icons.person, color: AppTheme.accentBlue, size: 20),
               const SizedBox(width: 8),
               const Text(
                 'Choose Your Gender',
@@ -791,13 +792,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFB800).withOpacity(0.1),
+              color: AppTheme.warningOrange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 const Icon(Icons.info_outline,
-                    color: Color(0xFFFFB800), size: 16),
+                    color: AppTheme.warningOrange, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -815,13 +816,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Gender options
           _buildGenderButton(
-              'male', 'Male', Icons.male, const Color(0xFF00D9FF)),
+              'male', 'Male', Icons.male, AppTheme.accentBlue),
           const SizedBox(height: 8),
           _buildGenderButton(
-              'female', 'Female', Icons.female, const Color(0xFFFF6B9D)),
+              'female', 'Female', Icons.female, AppTheme.neonPurple),
           const SizedBox(height: 8),
           _buildGenderButton(
-              'other', 'Other', Icons.person_outline, const Color(0xFF9D4EDD)),
+              'other', 'Other', Icons.person_outline, AppTheme.neonPurple),
           const SizedBox(height: 8),
           _buildGenderButton(
               null, 'Prefer not to say', Icons.lock_outline, Colors.white60),
@@ -836,7 +837,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -845,7 +846,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.music_note, color: Color(0xFF9D4EDD), size: 20),
+              Icon(Icons.music_note, color: AppTheme.neonPurple, size: 20),
               const SizedBox(width: 8),
               const Text(
                 'Primary Genre',
@@ -862,14 +863,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF9D4EDD).withOpacity(0.2),
+                color: AppTheme.neonPurple.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF9D4EDD)),
+                border: Border.all(color: AppTheme.neonPurple),
               ),
               child: Text(
                 'Current: $_currentGenre',
                 style: const TextStyle(
-                  color: Color(0xFF9D4EDD),
+                  color: AppTheme.neonPurple,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -880,9 +881,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFD60A).withOpacity(0.1),
+                color: AppTheme.warningOrange.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFFD60A)),
+                border: Border.all(color: AppTheme.warningOrange),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -890,12 +891,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Row(
                     children: [
                       Icon(Icons.info_outline,
-                          color: Color(0xFFFFD60A), size: 16),
+                          color: AppTheme.warningOrange, size: 16),
                       SizedBox(width: 8),
                       Text(
                         'One-Time Genre Reset Available!',
                         style: TextStyle(
-                          color: Color(0xFFFFD60A),
+                          color: AppTheme.warningOrange,
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
@@ -937,12 +938,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: genre == _currentGenre
-                          ? const Color(0xFF9D4EDD).withOpacity(0.3)
-                          : const Color(0xFF0D1117),
+                          ? AppTheme.neonPurple.withOpacity(0.3)
+                          : AppTheme.backgroundDark,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: genre == _currentGenre
-                            ? const Color(0xFF9D4EDD)
+                            ? AppTheme.neonPurple
                             : Colors.white24,
                       ),
                     ),
@@ -950,7 +951,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       genre,
                       style: TextStyle(
                         color: genre == _currentGenre
-                            ? const Color(0xFF9D4EDD)
+                            ? AppTheme.neonPurple
                             : Colors.white,
                         fontSize: 13,
                         fontWeight: genre == _currentGenre
@@ -996,7 +997,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppTheme.surfaceDark,
         title: const Text(
           '⚠️ Confirm Genre Reset',
           style: TextStyle(color: Colors.white),
@@ -1029,7 +1030,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Text(
               '• Cannot be undone (one-time only)',
-              style: TextStyle(color: Color(0xFFFF6B9D), fontSize: 13),
+              style: TextStyle(color: AppTheme.neonPurple, fontSize: 13),
             ),
           ],
         ),
@@ -1044,7 +1045,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _resetGenre(newGenre);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF9D4EDD),
+              backgroundColor: AppTheme.neonPurple,
             ),
             child: const Text('Confirm Reset'),
           ),
@@ -1061,7 +1062,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0D1117),
+          color: AppTheme.backgroundDark,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: color.withOpacity(0.3)),
         ),
@@ -1087,7 +1088,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -1115,7 +1116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               hintText: 'Enter new artist name',
               hintStyle: const TextStyle(color: Colors.white30),
               filled: true,
-              fillColor: const Color(0xFF0D1117),
+              fillColor: AppTheme.backgroundDark,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -1156,7 +1157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? _updateArtistName
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00D9FF),
+                backgroundColor: AppTheme.accentBlue,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1180,7 +1181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -1212,7 +1213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: ElevatedButton(
               onPressed: _saveSettings,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00D9FF),
+                backgroundColor: AppTheme.accentBlue,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -1236,7 +1237,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
@@ -1257,7 +1258,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.red.withOpacity(0.3)),
       ),
@@ -1340,11 +1341,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Switch(
           value: value,
           onChanged: onChanged,
-          thumbColor: WidgetStateProperty.resolveWith<Color>(
-            (states) => states.contains(WidgetState.selected)
-                ? const Color(0xFF00D9FF)
-                : Colors.grey,
-          ),
+          activeColor: AppTheme.accentBlue, // Thumb color when ON
+          activeTrackColor: AppTheme.accentBlue.withOpacity(0.5), // Track color when ON
+          inactiveThumbColor: Colors.grey.shade600, // Thumb color when OFF
+          inactiveTrackColor: Colors.grey.shade800, // Track color when OFF
         ),
       ],
     );
@@ -1355,14 +1355,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF00D9FF), Color(0xFF0A84FF)],
+          colors: [AppTheme.accentBlue, AppTheme.accentBlue],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00D9FF).withOpacity(0.3),
+            color: AppTheme.accentBlue.withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1415,12 +1415,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.dashboard, color: Color(0xFF00D9FF), size: 20),
+                  Icon(Icons.dashboard, color: AppTheme.accentBlue, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'OPEN ADMIN DASHBOARD',
                     style: TextStyle(
-                      color: Color(0xFF00D9FF),
+                      color: AppTheme.accentBlue,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

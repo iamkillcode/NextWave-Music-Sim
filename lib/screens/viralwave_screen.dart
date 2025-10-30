@@ -6,6 +6,7 @@ import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../theme/nextwave_theme.dart';
+import '../theme/app_theme.dart';
 
 class ViralWaveScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -31,6 +32,16 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   // Custom promotion settings
   int _promoDays = 7; // Default 7 days
   double _budgetMultiplier = 1.0; // 1.0 = base cost, 2.0 = double cost/effect
+
+  // Search functionality
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Anti-exploit constants
   static const int maxConcurrentPromosPerItem =
@@ -150,17 +161,17 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF453A).withOpacity(0.2),
+                          color: AppTheme.errorRed.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFFFF453A).withOpacity(0.5),
+                            color: AppTheme.errorRed.withOpacity(0.5),
                           ),
                         ),
                         child: Row(
                           children: [
                             const Icon(
                               Icons.lock,
-                              color: Color(0xFFFF453A),
+                              color: AppTheme.errorRed,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
@@ -168,7 +179,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                               child: Text(
                                 _getValidationMessage(_selectedPromotionType),
                                 style: const TextStyle(
-                                  color: Color(0xFFFF453A),
+                                  color: AppTheme.errorRed,
                                   fontSize: 13,
                                 ),
                               ),
@@ -185,17 +196,17 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                         margin: const EdgeInsets.only(top: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFD60A).withOpacity(0.2),
+                          color: AppTheme.warningOrange.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFFFFD60A).withOpacity(0.5),
+                            color: AppTheme.warningOrange.withOpacity(0.5),
                           ),
                         ),
                         child: Row(
                           children: [
                             const Icon(
                               Icons.warning_amber,
-                              color: Color(0xFFFFD60A),
+                              color: AppTheme.warningOrange,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
@@ -203,7 +214,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                               child: Text(
                                 'Maximum concurrent promotions reached for "${_selectedSong!.title}". Wait for current promos to complete.',
                                 style: const TextStyle(
-                                  color: Color(0xFFFFD60A),
+                                  color: AppTheme.warningOrange,
                                   fontSize: 13,
                                 ),
                               ),
@@ -242,7 +253,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                             ? _launchCampaign
                             : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF6B9D),
+                          backgroundColor: AppTheme.neonPurple,
                           disabledBackgroundColor: Colors.grey,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
@@ -359,18 +370,22 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   Widget _buildHeaderCard() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 450;
+    final isTinyScreen = screenWidth < 380;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 14 : 20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF6B9D), Color(0xFFFF1744)],
+          colors: [AppTheme.neonPurple, AppTheme.errorRed],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF6B9D).withOpacity(0.3),
+            color: AppTheme.neonPurple.withOpacity(0.3),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -382,19 +397,19 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isTinyScreen ? 8 : (isSmallScreen ? 10 : 12)),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.trending_up,
                   color: Colors.white,
-                  size: 28,
+                  size: isTinyScreen ? 20 : (isSmallScreen ? 24 : 28),
                 ),
               ),
-              const SizedBox(width: 16),
-              const Expanded(
+              SizedBox(width: isSmallScreen ? 10 : 16),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -402,28 +417,31 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                       'Boost Your Music',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 20,
+                        fontSize: isTinyScreen ? 16 : (isSmallScreen ? 18 : 20),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    SizedBox(height: isTinyScreen ? 2 : 4),
                     Text(
                       'Reach millions of potential fans',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isTinyScreen ? 11 : (isSmallScreen ? 12 : 14),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12 : 16),
           Row(
             children: [
               _buildHeaderStat('💰',
-                  '\$${NumberFormat('#,###').format(widget.artistStats.money)}'),
-              const SizedBox(width: 12),
+                  '\$${NumberFormat('#,###').format(widget.artistStats.money)}', isSmallScreen, isTinyScreen),
+              SizedBox(width: isSmallScreen ? 8 : 12),
               _buildHeaderStat('👥',
-                  NumberFormat('#,###').format(widget.artistStats.fanbase)),
+                  NumberFormat('#,###').format(widget.artistStats.fanbase), isSmallScreen, isTinyScreen),
             ],
           ),
         ],
@@ -431,10 +449,10 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     );
   }
 
-  Widget _buildHeaderStat(String emoji, String value) {
+  Widget _buildHeaderStat(String emoji, String value, bool isSmallScreen, bool isTinyScreen) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: EdgeInsets.all(isTinyScreen ? 6 : (isSmallScreen ? 8 : 10)),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.2),
           borderRadius: BorderRadius.circular(8),
@@ -442,14 +460,17 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 6),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+            Text(emoji, style: TextStyle(fontSize: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16))),
+            SizedBox(width: isTinyScreen ? 4 : 6),
+            Flexible(
+              child: Text(
+                value,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isTinyScreen ? 11 : (isSmallScreen ? 12 : 14),
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -501,7 +522,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       children: [
         Row(
           children: [
-            const Icon(Icons.campaign, color: Color(0xFF00D9FF), size: 20),
+            Icon(Icons.campaign, color: AppTheme.accentBlue, size: 20),
             const SizedBox(width: 8),
             const Text(
               'Active Campaigns',
@@ -515,13 +536,13 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF00D9FF).withOpacity(0.2),
+                color: AppTheme.accentBlue.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 '$totalCampaigns running',
                 style: const TextStyle(
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
@@ -547,12 +568,12 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF161B22),
+              color: AppTheme.surfaceDark,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: album.type == AlbumType.ep
-                    ? const Color(0xFFFFD60A).withOpacity(0.3)
-                    : const Color(0xFFFF6B9D).withOpacity(0.3),
+                    ? AppTheme.warningOrange.withOpacity(0.3)
+                    : AppTheme.neonPurple.withOpacity(0.3),
               ),
             ),
             child: Column(
@@ -601,8 +622,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                   '+${NumberFormat('#,###').format(totalDailyBuffer)}/day total',
                   style: TextStyle(
                     color: album.type == AlbumType.ep
-                        ? const Color(0xFFFFD60A)
-                        : const Color(0xFFFF6B9D),
+                        ? AppTheme.warningOrange
+                        : AppTheme.neonPurple,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -621,10 +642,10 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF161B22),
+              color: AppTheme.surfaceDark,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF00D9FF).withOpacity(0.3),
+                color: AppTheme.accentBlue.withOpacity(0.3),
               ),
             ),
             child: Column(
@@ -636,7 +657,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF00D9FF),
+                        color: AppTheme.accentBlue,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -666,7 +687,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                     Text(
                       '+${NumberFormat('#,###').format(song.promoBuffer)}/day',
                       style: const TextStyle(
-                        color: Color(0xFF00D9FF),
+                        color: AppTheme.accentBlue,
                         fontSize: 12,
                       ),
                     ),
@@ -689,13 +710,17 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   Widget _buildPromotionTypeSelector() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 450;
+    final isTinyScreen = screenWidth < 380;
+
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 3, // Changed to 3 columns for 3 options
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.1,
+      crossAxisSpacing: isSmallScreen ? 8 : 12,
+      mainAxisSpacing: isSmallScreen ? 8 : 12,
+      childAspectRatio: isTinyScreen ? 0.9 : (isSmallScreen ? 1.0 : 1.1),
       children: _promotionTypes.entries.map<Widget>((entry) {
         final isSelected = _selectedPromotionType == entry.key;
         final data = entry.value;
@@ -713,11 +738,11 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           child: Opacity(
             opacity: isAvailable ? 1.0 : 0.4,
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(isTinyScreen ? 6 : (isSmallScreen ? 8 : 12)),
               decoration: BoxDecoration(
                 color: isSelected
                     ? (data['color'] as Color).withOpacity(0.2)
-                    : const Color(0xFF161B22),
+                    : AppTheme.surfaceDark,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isSelected
@@ -731,36 +756,39 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(data['emoji'], style: const TextStyle(fontSize: 32)),
-                      const SizedBox(height: 8),
+                      Text(
+                        data['emoji'],
+                        style: TextStyle(fontSize: isTinyScreen ? 24 : (isSmallScreen ? 28 : 32)),
+                      ),
+                      SizedBox(height: isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
                       Text(
                         data['name'],
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
-                          fontSize: 13,
+                          fontSize: isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: isTinyScreen ? 2 : 4),
                       Text(
                         '\$${NumberFormat('#,###').format(data['baseCost'])}',
                         style: TextStyle(
                           color: data['color'],
-                          fontSize: 11,
+                          fontSize: isTinyScreen ? 9 : (isSmallScreen ? 10 : 11),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
                   if (!isAvailable)
-                    const Positioned(
-                      top: 4,
-                      right: 4,
+                    Positioned(
+                      top: isTinyScreen ? 2 : 4,
+                      right: isTinyScreen ? 2 : 4,
                       child: Icon(
                         Icons.lock,
                         color: Colors.red,
-                        size: 16,
+                        size: isTinyScreen ? 14 : 16,
                       ),
                     ),
                 ],
@@ -773,117 +801,274 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   Widget _buildSongSelector(List<Song> songs) {
+    // Filter songs based on search query
+    final filteredSongs = songs.where((song) {
+      if (_searchQuery.isEmpty) return true;
+      return song.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          song.genre.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    // Sort by streams descending
+    filteredSongs.sort((a, b) => b.streams.compareTo(a.streams));
+
+    // Limit to top 20 songs if not searching
+    final displaySongs = _searchQuery.isEmpty
+        ? (filteredSongs.length > 20 ? filteredSongs.sublist(0, 20) : filteredSongs)
+        : filteredSongs;
+
+    // Responsive check
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 450;
+    final isTinyScreen = screenWidth < 380;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Song to Promote',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...songs.map<Widget>((song) {
-          final isSelected = _selectedSong?.id == song.id;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedSong = song;
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFF00D9FF).withOpacity(0.2)
-                      : const Color(0xFF161B22),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF00D9FF)
-                        : Colors.white.withOpacity(0.1),
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    // Cover art thumbnail
-                    if (song.coverArtUrl != null &&
-                        song.coverArtUrl!.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: CachedNetworkImage(
-                          imageUrl: song.coverArtUrl!,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey[800],
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            width: 50,
-                            height: 50,
-                            color: Colors.grey[800],
-                            child: const Icon(Icons.music_note,
-                                color: Colors.white54),
-                          ),
-                        ),
-                      )
-                    else
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child:
-                            const Icon(Icons.music_note, color: Colors.white54),
-                      ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            song.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '${song.genre} • ${song.streams} streams',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isSelected)
-                      const Icon(
-                        Icons.check_circle,
-                        color: Color(0xFF32D74B),
-                        size: 22,
-                      ),
-                  ],
+        Row(
+          children: [
+            const Text(
+              'Select Song to Promote',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.accentBlue.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${songs.length} total',
+                style: const TextStyle(
+                  color: AppTheme.accentBlue,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-          );
-        }),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Search bar
+        TextField(
+          controller: _searchController,
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search by song title or genre...',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+            prefixIcon: Icon(Icons.search, color: AppTheme.accentBlue),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.white54),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: AppTheme.surfaceDark,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: AppTheme.accentBlue, width: 2),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isTinyScreen ? 10 : 14,
+              vertical: isTinyScreen ? 10 : 14,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Show result count
+        if (_searchQuery.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              '${displaySongs.length} song${displaySongs.length == 1 ? "" : "s"} found',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 13,
+              ),
+            ),
+          )
+        else if (songs.length > 20)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.accentBlue.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.accentBlue.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppTheme.accentBlue, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Showing top 20 by streams. Use search to find specific songs.',
+                      style: TextStyle(
+                        color: AppTheme.accentBlue,
+                        fontSize: isSmallScreen ? 11 : 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // Song list
+        if (displaySongs.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 48,
+                    color: Colors.white.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No songs found',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...displaySongs.map<Widget>((song) {
+            final isSelected = _selectedSong?.id == song.id;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedSong = song;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.accentBlue.withOpacity(0.2)
+                        : AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppTheme.accentBlue
+                          : Colors.white.withOpacity(0.1),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Cover art thumbnail
+                      if (song.coverArtUrl != null &&
+                          song.coverArtUrl!.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: song.coverArtUrl!,
+                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              color: Colors.grey[800],
+                              child: const Icon(Icons.music_note,
+                                  color: Colors.white54),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                          height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.music_note, color: Colors.white54),
+                        ),
+                      SizedBox(width: isSmallScreen ? 10 : 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isSmallScreen ? 13 : 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${song.genre} • ${NumberFormat('#,###').format(song.streams)} streams',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: isSmallScreen ? 11 : 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isSelected)
+                        Icon(
+                          Icons.check_circle,
+                          color: AppTheme.successGreen,
+                          size: isSmallScreen ? 20 : 22,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
       ],
     );
   }
@@ -894,19 +1079,126 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             album.type == AlbumType.ep && album.state == AlbumState.released)
         .toList();
 
+    // Filter EPs based on search query
+    final filteredEPs = releasedEPs.where((ep) {
+      if (_searchQuery.isEmpty) return true;
+      return ep.title.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    // Responsive check
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 450;
+    final isTinyScreen = screenWidth < 380;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select EP to Promote',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            const Text(
+              'Select EP to Promote',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.warningOrange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${releasedEPs.length} total',
+                style: const TextStyle(
+                  color: AppTheme.warningOrange,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        ...releasedEPs.map<Widget>((ep) {
+
+        // Search bar
+        if (releasedEPs.length > 5)
+          Column(
+            children: [
+              TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search EPs...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                  prefixIcon: Icon(Icons.search, color: AppTheme.warningOrange),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.white54),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppTheme.surfaceDark,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppTheme.warningOrange, width: 2),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: isTinyScreen ? 10 : 14,
+                    vertical: isTinyScreen ? 10 : 14,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+
+        if (filteredEPs.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 48,
+                    color: Colors.white.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No EPs found',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...filteredEPs.map<Widget>((ep) {
           final isSelected = _selectedAlbum?.id == ep.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -917,15 +1209,15 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                 });
               },
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF00D9FF).withOpacity(0.2)
-                      : const Color(0xFF161B22),
+                      ? AppTheme.accentBlue.withOpacity(0.2)
+                      : AppTheme.surfaceDark,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: isSelected
-                        ? const Color(0xFF00D9FF)
+                        ? AppTheme.accentBlue
                         : Colors.white.withOpacity(0.1),
                     width: isSelected ? 2 : 1,
                   ),
@@ -938,20 +1230,20 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                         borderRadius: BorderRadius.circular(6),
                         child: CachedNetworkImage(
                           imageUrl: ep.coverArtUrl!,
-                          width: 50,
-                          height: 50,
+                          width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                          height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            width: 50,
-                            height: 50,
+                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                             color: Colors.grey[800],
                             child: const Center(
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
                           errorWidget: (context, url, error) => Container(
-                            width: 50,
-                            height: 50,
+                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                             color: Colors.grey[800],
                             child:
                                 const Icon(Icons.album, color: Colors.white54),
@@ -960,42 +1252,44 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                       )
                     else
                       Container(
-                        width: 50,
-                        height: 50,
+                        width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                        height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                         decoration: BoxDecoration(
                           color: Colors.grey[800],
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Icon(Icons.album, color: Colors.white54),
                       ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: isSmallScreen ? 10 : 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             ep.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 15,
+                              fontSize: isSmallScreen ? 13 : 15,
                               fontWeight: FontWeight.bold,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             'EP • ${ep.songIds.length} songs',
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.6),
-                              fontSize: 12,
+                              fontSize: isSmallScreen ? 11 : 12,
                             ),
                           ),
                         ],
                       ),
                     ),
                     if (isSelected)
-                      const Icon(
+                      Icon(
                         Icons.check_circle,
-                        color: Color(0xFF32D74B),
-                        size: 22,
+                        color: AppTheme.successGreen,
+                        size: isSmallScreen ? 20 : 22,
                       ),
                   ],
                 ),
@@ -1013,19 +1307,126 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             album.type == AlbumType.album && album.state == AlbumState.released)
         .toList();
 
+    // Filter albums based on search query
+    final filteredAlbums = releasedAlbums.where((album) {
+      if (_searchQuery.isEmpty) return true;
+      return album.title.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+
+    // Responsive check
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 450;
+    final isTinyScreen = screenWidth < 380;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Album to Promote',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            const Text(
+              'Select Album to Promote',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.neonPurple.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${releasedAlbums.length} total',
+                style: const TextStyle(
+                  color: AppTheme.neonPurple,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        ...releasedAlbums.map<Widget>((album) {
+
+        // Search bar
+        if (releasedAlbums.length > 5)
+          Column(
+            children: [
+              TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search Albums...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                  prefixIcon: Icon(Icons.search, color: AppTheme.neonPurple),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.white54),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppTheme.surfaceDark,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppTheme.neonPurple, width: 2),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: isTinyScreen ? 10 : 14,
+                    vertical: isTinyScreen ? 10 : 14,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+
+        if (filteredAlbums.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 48,
+                    color: Colors.white.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No Albums found',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...filteredAlbums.map<Widget>((album) {
           final isSelected = _selectedAlbum?.id == album.id;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -1036,15 +1437,15 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                 });
               },
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF00D9FF).withOpacity(0.2)
-                      : const Color(0xFF161B22),
+                      ? AppTheme.accentBlue.withOpacity(0.2)
+                      : AppTheme.surfaceDark,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: isSelected
-                        ? const Color(0xFF00D9FF)
+                        ? AppTheme.accentBlue
                         : Colors.white.withOpacity(0.1),
                     width: isSelected ? 2 : 1,
                   ),
@@ -1058,20 +1459,20 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                         borderRadius: BorderRadius.circular(6),
                         child: CachedNetworkImage(
                           imageUrl: album.coverArtUrl!,
-                          width: 50,
-                          height: 50,
+                          width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                          height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            width: 50,
-                            height: 50,
+                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                             color: Colors.grey[800],
                             child: const Center(
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
                           errorWidget: (context, url, error) => Container(
-                            width: 50,
-                            height: 50,
+                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                             color: Colors.grey[800],
                             child:
                                 const Icon(Icons.album, color: Colors.white54),
@@ -1080,42 +1481,44 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                       )
                     else
                       Container(
-                        width: 50,
-                        height: 50,
+                        width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                        height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                         decoration: BoxDecoration(
                           color: Colors.grey[800],
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Icon(Icons.album, color: Colors.white54),
                       ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: isSmallScreen ? 10 : 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             album.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 15,
+                              fontSize: isSmallScreen ? 13 : 15,
                               fontWeight: FontWeight.bold,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             'Album • ${album.songIds.length} songs',
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.6),
-                              fontSize: 12,
+                              fontSize: isSmallScreen ? 11 : 12,
                             ),
                           ),
                         ],
                       ),
                     ),
                     if (isSelected)
-                      const Icon(
+                      Icon(
                         Icons.check_circle,
-                        color: Color(0xFF32D74B),
-                        size: 22,
+                        color: AppTheme.successGreen,
+                        size: isSmallScreen ? 20 : 22,
                       ),
                   ],
                 ),
@@ -1128,25 +1531,29 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
   }
 
   Widget _buildPromotionControls() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 450;
+    final isTinyScreen = screenWidth < 380;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Campaign Duration',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: isSmallScreen ? 14 : 16,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 8 : 12),
           Row(
             children: [
               Expanded(
@@ -1155,7 +1562,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                   min: 1,
                   max: 30,
                   divisions: 29,
-                  activeColor: const Color(0xFF00D9FF),
+                  activeColor: AppTheme.accentBlue,
                   inactiveColor: Colors.white.withOpacity(0.2),
                   onChanged: (value) {
                     setState(() {
@@ -1165,33 +1572,35 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTinyScreen ? 8 : (isSmallScreen ? 10 : 12),
+                  vertical: isTinyScreen ? 4 : 6,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withOpacity(0.2),
+                  color: AppTheme.accentBlue.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '$_promoDays days',
-                  style: const TextStyle(
-                    color: Color(0xFF00D9FF),
-                    fontSize: 14,
+                  style: TextStyle(
+                    color: AppTheme.accentBlue,
+                    fontSize: isTinyScreen ? 11 : (isSmallScreen ? 12 : 14),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          const Text(
+          SizedBox(height: isSmallScreen ? 16 : 20),
+          Text(
             'Budget Multiplier',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: isSmallScreen ? 14 : 16,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 8 : 12),
           Row(
             children: [
               Expanded(
@@ -1200,7 +1609,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                   min: 0.5,
                   max: 3.0,
                   divisions: 25,
-                  activeColor: const Color(0xFFFFD60A),
+                  activeColor: AppTheme.warningOrange,
                   inactiveColor: Colors.white.withOpacity(0.2),
                   onChanged: (value) {
                     setState(() {
@@ -1210,17 +1619,19 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTinyScreen ? 8 : (isSmallScreen ? 10 : 12),
+                  vertical: isTinyScreen ? 4 : 6,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFD60A).withOpacity(0.2),
+                  color: AppTheme.warningOrange.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${_budgetMultiplier.toStringAsFixed(1)}x',
-                  style: const TextStyle(
-                    color: Color(0xFFFFD60A),
-                    fontSize: 14,
+                  style: TextStyle(
+                    color: AppTheme.warningOrange,
+                    fontSize: isTinyScreen ? 11 : (isSmallScreen ? 12 : 14),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1344,17 +1755,17 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF453A).withOpacity(0.2),
+        color: AppTheme.errorRed.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber, color: Color(0xFFFF453A), size: 20),
+          Icon(Icons.warning_amber, color: AppTheme.errorRed, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Not enough money (\$${NumberFormat('#,###').format(_totalCost)} required)',
-              style: const TextStyle(color: Color(0xFFFF453A), fontSize: 13),
+              style: TextStyle(color: AppTheme.errorRed, fontSize: 13),
             ),
           ),
         ],
@@ -1579,7 +1990,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF161B22),
+        backgroundColor: AppTheme.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
@@ -1611,19 +2022,19 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A84FF).withOpacity(0.2),
+                color: AppTheme.accentBlue.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.info_outline,
-                      color: Color(0xFF0A84FF), size: 18),
+                      color: AppTheme.accentBlue, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Streams and fans will grow gradually over $_promoDays days as your music gains traction',
                       style: const TextStyle(
-                        color: Color(0xFF0A84FF),
+                        color: AppTheme.accentBlue,
                         fontSize: 12,
                       ),
                     ),
@@ -1641,7 +2052,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
             },
             child: const Text(
               'Done',
-              style: TextStyle(color: Color(0xFF0A84FF)),
+              style: TextStyle(color: AppTheme.accentBlue),
             ),
           ),
           ElevatedButton(
@@ -1653,7 +2064,7 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               });
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B9D),
+              backgroundColor: AppTheme.neonPurple,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1683,8 +2094,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFF32D74B),
+            style: TextStyle(
+              color: AppTheme.successGreen,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),

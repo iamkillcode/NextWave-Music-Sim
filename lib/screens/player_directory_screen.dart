@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../services/firebase_service.dart';
+import '../services/chat_service.dart';
+import '../services/poke_service.dart';
 import '../models/multiplayer_player.dart';
 import 'tunify_screen.dart';
 import 'maple_music_screen.dart';
+import 'chat_screen.dart';
 
 class PlayerDirectoryScreen extends StatefulWidget {
   const PlayerDirectoryScreen({super.key});
@@ -14,10 +18,12 @@ class PlayerDirectoryScreen extends StatefulWidget {
 class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
     with SingleTickerProviderStateMixin {
   final _service = FirebaseService();
+  final _pokeService = PokeService();
   final TextEditingController _searchController = TextEditingController();
   int _tabIndex = 0; // 0=Streams, 1=Fame, 2=NetWorth
   bool _loading = false;
   List<MultiplayerPlayer> _players = [];
+  Map<String, String> _pokeStatuses = {}; // userId -> status
 
   @override
   void initState() {
@@ -102,19 +108,112 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
     }
   }
 
+  Future<void> _handlePoke(MultiplayerPlayer p) async {
+    final currentUserId = _pokeService.currentUserId;
+    
+    if (currentUserId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to poke')),
+        );
+      }
+      return;
+    }
+    
+    if (currentUserId == p.id) return;
+
+    final success = await _pokeService.pokeUser(p.id);
+    
+    if (success && mounted) {
+      setState(() {
+        _pokeStatuses[p.id] = 'sent';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Poked ${p.displayName}! 👋'),
+          backgroundColor: AppTheme.neonGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _startChat(MultiplayerPlayer p) async {
+    final chatService = ChatService();
+    final currentUserId = chatService.currentUserId;
+    
+    if (currentUserId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please sign in to send messages')),
+        );
+      }
+      return;
+    }
+    
+    if (currentUserId == p.id) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You cannot message yourself')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final conversation = await chatService.startConversation(
+        otherUserId: p.id,
+        otherUserName: p.displayName,
+        otherUserAvatar: p.avatarUrl,
+      );
+
+      if (conversation == null && mounted) {
+        // No mutual pokes
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('You need to poke each other first to chat! 👋'),
+            backgroundColor: AppTheme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      if (conversation != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversationId: conversation.id,
+              otherUserId: p.id,
+              otherUserName: p.displayName,
+              otherUserAvatar: p.avatarUrl,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start chat: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
         title: const Text('Players', style: TextStyle(color: Colors.white)),
-        backgroundColor: const Color(0xFF21262D),
+        backgroundColor: AppTheme.surfaceDark,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: RefreshIndicator(
         onRefresh: _loadPlayers,
-        color: const Color(0xFF00D9FF),
-        backgroundColor: const Color(0xFF21262D),
+        color: AppTheme.accentBlue,
+        backgroundColor: AppTheme.surfaceDark,
         child: Column(
           children: [
             const SizedBox(height: 12),
@@ -129,7 +228,7 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
               child: _loading
                   ? const Center(
                       child:
-                          CircularProgressIndicator(color: Color(0xFF00D9FF)),
+                          CircularProgressIndicator(color: AppTheme.accentBlue),
                     )
                   : _filteredPlayers.isEmpty
                       ? const Center(
@@ -155,9 +254,9 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF30363D)),
+        border: Border.all(color: AppTheme.borderDefault),
       ),
       child: Row(
         children: [
@@ -214,8 +313,8 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
       ),
-      selectedColor: const Color(0xFF00D9FF),
-      backgroundColor: const Color(0xFF21262D),
+      selectedColor: AppTheme.accentBlue,
+      backgroundColor: AppTheme.surfaceDark,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       onSelected: (v) {
         if (v) {
@@ -229,18 +328,18 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
   Widget _buildPlayerTile(MultiplayerPlayer p, int rank) {
     // Rank colors for top 3
     Color? rankColor;
-    if (rank == 1) rankColor = const Color(0xFFFFD700); // Gold
-    if (rank == 2) rankColor = const Color(0xFFC0C0C0); // Silver
-    if (rank == 3) rankColor = const Color(0xFFCD7F32); // Bronze
+    if (rank == 1) rankColor = AppTheme.chartGold; // Gold
+    if (rank == 2) rankColor = AppTheme.chartSilver; // Silver
+    if (rank == 3) rankColor = AppTheme.chartBronze; // Bronze
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B22),
+        color: AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: rankColor ?? const Color(0xFF30363D),
+          color: rankColor ?? AppTheme.borderDefault,
           width: rankColor != null ? 2 : 1,
         ),
       ),
@@ -256,10 +355,10 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: rankColor?.withOpacity(0.2) ?? const Color(0xFF21262D),
+                  color: rankColor?.withOpacity(0.2) ?? AppTheme.surfaceDark,
                   border: Border.all(
                     color:
-                        rankColor?.withOpacity(0.6) ?? const Color(0xFF30363D),
+                        rankColor?.withOpacity(0.6) ?? AppTheme.borderDefault,
                     width: 2,
                   ),
                 ),
@@ -327,7 +426,7 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                           color: rankColor,
                           shape: BoxShape.circle,
                           border: Border.all(
-                              color: const Color(0xFF161B22), width: 2),
+                              color: AppTheme.surfaceDark, width: 2),
                         ),
                         child: const Icon(Icons.emoji_events,
                             color: Colors.black, size: 12),
@@ -342,10 +441,10 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                         width: 14,
                         height: 14,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF32D74B),
+                          color: AppTheme.successGreen,
                           shape: BoxShape.circle,
                           border: Border.all(
-                              color: const Color(0xFF161B22), width: 2),
+                              color: AppTheme.surfaceDark, width: 2),
                         ),
                       ),
                     ),
@@ -380,7 +479,7 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                       p.rankTitle,
                       style: TextStyle(
                         color: rankColor?.withOpacity(0.9) ??
-                            const Color(0xFF00D9FF),
+                            AppTheme.accentBlue,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -401,7 +500,7 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                 child: _buildStatBadge(
                   Icons.play_circle_filled,
                   _formatNumber(p.totalStreams),
-                  const Color(0xFF00D9FF),
+                  AppTheme.accentBlue,
                 ),
               ),
               const SizedBox(width: 6),
@@ -409,7 +508,7 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                 child: _buildStatBadge(
                   Icons.star,
                   '${p.currentFame}',
-                  const Color(0xFFFFD700),
+                  AppTheme.chartGold,
                 ),
               ),
               const SizedBox(width: 6),
@@ -417,7 +516,7 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                 child: _buildStatBadge(
                   Icons.attach_money,
                   p.formattedMoney,
-                  const Color(0xFF32D74B),
+                  AppTheme.successGreen,
                 ),
               ),
             ],
@@ -430,18 +529,18 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                 child: OutlinedButton.icon(
                   onPressed: () => _openPlatform(p, 'tunify'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1DB954),
-                    side: const BorderSide(color: Color(0xFF1DB954)),
+                    foregroundColor: AppTheme.successGreen,
+                    side: BorderSide(color: AppTheme.successGreen),
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   ),
-                  icon: const Icon(Icons.music_note, size: 16),
+                  icon: const Icon(Icons.music_note, size: 14),
                   label: const Text('Tunify',
                       style:
-                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _openPlatform(p, 'maple'),
@@ -449,18 +548,107 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
                     foregroundColor: const Color(0xFFFC3C44),
                     side: const BorderSide(color: Color(0xFFFC3C44)),
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   ),
-                  icon: const Text('🍎', style: TextStyle(fontSize: 14)),
+                  icon: const Text('🍎', style: TextStyle(fontSize: 12)),
                   label: const Text('Maple',
                       style:
-                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                 ),
+              ),
+              const SizedBox(width: 6),
+              // Dynamic Poke/Chat button
+              Expanded(
+                child: _buildPokeOrChatButton(p),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPokeOrChatButton(MultiplayerPlayer p) {
+    final currentUserId = _pokeService.currentUserId;
+    
+    // Can't poke yourself
+    if (currentUserId == p.id) {
+      return OutlinedButton.icon(
+        onPressed: null,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white38,
+          side: BorderSide(color: Colors.white38),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        ),
+        icon: const Icon(Icons.person, size: 14),
+        label: const Text('You',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+      );
+    }
+
+    return FutureBuilder<String>(
+      future: _pokeService.getPokeStatus(p.id),
+      builder: (context, snapshot) {
+        final status = _pokeStatuses[p.id] ?? snapshot.data ?? 'none';
+
+        switch (status) {
+          case 'mutual':
+            // Can chat!
+            return OutlinedButton.icon(
+              onPressed: () => _startChat(p),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.neonGreen,
+                side: BorderSide(color: AppTheme.neonGreen),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              ),
+              icon: const Icon(Icons.chat_bubble, size: 14),
+              label: const Text('Chat',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            );
+
+          case 'sent':
+            // Waiting for poke back
+            return OutlinedButton.icon(
+              onPressed: null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.neonPurple,
+                side: BorderSide(color: AppTheme.neonPurple),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              ),
+              icon: const Icon(Icons.hourglass_empty, size: 14),
+              label: const Text('Poked!',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            );
+
+          case 'received':
+            // They poked you - poke back!
+            return OutlinedButton.icon(
+              onPressed: () => _handlePoke(p),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.chartGold,
+                side: BorderSide(color: AppTheme.chartGold),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              ),
+              icon: const Icon(Icons.waving_hand, size: 14),
+              label: const Text('Poke Back',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            );
+
+          default:
+            // No connection yet - send poke
+            return OutlinedButton.icon(
+              onPressed: () => _handlePoke(p),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.accentBlue,
+                side: BorderSide(color: AppTheme.accentBlue),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              ),
+              icon: const Icon(Icons.waving_hand, size: 14),
+              label: const Text('Poke',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            );
+        }
+      },
     );
   }
 
@@ -521,15 +709,15 @@ class _PlayerDirectoryScreenState extends State<PlayerDirectoryScreen>
   List<Color> _getAvatarGradient(String? gender) {
     switch (gender?.toLowerCase()) {
       case 'male':
-        return [const Color(0xFF00D9FF), const Color(0xFF0066CC)]; // Blue
+        return [AppTheme.accentBlue, const Color(0xFF0066CC)]; // Blue
       case 'female':
-        return [const Color(0xFFFF6B9D), const Color(0xFFFF1744)]; // Pink
+        return [AppTheme.neonPurple, const Color(0xFFFF1744)]; // Pink
       case 'other':
-        return [const Color(0xFF7C3AED), const Color(0xFF4C1D95)]; // Purple
+        return [AppTheme.neonPurple, const Color(0xFF4C1D95)]; // Purple
       default:
         return [
-          const Color(0xFF00D9FF),
-          const Color(0xFF7C3AED)
+          AppTheme.accentBlue,
+          AppTheme.neonPurple
         ]; // Default gradient
     }
   }

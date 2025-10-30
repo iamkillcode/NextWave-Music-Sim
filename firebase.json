@@ -29,27 +29,17 @@
   },
   "functions": [
     {
-      "source": "functions/src",
-      "codebase": "typescript",
+      "source": "functions",
+      "codebase": "default",
       "runtime": "nodejs20",
       "ignore": [
         "node_modules",
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
-      ]
-    },
-    {
-      "source": "functions",
-      "codebase": "legacy",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
         "*.local",
-        "src/"
+        "src/",
+        "src.backup/"
       ],
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"

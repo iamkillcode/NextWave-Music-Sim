@@ -5365,6 +5365,77 @@ exports.validateNexTubeUpload = onCall(async (request) => {
   }
 });
 
+// NEXTUBE SCHEDULED VIDEO RELEASE PROCESSING
+// Runs every hour to check for scheduled videos that should be published
+// Updates status from 'scheduled' to 'published' when releaseDate is reached
+exports.processScheduledVideos = onSchedule({
+  schedule: '50 * * * *', // Run at :50 every hour (10 mins before NexTube daily sim)
+  timeZone: 'UTC',
+  timeoutSeconds: 120,
+  memory: '256MiB',
+}, async (event) => {
+  console.log('📅 Processing scheduled NexTube videos...');
+  
+  try {
+    // Get current in-game date
+    const currentGameDate = await getCurrentGameDateServer();
+    console.log(`📅 Current game date: ${currentGameDate.toISOString().split('T')[0]}`);
+    
+    // Query for videos with status 'scheduled' and releaseDate <= currentGameDate
+    const scheduledVideosSnapshot = await db.collection('nexttube_videos')
+      .where('status', '==', 'scheduled')
+      .get();
+    
+    if (scheduledVideosSnapshot.empty) {
+      console.log('✅ No scheduled videos to process');
+      return;
+    }
+    
+    console.log(`📺 Found ${scheduledVideosSnapshot.size} scheduled videos to check`);
+    
+    let publishedCount = 0;
+    const batch = db.batch();
+    
+    for (const doc of scheduledVideosSnapshot.docs) {
+      const video = doc.data();
+      const releaseDate = toDateSafe(video.releaseDate);
+      
+      if (!releaseDate) {
+        console.warn(`⚠️ Scheduled video ${doc.id} missing releaseDate, publishing now`);
+        batch.update(doc.ref, {
+          status: 'published',
+          releaseDate: admin.firestore.FieldValue.delete(),
+        });
+        publishedCount++;
+        continue;
+      }
+      
+      // Check if release date has passed (compare dates only, ignore time)
+      const releaseDateOnly = new Date(releaseDate.getFullYear(), releaseDate.getMonth(), releaseDate.getDate());
+      const currentDateOnly = new Date(currentGameDate.getFullYear(), currentGameDate.getMonth(), currentGameDate.getDate());
+      
+      if (currentDateOnly >= releaseDateOnly) {
+        console.log(`✅ Publishing video: ${video.title} (scheduled for ${releaseDateOnly.toISOString().split('T')[0]})`);
+        batch.update(doc.ref, {
+          status: 'published',
+        });
+        publishedCount++;
+      }
+    }
+    
+    if (publishedCount > 0) {
+      await batch.commit();
+      console.log(`🎉 Published ${publishedCount} scheduled videos`);
+    } else {
+      console.log('✅ No videos ready to publish yet');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error processing scheduled videos:', error);
+    throw error;
+  }
+});
+
 // NEXTUBE DAILY SIMULATION (v1 API)
 // Runs every 60 minutes (1h == 1 in-game day).
 // For each video, computes viewsToday based on owner stats, video type, novelty, and randomness.
@@ -5433,7 +5504,10 @@ exports.updateNextTubeDaily = onSchedule({
     let processed = 0;
 
     while (true) {
-      let query = db.collection('nexttube_videos').orderBy('createdAt').limit(pageSize);
+      let query = db.collection('nexttube_videos')
+        .where('status', '==', 'published') // Only process published videos
+        .orderBy('createdAt')
+        .limit(pageSize);
       if (lastDoc) query = query.startAfter(lastDoc);
       const snap = await query.get();
       if (snap.empty) break;
@@ -5634,16 +5708,17 @@ exports.runNextTubeNow = onCall({
       return isNaN(d.getTime()) ? new Date() : d;
     };
 
-    // Fetch only this user's videos
+    // Fetch only this user's published videos
     const snap = await db
       .collection('nexttube_videos')
       .where('ownerId', '==', userId)
+      .where('status', '==', 'published')
       .orderBy('createdAt')
       .limit(500)
       .get();
 
     if (snap.empty) {
-      return { processed: 0, message: 'No videos for this user' };
+      return { processed: 0, message: 'No published videos for this user' };
     }
 
     const batch = db.batch();

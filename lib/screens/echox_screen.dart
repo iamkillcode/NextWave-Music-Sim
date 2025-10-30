@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/firestore_sanitizer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
 import 'echox_comments_screen.dart';
+import 'echox_composer_screen.dart';
 import '../services/firebase_service.dart';
 import 'tunify_screen.dart';
 import 'maple_music_screen.dart';
@@ -126,7 +128,6 @@ class _EchoXScreenState extends State<EchoXScreen>
   late ArtistStats _currentStats;
   final TextEditingController _postController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isPosting = false;
 
   @override
   void initState() {
@@ -146,80 +147,140 @@ class _EchoXScreenState extends State<EchoXScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF000000),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00D9FF), Color(0xFF7C3AED)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(8),
+      backgroundColor: const Color(0xFF0A0E14), // Darker background
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              floating: true,
+              pinned: true,
+              backgroundColor: const Color(0xFF0A0E14),
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
               ),
-              child: const Icon(Icons.bolt, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'EchoX',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+              title: Row(
+                children: [
+                  // Animated gradient bolt icon
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00CED1), Color(0xFF20B2AA)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00CED1).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.bolt, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'EchoX',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      Text(
+                        'What\'s trending in music?',
+                        style: TextStyle(
+                          color: Color(0xFF00CED1),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorColor: const Color(0xFF00CED1),
+                    indicatorWeight: 3,
+                    labelColor: const Color(0xFF00CED1),
+                    unselectedLabelColor: Colors.white38,
+                    labelStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    tabs: const [
+                      Tab(text: 'For You'),
+                      Tab(text: 'My Posts'),
+                    ],
                   ),
                 ),
-                Text(
-                  'Artist Social Network',
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ],
-        ),
-        bottom: TabBar(
+          ];
+        },
+        body: TabBarView(
           controller: _tabController,
-          indicatorColor: const Color(0xFF00D9FF),
-          indicatorWeight: 3,
-          labelColor: const Color(0xFF00D9FF),
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(text: 'FEED', icon: Icon(Icons.dynamic_feed, size: 18)),
-            Tab(text: 'MY POSTS', icon: Icon(Icons.person, size: 18)),
+          children: [
+            _buildFeedTab(),
+            _buildMyPostsTab(),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildFeedTab(),
-          _buildMyPostsTab(),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showPostDialog,
-        backgroundColor: const Color(0xFF00D9FF),
-        icon: const Icon(Icons.add, color: Colors.black),
-        label: const Text(
-          'POST',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF00CED1), Color(0xFF20B2AA)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00CED1).withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: _showPostDialog,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          icon: const Icon(Icons.create, color: Colors.white),
+          label: const Text(
+            'POST',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
       ),
@@ -235,23 +296,85 @@ class _EchoXScreenState extends State<EchoXScreen>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF00D9FF)),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00CED1), Color(0xFF20B2AA)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00CED1).withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Loading feed...',
+                  style: TextStyle(
+                    color: Color(0xFF00CED1),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
         if (snapshot.hasError) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                const SizedBox(height: 16),
-                Text(
-                  'Error loading feed',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
-              ],
+            child: Container(
+              margin: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F1419),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.error_outline,
+                        color: Colors.red, size: 48),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Oops! Something went wrong',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Unable to load feed',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -266,25 +389,58 @@ class _EchoXScreenState extends State<EchoXScreen>
 
         if (posts.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('🔊', style: TextStyle(fontSize: 64)),
-                const SizedBox(height: 16),
-                const Text(
-                  'No posts yet',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+            child: Container(
+              margin: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F1419),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFF00CED1).withOpacity(0.2),
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF00CED1).withOpacity(0.2),
+                          const Color(0xFF20B2AA).withOpacity(0.2),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.bolt,
+                      size: 64,
+                      color: Color(0xFF00CED1),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Be the first to post on EchoX!',
-                  style: TextStyle(color: Colors.white54, fontSize: 16),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Welcome to EchoX',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Be the first to share your music journey!\nTap the POST button to get started.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -321,7 +477,7 @@ class _EchoXScreenState extends State<EchoXScreen>
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF00D9FF)),
+            child: CircularProgressIndicator(color: AppTheme.accentBlue),
           );
         }
 
@@ -375,131 +531,180 @@ class _EchoXScreenState extends State<EchoXScreen>
     final isMyPost = userId == post.authorId;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFF16181C),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: const Color(0xFF0F1419),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.white.withOpacity(0.08),
+            width: 1,
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Author info
-          Row(
-            children: [
-              // Make avatar tappable to view artist platforms
-              GestureDetector(
-                onTap: () =>
-                    _showViewArtistOptions(post.authorId, post.authorName),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isMyPost
-                          ? [const Color(0xFF00D9FF), const Color(0xFF7C3AED)]
-                          : [Colors.grey.shade700, Colors.grey.shade800],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child:
-                      const Icon(Icons.person, color: Colors.white, size: 24),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _navigateToComments(post),
+          splashColor: const Color(0xFF00CED1).withOpacity(0.05),
+          highlightColor: const Color(0xFF00CED1).withOpacity(0.02),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar
+                GestureDetector(
                   onTap: () =>
                       _showViewArtistOptions(post.authorId, post.authorName),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isMyPost
+                            ? [const Color(0xFF00CED1), const Color(0xFF20B2AA)]
+                            : [const Color(0xFF2C3440), const Color(0xFF1C2128)],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: isMyPost
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF00CED1).withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: Center(
+                      child: Text(
+                        post.authorName[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Content
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Author info row
                       Row(
                         children: [
                           Flexible(
-                            child: Text(
-                              post.authorName,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            child: GestureDetector(
+                              onTap: () => _showViewArtistOptions(
+                                  post.authorId, post.authorName),
+                              child: Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      post.authorName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isMyPost) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.verified,
+                                      color: Color(0xFF00CED1),
+                                      size: 18,
+                                    ),
+                                  ],
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '@${post.authorName.toLowerCase().replaceAll(' ', '')}',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.5),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '· ${_formatTimestamp(post.timestamp)}',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.5),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          if (isMyPost) ...[
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.verified,
-                              color: Color(0xFF00D9FF),
-                              size: 16,
+                          if (showDelete && isMyPost)
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: Colors.red, size: 18),
+                              onPressed: () => _deletePost(post.id),
                             ),
-                          ],
                         ],
                       ),
-                      Text(
-                        _formatTimestamp(post.timestamp),
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
+                      const SizedBox(height: 8),
+                      // Post content
+                      _buildPostContentWithMentions(post.content),
+                      const SizedBox(height: 12),
+                      // Interaction buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildInteractionButton(
+                            icon: Icons.chat_bubble_outline,
+                            count: post.comments,
+                            color: Colors.white.withOpacity(0.6),
+                            activeColor: const Color(0xFF00CED1),
+                            onTap: () => _navigateToComments(post),
+                          ),
+                          _buildInteractionButton(
+                            icon: Icons.repeat_rounded,
+                            count: post.echoes,
+                            color: Colors.white.withOpacity(0.6),
+                            activeColor: const Color(0xFF00FF7F),
+                            onTap: () => _echoPost(post),
+                          ),
+                          _buildInteractionButton(
+                            icon: isLiked
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            count: post.likes,
+                            color: Colors.white.withOpacity(0.6),
+                            activeColor: const Color(0xFFFF1493),
+                            isActive: isLiked,
+                            onTap: () => _toggleLike(post),
+                          ),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Icon(
+                              Icons.open_in_new,
+                              color: Colors.white.withOpacity(0.6),
+                              size: 18,
+                            ),
+                            onPressed: () => _showViewArtistOptions(
+                                post.authorId, post.authorName),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-              ),
-              if (showDelete && isMyPost)
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () => _deletePost(post.id),
-                ),
-              // Quick action to open platforms
-              IconButton(
-                tooltip: 'View platforms',
-                icon: const Icon(Icons.open_in_new, color: Colors.white70),
-                onPressed: () =>
-                    _showViewArtistOptions(post.authorId, post.authorName),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Post content
-          Text(
-            post.content,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              height: 1.4,
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          // Interaction buttons
-          Row(
-            children: [
-              _buildInteractionButton(
-                icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                count: post.likes,
-                color: isLiked ? Colors.red : Colors.white54,
-                onTap: () => _toggleLike(post),
-              ),
-              const SizedBox(width: 24),
-              _buildInteractionButton(
-                icon: Icons.chat_bubble_outline,
-                count: post.comments,
-                color: Colors.white54,
-                onTap: () => _navigateToComments(post),
-              ),
-              const SizedBox(width: 24),
-              _buildInteractionButton(
-                icon: Icons.repeat,
-                count: post.echoes,
-                color: Colors.white54,
-                onTap: () => _echoPost(post),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -508,25 +713,34 @@ class _EchoXScreenState extends State<EchoXScreen>
     required IconData icon,
     required int count,
     required Color color,
+    Color? activeColor,
+    bool isActive = false,
     required VoidCallback onTap,
   }) {
+    final displayColor = isActive && activeColor != null ? activeColor : color;
+    
     return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          if (count > 0) ...[
-            const SizedBox(width: 6),
-            Text(
-              _formatCount(count),
-              style: TextStyle(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: displayColor, size: 18),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Text(
+                _formatCount(count),
+                style: TextStyle(
+                  color: displayColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -537,104 +751,21 @@ class _EchoXScreenState extends State<EchoXScreen>
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF16181C),
-        title: const Row(
-          children: [
-            Icon(Icons.bolt, color: Color(0xFF00D9FF)),
-            SizedBox(width: 8),
-            Text(
-              'Create Post',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EchoXComposerScreen(
+          artistStats: _currentStats,
+          onPost: (content, {trackId, albumId}) async {
+            await _createPostWithContent(content, trackId: trackId, albumId: albumId);
+          },
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _postController,
-                maxLines: 4,
-                maxLength: 280,
-                style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: "What's happening in your music career?",
-                  hintStyle: TextStyle(color: Colors.white38),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF00D9FF)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white24),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF00D9FF), width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF00D9FF)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline,
-                        color: Color(0xFF00D9FF), size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Cost: 5 Energy • Gain: +1 Fame, +2 Hype',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: _isPosting ? null : _createPost,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
-              foregroundColor: Colors.black,
-            ),
-            child: _isPosting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.black,
-                    ),
-                  )
-                : const Text('POST'),
-          ),
-        ],
+        fullscreenDialog: true,
       ),
     );
   }
 
-  Future<void> _createPost() async {
-    final content = _postController.text.trim();
+  Future<void> _createPostWithContent(String content, {String? trackId, String? albumId}) async {
     if (content.isEmpty) {
       _showMessage('❌ Post cannot be empty!');
       return;
@@ -645,11 +776,12 @@ class _EchoXScreenState extends State<EchoXScreen>
       return;
     }
 
-    setState(() => _isPosting = true);
-
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Not signed in');
+
+      // Parse @ mentions
+      final mentionedUsers = _extractMentions(content);
 
       final post = EchoPost(
         id: '',
@@ -659,9 +791,15 @@ class _EchoXScreenState extends State<EchoXScreen>
         timestamp: DateTime.now(),
       );
 
+      // Create post document
+      final postData = post.toFirestore();
+      postData['mentionedUsers'] = mentionedUsers;
+      if (trackId != null) postData['attachedTrackId'] = trackId;
+      if (albumId != null) postData['attachedAlbumId'] = albumId;
+
       await FirebaseFirestore.instance
           .collection('echox_posts')
-          .add(post.toFirestore());
+          .add(postData);
 
       // Update stats
       _currentStats = _currentStats.copyWith(
@@ -674,14 +812,17 @@ class _EchoXScreenState extends State<EchoXScreen>
 
       _postController.clear();
       if (mounted) {
-        Navigator.pop(context);
         _showMessage('📢 Posted on EchoX! +1 Fame, +2 Hype');
       }
     } catch (e) {
       _showMessage('❌ Failed to post: $e');
-    } finally {
-      setState(() => _isPosting = false);
     }
+  }
+
+  List<String> _extractMentions(String content) {
+    final mentionRegex = RegExp(r'@(\w+)');
+    final matches = mentionRegex.allMatches(content);
+    return matches.map((m) => m.group(1)!).toSet().toList();
   }
 
   Future<void> _toggleLike(EchoPost post) async {
@@ -749,6 +890,70 @@ class _EchoXScreenState extends State<EchoXScreen>
     }
   }
 
+  Widget _buildPostContentWithMentions(String content) {
+    const mentionColor = Color(0xFF00CED1);
+    
+    final spans = <TextSpan>[];
+    final mentionRegex = RegExp(r'(@\w+)');
+    int lastMatchEnd = 0;
+    
+    for (final match in mentionRegex.allMatches(content)) {
+      // Add text before the mention
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(
+          text: content.substring(lastMatchEnd, match.start),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 15,
+            height: 1.4,
+            letterSpacing: 0.2,
+          ),
+        ));
+      }
+      
+      // Add the @ mention with glow effect
+      final mentionText = match.group(0)!;
+      spans.add(TextSpan(
+        text: mentionText,
+        style: const TextStyle(
+          color: mentionColor,
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          height: 1.4,
+          letterSpacing: 0.2,
+          shadows: [
+            Shadow(
+              color: mentionColor,
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        // TODO: Add GestureRecognizer to navigate to player profile
+        // recognizer: TapGestureRecognizer()
+        //   ..onTap = () => _navigateToPlayer(mentionText.substring(1)),
+      ));
+      
+      lastMatchEnd = match.end;
+    }
+    
+    // Add remaining text after last mention
+    if (lastMatchEnd < content.length) {
+      spans.add(TextSpan(
+        text: content.substring(lastMatchEnd),
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.95),
+          fontSize: 15,
+          height: 1.4,
+          letterSpacing: 0.2,
+        ),
+      ));
+    }
+    
+    return RichText(
+      text: TextSpan(children: spans),
+    );
+  }
+
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final diff = now.difference(timestamp);
@@ -794,7 +999,7 @@ class _EchoXScreenState extends State<EchoXScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: const Color(0xFF16181C),
+          backgroundColor: AppTheme.surfaceDark,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -805,7 +1010,7 @@ class _EchoXScreenState extends State<EchoXScreen>
   void _showViewArtistOptions(String playerId, String authorName) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF16181C),
+      backgroundColor: AppTheme.surfaceDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -888,7 +1093,7 @@ class _EchoXScreenState extends State<EchoXScreen>
                 const SizedBox(height: 16),
                 ListTile(
                   leading:
-                      const Icon(Icons.music_note, color: Color(0xFF1DB954)),
+                      Icon(Icons.music_note, color: AppTheme.successGreen),
                   title: const Text('Tunify',
                       style: TextStyle(color: Colors.white)),
                   subtitle: Text('Spotify-style profile',

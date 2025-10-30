@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firebase_status.dart';
@@ -296,10 +297,10 @@ class _AuthScreenState extends State<AuthScreen>
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: AppTheme.surfaceDark,
         title: const Row(
           children: [
-            Icon(Icons.lock_reset, color: Color(0xFF00D9FF)),
+            Icon(Icons.lock_reset, color: AppTheme.accentBlue),
             SizedBox(width: 8),
             Text(
               'Reset Password',
@@ -325,10 +326,10 @@ class _AuthScreenState extends State<AuthScreen>
                 labelStyle: const TextStyle(color: Colors.white60),
                 prefixIcon: const Icon(
                   Icons.email_outlined,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -340,7 +341,7 @@ class _AuthScreenState extends State<AuthScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -363,7 +364,7 @@ class _AuthScreenState extends State<AuthScreen>
               Navigator.pop(context, email);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9FF),
+              backgroundColor: AppTheme.accentBlue,
               foregroundColor: Colors.black,
             ),
             child: const Text('SEND RESET EMAIL'),
@@ -438,9 +439,9 @@ class _AuthScreenState extends State<AuthScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFF0D1117),
+              AppTheme.backgroundDark,
               const Color(0xFF1A1F2E),
-              const Color(0xFF0D1117),
+              AppTheme.backgroundDark,
             ],
           ),
         ),
@@ -457,8 +458,8 @@ class _AuthScreenState extends State<AuthScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF00D9FF).withOpacity(0.2),
-                          const Color(0xFF7C3AED).withOpacity(0.2),
+                          AppTheme.accentBlue.withOpacity(0.2),
+                          AppTheme.neonPurple.withOpacity(0.2),
                         ],
                       ),
                       shape: BoxShape.circle,
@@ -466,7 +467,7 @@ class _AuthScreenState extends State<AuthScreen>
                     child: const Icon(
                       Icons.music_note,
                       size: 64,
-                      color: Color(0xFF00D9FF),
+                      color: AppTheme.accentBlue,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -498,10 +499,10 @@ class _AuthScreenState extends State<AuthScreen>
                           : double.infinity,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF21262D),
+                      color: AppTheme.surfaceDark,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFF00D9FF).withOpacity(0.3),
+                        color: AppTheme.accentBlue.withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -510,7 +511,7 @@ class _AuthScreenState extends State<AuthScreen>
                         // Tab Bar
                         Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0D1117),
+                            color: AppTheme.backgroundDark,
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(16),
                               topRight: Radius.circular(16),
@@ -518,9 +519,9 @@ class _AuthScreenState extends State<AuthScreen>
                           ),
                           child: TabBar(
                             controller: _tabController,
-                            indicatorColor: const Color(0xFF00D9FF),
+                            indicatorColor: AppTheme.accentBlue,
                             indicatorWeight: 3,
-                            labelColor: const Color(0xFF00D9FF),
+                            labelColor: AppTheme.accentBlue,
                             unselectedLabelColor: Colors.white60,
                             labelStyle: const TextStyle(
                               fontSize: 16,
@@ -696,10 +697,10 @@ class _AuthScreenState extends State<AuthScreen>
                 labelStyle: const TextStyle(color: Colors.white60),
                 prefixIcon: const Icon(
                   Icons.email_outlined,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -711,7 +712,7 @@ class _AuthScreenState extends State<AuthScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -738,7 +739,7 @@ class _AuthScreenState extends State<AuthScreen>
                 labelStyle: const TextStyle(color: Colors.white60),
                 prefixIcon: const Icon(
                   Icons.lock_outlined,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -749,7 +750,7 @@ class _AuthScreenState extends State<AuthScreen>
                       setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -761,7 +762,7 @@ class _AuthScreenState extends State<AuthScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -788,7 +789,7 @@ class _AuthScreenState extends State<AuthScreen>
                 labelStyle: const TextStyle(color: Colors.white60),
                 prefixIcon: const Icon(
                   Icons.lock_outlined,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -802,7 +803,7 @@ class _AuthScreenState extends State<AuthScreen>
                   ),
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -814,7 +815,7 @@ class _AuthScreenState extends State<AuthScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -837,7 +838,7 @@ class _AuthScreenState extends State<AuthScreen>
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _handleSignUp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00D9FF),
+                  backgroundColor: AppTheme.accentBlue,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -895,10 +896,10 @@ class _AuthScreenState extends State<AuthScreen>
                 ),
                 prefixIcon: const Icon(
                   Icons.person_outline,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -910,7 +911,7 @@ class _AuthScreenState extends State<AuthScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -934,7 +935,7 @@ class _AuthScreenState extends State<AuthScreen>
                 labelStyle: const TextStyle(color: Colors.white60),
                 prefixIcon: const Icon(
                   Icons.lock_outlined,
-                  color: Color(0xFF00D9FF),
+                  color: AppTheme.accentBlue,
                 ),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -945,7 +946,7 @@ class _AuthScreenState extends State<AuthScreen>
                       setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppTheme.backgroundDark,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.white30),
@@ -957,7 +958,7 @@ class _AuthScreenState extends State<AuthScreen>
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(
-                    color: Color(0xFF00D9FF),
+                    color: AppTheme.accentBlue,
                     width: 2,
                   ),
                 ),
@@ -978,7 +979,7 @@ class _AuthScreenState extends State<AuthScreen>
                 onPressed: _handleForgotPassword,
                 child: const Text(
                   'Forgot Password?',
-                  style: TextStyle(color: Color(0xFF00D9FF)),
+                  style: TextStyle(color: AppTheme.accentBlue),
                 ),
               ),
             ),
@@ -990,7 +991,7 @@ class _AuthScreenState extends State<AuthScreen>
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00D9FF),
+                  backgroundColor: AppTheme.accentBlue,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(

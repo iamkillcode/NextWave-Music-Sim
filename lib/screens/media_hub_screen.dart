@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../widgets/app_navigation_wrapper.dart';
+import '../services/chat_service.dart';
 import 'tunify_screen.dart';
 import 'maple_music_screen.dart';
 import 'echox_screen.dart';
 import 'player_directory_screen.dart';
 import 'nexttube_home_screen.dart';
+import 'conversation_list_screen.dart';
 
 class MediaHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
@@ -28,7 +31,7 @@ class MediaHubScreen extends StatelessWidget {
       artistStats: artistStats,
       onStatsUpdated: onStatsUpdated,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppTheme.backgroundDark,
         appBar: AppBar(
           title: const Text(
             'Media Hub',
@@ -38,7 +41,7 @@ class MediaHubScreen extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: const Color(0xFF21262D),
+          backgroundColor: AppTheme.surfaceDark,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
         ),
@@ -55,8 +58,8 @@ class MediaHubScreen extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFF21262D),
-                      const Color(0xFF1C2128),
+                      AppTheme.surfaceDark,
+                      AppTheme.surfaceElevated,
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
@@ -75,7 +78,7 @@ class MediaHubScreen extends StatelessWidget {
                     const Row(
                       children: [
                         Icon(Icons.insights_rounded,
-                            color: Color(0xFF00D9FF), size: 24),
+                            color: AppTheme.accentBlue, size: 24),
                         SizedBox(width: 8),
                         Text(
                           'Your Reach',
@@ -127,7 +130,7 @@ class MediaHubScreen extends StatelessWidget {
               const Row(
                 children: [
                   Icon(Icons.music_note_rounded,
-                      color: Color(0xFF00D9FF), size: 20),
+                      color: AppTheme.accentBlue, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'Streaming Platforms',
@@ -157,7 +160,7 @@ class MediaHubScreen extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF1DB954), Color(0xFF1ED760)],
+                      colors: [AppTheme.successGreen, Color(0xFF1ED760)],
                     ),
                     badge: _formatNumber(_getTunifyStreams()),
                     onTap: () {
@@ -179,7 +182,7 @@ class MediaHubScreen extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFFFC3C44), Color(0xFFFF6B9D)],
+                      colors: [Color(0xFFFC3C44), AppTheme.neonPurple],
                     ),
                     badge: _formatNumber(_getMapleMusicStreams()),
                     onTap: () {
@@ -201,7 +204,7 @@ class MediaHubScreen extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFFFF0000), Color(0xFFFF6B6B)],
+                      colors: [Color(0xFFFF0000), AppTheme.errorRed],
                     ),
                     badge: '',
                     onTap: () {
@@ -223,7 +226,7 @@ class MediaHubScreen extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF00D9FF), Color(0xFF7C3AED)],
+                      colors: [AppTheme.accentBlue, AppTheme.neonPurple],
                     ),
                     badge: '',
                     onTap: () {
@@ -244,7 +247,7 @@ class MediaHubScreen extends StatelessWidget {
               const Row(
                 children: [
                   Icon(Icons.public_rounded,
-                      color: Color(0xFF00D9FF), size: 20),
+                      color: AppTheme.accentBlue, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'Social Media',
@@ -285,6 +288,24 @@ class MediaHubScreen extends StatelessWidget {
                             artistStats: artistStats,
                             onStatsUpdated: onStatsUpdated,
                           ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppIconWithUnreadBadge(
+                    context,
+                    name: 'StarChat',
+                    icon: Icons.chat_bubble_rounded,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppTheme.neonGreen, AppTheme.neonPurple],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ConversationListScreen(),
                         ),
                       );
                     },
@@ -356,11 +377,11 @@ class MediaHubScreen extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                        colors: [AppTheme.errorRed, Color(0xFFFF8E53)],
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border:
-                          Border.all(color: const Color(0xFF0D1117), width: 2),
+                          Border.all(color: AppTheme.backgroundDark, width: 2),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.3),
@@ -400,10 +421,118 @@ class MediaHubScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAppIconWithUnreadBadge(
+    BuildContext context, {
+    required String name,
+    required IconData icon,
+    required Gradient gradient,
+    required VoidCallback onTap,
+  }) {
+    final chatService = ChatService();
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // App Icon with real-time unread badge
+          StreamBuilder<int>(
+            stream: chatService.streamTotalUnreadCount(),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+              
+              return Stack(
+                children: [
+                  // Main Icon Container
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: gradient,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                          spreadRadius: -2,
+                        ),
+                        BoxShadow(
+                          color: gradient.colors.first.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                    ),
+                  ),
+                  // Badge (real-time unread count)
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppTheme.errorRed, Color(0xFFFF8E53)],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppTheme.backgroundDark, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          // App Name
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatColumn(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: const Color(0xFF00D9FF), size: 28),
+        Icon(icon, color: AppTheme.accentBlue, size: 28),
         const SizedBox(height: 8),
         Text(
           value,
