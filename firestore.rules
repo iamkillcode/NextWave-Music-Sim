@@ -105,6 +105,63 @@ service cloud.firestore {
     // Note: Pokes are stored as arrays in player documents: sentPokes and receivedPokes
     // The general player rules allow authenticated users to update their own poke arrays
 
+    // WakandaZon marketplace listings - public read, owner write
+    match /wakandazon_listings/{listingId} {
+      // Anyone can read listings
+      allow read: if true;
+      
+      // Only authenticated users can create listings for themselves
+      // Requires at least 100 fame to sell songs
+      allow create: if isSignedIn() 
+        && request.resource.data.sellerId == request.auth.uid
+        && get(/databases/$(database)/documents/players/$(request.auth.uid)).data.currentFame >= 100
+        && request.resource.data.keys().hasAll(['sellerId', 'sellerName', 'songTitle', 'genre', 'quality', 'price', 'status', 'listedAt'])
+        && request.resource.data.status == 'active'
+        && request.resource.data.price is int
+        && request.resource.data.price > 0
+        && request.resource.data.price <= 10000000;
+      
+      // Sellers cannot update listings directly (only Cloud Functions can mark as sold/cancelled)
+      // Prevent client-side status changes to avoid exploits
+      allow update: if false;
+      
+      // Only seller can delete their own active listings
+      // NOTE: Cancellations should use the Cloud Function instead
+      allow delete: if isOwner(resource.data.sellerId) 
+        && resource.data.status == 'active';
+    }
+
+    // WakandaZon purchases - read only for participants, write only by Cloud Functions
+    match /wakandazon_purchases/{purchaseId} {
+      // Only buyer or seller can read purchase records
+      allow read: if isSignedIn() 
+        && (request.auth.uid == resource.data.buyerId 
+            || request.auth.uid == resource.data.sellerId);
+      
+      // Purchases can only be created by Cloud Functions (server-side)
+      // Clients cannot create purchases directly to prevent money exploits
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Players collection - read public, write restricted
+    match /players/{playerId} {
+      // Anyone can read player profiles (for leaderboards, charts, etc.)
+      allow read: if true;
+      
+      // Players can update their own profile, but NOT money field
+      // Money can only be changed by Cloud Functions to prevent exploits
+      allow update: if isOwner(playerId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['money']);
+      
+      // Allow creation (for new user registration)
+      allow create: if isSignedIn() && request.auth.uid == playerId;
+      
+      // No deletion of player accounts via client
+      allow delete: if false;
+    }
+
     // Default rules for other collections (temporary - update before Nov 11, 2025)
     match /{document=**} {
       allow read, write: if request.time < timestamp.date(2025, 11, 11);

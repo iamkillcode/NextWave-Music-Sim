@@ -1200,7 +1200,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           case 'inspiration':
             artistStats = artistStats.copyWith(
               inspirationLevel:
-                  artistStats.inspirationLevel + practice.skillGain,
+                  (artistStats.inspirationLevel + practice.skillGain)
+                      .clamp(0, 100),
               experience: artistStats.experience + practice.xpGain,
             );
             break;

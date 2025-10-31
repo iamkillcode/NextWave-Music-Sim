@@ -504,7 +504,8 @@ class _StudioScreenState extends State<StudioScreen>
         songsWritten:
             _currentStats.songsWritten + 1, // ✅ Increment when released!
         songs: updatedSongs,
-        inspirationLevel: (_currentStats.inspirationLevel + hypeGain).clamp(0, 150), // 🔥 Add hype from release
+        inspirationLevel: (_currentStats.inspirationLevel + hypeGain)
+            .clamp(0, 100), // 🔥 Add hype from release (max 100)
         lastActivityDate: currentGameDate, // ✅ Update activity for fame decay
       );
     });

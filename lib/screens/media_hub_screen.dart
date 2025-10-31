@@ -11,6 +11,7 @@ import 'player_directory_screen.dart';
 import 'nexttube_home_screen.dart';
 import 'conversation_list_screen.dart';
 import 'certifications_screen.dart';
+import 'wakandazon_screen.dart';
 
 class MediaHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
@@ -359,6 +360,28 @@ class MediaHubScreen extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (context) => CertificationsScreen(
                             artistStats: artistStats,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppIcon(
+                    context,
+                    name: 'WakandaZon',
+                    icon: Icons.shopping_bag_rounded,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFF9900), Color(0xFFFF6600)],
+                    ),
+                    badge: '',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => WakandaZonScreen(
+                            artistStats: artistStats,
+                            onStatsUpdated: onStatsUpdated,
                           ),
                         ),
                       );

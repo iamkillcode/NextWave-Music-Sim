@@ -786,7 +786,7 @@ class _EchoXScreenState extends State<EchoXScreen>
         fame: _currentStats.fame + 1,
         creativity: _currentStats.creativity + hypeGain, // Update old field too
         inspirationLevel: (_currentStats.inspirationLevel + hypeGain)
-            .clamp(0, 150), // 🔥 Add hype
+            .clamp(0, 100), // 🔥 Add hype (max 100)
         lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
       widget.onStatsUpdated(_currentStats);

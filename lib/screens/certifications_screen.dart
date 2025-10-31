@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 
-class CertificationsScreen extends StatelessWidget {
+class CertificationsScreen extends StatefulWidget {
   final ArtistStats artistStats;
 
   const CertificationsScreen({
@@ -12,8 +14,28 @@ class CertificationsScreen extends StatelessWidget {
   });
 
   @override
+  State<CertificationsScreen> createState() => _CertificationsScreenState();
+}
+
+class _CertificationsScreenState extends State<CertificationsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final certifiedSongs = artistStats.songs
+    final certifiedSongs = widget.artistStats.songs
         .where((song) =>
             song.state == SongState.released &&
             song.highestCertification != 'none')
@@ -41,43 +63,315 @@ class CertificationsScreen extends StatelessWidget {
         backgroundColor: AppTheme.surfaceDark,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFFFFD700),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          tabs: const [
+            Tab(text: 'My Certifications'),
+            Tab(text: 'Rankings'),
+          ],
+        ),
       ),
-      body: certifiedSongs.isEmpty
-          ? _buildEmptyState()
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Stats Card
-                  _buildStatsCard(certifiedSongs),
-                  const SizedBox(height: 24),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildMyCertifications(certifiedSongs),
+          _buildRankings(),
+        ],
+      ),
+    );
+  }
 
-                  // Certifications List
-                  const Row(
-                    children: [
-                      Icon(Icons.emoji_events_rounded,
-                          color: AppTheme.accentBlue, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Certified Songs',
+  Widget _buildMyCertifications(List<Song> certifiedSongs) {
+    if (certifiedSongs.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats Card
+          _buildStatsCard(certifiedSongs),
+          const SizedBox(height: 24),
+
+          // Certifications List
+          const Row(
+            children: [
+              Icon(Icons.emoji_events_rounded,
+                  color: AppTheme.accentBlue, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Certified Songs',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Song Cards
+          ...certifiedSongs.map((song) => _buildSongCard(song)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRankings() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('players').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Text(
+              'No data available',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+          );
+        }
+
+        // Calculate certification scores for each player
+        final playerScores = <Map<String, dynamic>>[];
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+
+        for (final doc in snapshot.data!.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final songs = data['songs'] as List<dynamic>? ?? [];
+
+          int totalScore = 0;
+          int certCount = 0;
+
+          for (final songData in songs) {
+            if (songData is Map<String, dynamic>) {
+              final cert =
+                  songData['highestCertification'] as String? ?? 'none';
+              final level = songData['certificationLevel'] as int? ?? 0;
+
+              if (cert != 'none') {
+                certCount++;
+                totalScore += _getCertificationScore(cert, level);
+              }
+            }
+          }
+
+          if (certCount > 0) {
+            playerScores.add({
+              'id': doc.id,
+              'name': data['displayName'] ?? 'Unknown Artist',
+              'avatarUrl': data['avatarUrl'],
+              'score': totalScore,
+              'certCount': certCount,
+            });
+          }
+        }
+
+        // Sort by score
+        playerScores
+            .sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: playerScores.length,
+          itemBuilder: (context, index) {
+            final player = playerScores[index];
+            final isCurrentUser = player['id'] == currentUserId;
+
+            return _buildRankingCard(
+              rank: index + 1,
+              name: player['name'],
+              avatarUrl: player['avatarUrl'],
+              score: player['score'],
+              certCount: player['certCount'],
+              isCurrentUser: isCurrentUser,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRankingCard({
+    required int rank,
+    required String name,
+    String? avatarUrl,
+    required int score,
+    required int certCount,
+    required bool isCurrentUser,
+  }) {
+    Color rankColor;
+    if (rank == 1) {
+      rankColor = const Color(0xFFFFD700); // Gold
+    } else if (rank == 2) {
+      rankColor = const Color(0xFFC0C0C0); // Silver
+    } else if (rank == 3) {
+      rankColor = const Color(0xFFCD7F32); // Bronze
+    } else {
+      rankColor = Colors.white60;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isCurrentUser
+            ? AppTheme.accentBlue.withOpacity(0.1)
+            : AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCurrentUser
+              ? AppTheme.accentBlue.withOpacity(0.5)
+              : Colors.white.withOpacity(0.1),
+          width: isCurrentUser ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Rank
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: rankColor.withOpacity(0.2),
+              shape: BoxShape.circle,
+              border: Border.all(color: rankColor, width: 2),
+            ),
+            child: Center(
+              child: Text(
+                '$rank',
+                style: TextStyle(
+                  color: rankColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+
+          // Avatar
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: avatarUrl != null
+                  ? Colors.grey[800]
+                  : AppTheme.accentBlue.withOpacity(0.2),
+              shape: BoxShape.circle,
+              image: avatarUrl != null
+                  ? DecorationImage(
+                      image: NetworkImage(avatarUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: avatarUrl == null
+                ? Center(
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        color: AppTheme.accentBlue,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 16),
+
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
+                          color: isCurrentUser
+                              ? AppTheme.accentBlue
+                              : Colors.white,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isCurrentUser) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentBlue,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'YOU',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$certCount certifications • $score pts',
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 13,
                   ),
-                  const SizedBox(height: 16),
-
-                  // Song Cards
-                  ...certifiedSongs.map((song) => _buildSongCard(song)),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
+
+          // Trophy
+          Icon(
+            Icons.emoji_events_rounded,
+            color: rankColor,
+            size: 28,
+          ),
+        ],
+      ),
     );
+  }
+
+  int _getCertificationScore(String cert, int level) {
+    switch (cert) {
+      case 'diamond':
+        return 1000;
+      case 'multi_platinum':
+        return 500 * level;
+      case 'platinum':
+        return 300;
+      case 'gold':
+        return 150;
+      case 'silver':
+        return 50;
+      default:
+        return 0;
+    }
   }
 
   Widget _buildEmptyState() {

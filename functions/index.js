@@ -2036,18 +2036,25 @@ function detectSuspiciousActivity(playerData, changes) {
   const flags = [];
   
   // Check for impossible stat combinations
-  if (playerData.currentMoney > 10000000) flags.push('excessive_money');
-  if (playerData.currentFame > 1000) flags.push('excessive_fame');
+  // Increased thresholds for late-game players (certifications, marketplace, etc.)
+  if (playerData.currentMoney > 50000000) flags.push('excessive_money'); // $50M
+  if (playerData.currentFame > 5000) flags.push('excessive_fame'); // 5000 fame
   
   // Check for rapid progression
+  // Max skills: 100 each × 3 = 300 total (legitimate endgame)
   const totalSkills = (playerData.songwritingSkill || 0) + 
                      (playerData.lyricsSkill || 0) + 
                      (playerData.compositionSkill || 0);
-  if (totalSkills > 250) flags.push('suspicious_skill_total');
+  if (totalSkills > 300) flags.push('suspicious_skill_total'); // Max possible
   
-  // Check for negative values
+  // Check for negative values (actual exploits)
   if (playerData.currentMoney < 0) flags.push('negative_money');
   if (playerData.energy < 0 || playerData.energy > 100) flags.push('invalid_energy');
+  
+  // Check for skills exceeding maximum
+  if ((playerData.songwritingSkill || 0) > 100) flags.push('excessive_songwriting');
+  if ((playerData.lyricsSkill || 0) > 100) flags.push('excessive_lyrics');
+  if ((playerData.compositionSkill || 0) > 100) flags.push('excessive_composition');
   
   return flags;
 }
@@ -6535,4 +6542,252 @@ exports.runNextTubeForAllAdmin = onCall({
       message: 'NexTube day simulated for all players (admin)'
     };
   });
+
+// ---------------------------------------------------------------------------
+// WakandaZon Marketplace Functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Purchase a song from the WakandaZon marketplace
+ * This function handles the secure transaction atomically to prevent exploits
+ */
+exports.purchaseSong = onCall(async (request) => {
+  const buyerId = request.auth?.uid;
+  if (!buyerId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to purchase songs');
+  }
+
+  const { listingId } = request.data;
+  if (!listingId || typeof listingId !== 'string') {
+    throw new HttpsError('invalid-argument', 'Missing or invalid listingId');
+  }
+
+  try {
+    // Use a transaction to ensure atomicity
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Read listing
+      const listingRef = db.collection('wakandazon_listings').doc(listingId);
+      const listingSnap = await transaction.get(listingRef);
+
+      if (!listingSnap.exists) {
+        throw new HttpsError('not-found', 'Listing not found');
+      }
+
+      const listing = listingSnap.data();
+
+      // 2. Validate listing status
+      if (listing.status !== 'active') {
+        throw new HttpsError('failed-precondition', 'This listing is no longer available');
+      }
+
+      const sellerId = listing.sellerId;
+      const price = listing.price || 0;
+      const songTitle = listing.songTitle || 'Untitled';
+      const genre = listing.genre || 'Pop';
+      const quality = listing.quality || 50;
+
+      // 3. Prevent self-purchase
+      if (sellerId === buyerId) {
+        throw new HttpsError('failed-precondition', 'You cannot buy your own listing');
+      }
+
+      // 4. Read buyer and seller player documents
+      const buyerRef = db.collection('players').doc(buyerId);
+      const sellerRef = db.collection('players').doc(sellerId);
+
+      const [buyerSnap, sellerSnap] = await Promise.all([
+        transaction.get(buyerRef),
+        transaction.get(sellerRef),
+      ]);
+
+      if (!buyerSnap.exists) {
+        throw new HttpsError('not-found', 'Buyer account not found');
+      }
+
+      const buyer = buyerSnap.data();
+      const seller = sellerSnap.exists ? sellerSnap.data() : {};
+
+      const buyerMoney = buyer.money || 0;
+      const sellerMoney = seller.money || 0;
+
+      // 5. Validate buyer has sufficient funds
+      if (buyerMoney < price) {
+        throw new HttpsError('failed-precondition', 'Insufficient funds');
+      }
+
+      // 6. Create the purchased song for buyer
+      const newSong = {
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: songTitle,
+        genre: genre,
+        quality: quality,
+        state: 'written',
+        createdDate: admin.firestore.Timestamp.now(),
+        streams: 0,
+        likes: 0,
+        eligibleUnits: 0,
+        highestCertification: 'none',
+        certificationLevel: 0,
+        totalSales: 0,
+        metadata: { purchasedFrom: 'wakandazon', originalSeller: sellerId },
+        streamingPlatforms: [],
+        hasOfficialVideo: false,
+        viralityScore: 0,
+        peakDailyStreams: 0,
+        daysOnChart: 0,
+        lastDayStreams: 0,
+      };
+
+      // 7. Update buyer: deduct money, add song
+      const buyerSongs = Array.isArray(buyer.songs) ? buyer.songs : [];
+      transaction.update(buyerRef, {
+        money: buyerMoney - price,
+        songs: [...buyerSongs, newSong],
+      });
+
+      // 8. Update seller: add money
+      transaction.update(sellerRef, {
+        money: sellerMoney + price,
+      });
+
+      // 9. Mark listing as sold
+      transaction.update(listingRef, {
+        status: 'sold',
+        buyerId: buyerId,
+        buyerName: buyer.displayName || buyer.name || 'Unknown',
+        soldAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // 10. Create purchase record
+      const purchaseRef = db.collection('wakandazon_purchases').doc();
+      transaction.set(purchaseRef, {
+        buyerId: buyerId,
+        buyerName: buyer.displayName || buyer.name || 'Unknown',
+        sellerId: sellerId,
+        sellerName: seller.displayName || seller.name || 'Unknown',
+        songTitle: songTitle,
+        genre: genre,
+        quality: quality,
+        price: price,
+        purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        listingId: listingId,
+      });
+
+      return {
+        success: true,
+        purchaseId: purchaseRef.id,
+        songTitle: songTitle,
+        price: price,
+        newSongId: newSong.id,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    // Re-throw HttpsErrors as-is
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    // Wrap other errors
+    console.error('Error in purchaseSong:', error);
+    throw new HttpsError('internal', `Transaction failed: ${error.message}`);
+  }
+});
+
+/**
+ * Cancel a listing and return the song to the seller
+ */
+exports.cancelListing = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to cancel listings');
+  }
+
+  const { listingId } = request.data;
+  if (!listingId || typeof listingId !== 'string') {
+    throw new HttpsError('invalid-argument', 'Missing or invalid listingId');
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Read listing
+      const listingRef = db.collection('wakandazon_listings').doc(listingId);
+      const listingSnap = await transaction.get(listingRef);
+
+      if (!listingSnap.exists) {
+        throw new HttpsError('not-found', 'Listing not found');
+      }
+
+      const listing = listingSnap.data();
+
+      // 2. Verify ownership
+      if (listing.sellerId !== userId) {
+        throw new HttpsError('permission-denied', 'You can only cancel your own listings');
+      }
+
+      // 3. Check if already sold or cancelled
+      if (listing.status !== 'active') {
+        throw new HttpsError('failed-precondition', 'This listing cannot be cancelled');
+      }
+
+      // 4. Read seller player document
+      const playerRef = db.collection('players').doc(userId);
+      const playerSnap = await transaction.get(playerRef);
+
+      if (!playerSnap.exists) {
+        throw new HttpsError('not-found', 'Player account not found');
+      }
+
+      const player = playerSnap.data();
+
+      // 5. Return song to player's inventory
+      const returnedSong = {
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: listing.songTitle || 'Untitled',
+        genre: listing.genre || 'Pop',
+        quality: listing.quality || 50,
+        state: 'written',
+        createdDate: admin.firestore.Timestamp.now(),
+        streams: 0,
+        likes: 0,
+        eligibleUnits: 0,
+        highestCertification: 'none',
+        certificationLevel: 0,
+        totalSales: 0,
+        metadata: { returnedFromWakandazon: true },
+        streamingPlatforms: [],
+        hasOfficialVideo: false,
+        viralityScore: 0,
+        peakDailyStreams: 0,
+        daysOnChart: 0,
+        lastDayStreams: 0,
+      };
+
+      const playerSongs = Array.isArray(player.songs) ? player.songs : [];
+      transaction.update(playerRef, {
+        songs: [...playerSongs, returnedSong],
+      });
+
+      // 6. Mark listing as cancelled (or delete it)
+      transaction.update(listingRef, {
+        status: 'cancelled',
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        songTitle: listing.songTitle,
+        returnedSongId: returnedSong.id,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    console.error('Error in cancelListing:', error);
+    throw new HttpsError('internal', `Transaction failed: ${error.message}`);
+  }
+});
 
