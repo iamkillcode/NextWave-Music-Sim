@@ -247,16 +247,22 @@ class _ChatConversationsScreenState extends State<ChatConversationsScreen> {
     final otherAvatar = conversation.getOtherParticipantAvatar(currentUserId);
     final unreadCount = conversation.getUnreadCount(currentUserId);
     final isTyping = conversation.isOtherUserTyping(currentUserId);
+    final isBlocked = conversation.isBlocked;
+    final blockedByMe = conversation.blockedBy == currentUserId;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: isBlocked
+            ? AppTheme.surfaceDark.withOpacity(0.5)
+            : AppTheme.surfaceDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: unreadCount > 0
-              ? AppTheme.neonGreen.withOpacity(0.3)
-              : Colors.transparent,
+          color: isBlocked
+              ? AppTheme.errorRed.withOpacity(0.3)
+              : (unreadCount > 0
+                  ? AppTheme.neonGreen.withOpacity(0.3)
+                  : Colors.transparent),
           width: 2,
         ),
       ),
@@ -360,14 +366,15 @@ class _ChatConversationsScreenState extends State<ChatConversationsScreen> {
             if (conversation.lastMessageTime != null)
               Text(
                 _formatTime(conversation.lastMessageTime!),
-              style: TextStyle(
-                color: unreadCount > 0
-                    ? AppTheme.neonGreen
-                    : Colors.white.withOpacity(0.5),
-                fontSize: 12,
-                fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                style: TextStyle(
+                  color: unreadCount > 0
+                      ? AppTheme.neonGreen
+                      : Colors.white.withOpacity(0.5),
+                  fontSize: 12,
+                  fontWeight:
+                      unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
-            ),
             if (unreadCount > 0) ...[
               const SizedBox(height: 4),
               Container(
@@ -381,19 +388,156 @@ class _ChatConversationsScreenState extends State<ChatConversationsScreen> {
             ],
           ],
         ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                conversationId: conversation.id,
-                otherUserId: otherUserId,
-                otherUserName: otherName,
-                otherUserAvatar: otherAvatar,
-              ),
-            ),
-          );
+        onTap: isBlocked && !blockedByMe
+            ? null // Can't open conversation if blocked by other user
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      conversationId: conversation.id,
+                      otherUserId: otherUserId,
+                      otherUserName: otherName,
+                      otherUserAvatar: otherAvatar,
+                    ),
+                  ),
+                );
+              },
+        onLongPress: () {
+          _showConversationOptions(conversation, otherName);
         },
+      ),
+    );
+  }
+
+  void _showConversationOptions(
+      ChatConversation conversation, String otherName) {
+    final currentUserId = _chatService.currentUserId ?? '';
+    final isBlocked = conversation.isBlocked;
+    final blockedByMe = conversation.blockedBy == currentUserId;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (isBlocked && blockedByMe)
+            ListTile(
+              leading:
+                  const Icon(Icons.check_circle, color: AppTheme.neonGreen),
+              title: const Text('Unblock User',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                'Allow messages from $otherName again',
+                style: TextStyle(color: Colors.white.withOpacity(0.5)),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _chatService.unblockUser(conversation.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✅ Unblocked $otherName'),
+                      backgroundColor: AppTheme.neonGreen,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+            ),
+          if (!isBlocked)
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.orange),
+              title: const Text('Delete Conversation',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text(
+                'Remove from your inbox',
+                style: TextStyle(color: Colors.white54),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmDeleteConversation(conversation, otherName);
+              },
+            ),
+          if (!isBlocked)
+            ListTile(
+              leading: const Icon(Icons.block, color: AppTheme.errorRed),
+              title: const Text('Block User',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                'Stop receiving messages from $otherName',
+                style: TextStyle(color: Colors.white.withOpacity(0.5)),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await _chatService.blockUser(conversation.id,
+                    conversation.getOtherParticipantId(currentUserId));
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('🚫 Blocked $otherName'),
+                      backgroundColor: AppTheme.errorRed,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+            ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteConversation(
+      ChatConversation conversation, String otherName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        title: const Text('Delete Conversation',
+            style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Delete conversation with $otherName? This cannot be undone.',
+          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel',
+                style: TextStyle(color: Colors.white.withOpacity(0.5))),
+          ),
+          TextButton(
+            onPressed: () async {
+              await _chatService.deleteConversation(conversation.id);
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Conversation deleted'),
+                    backgroundColor: Colors.orange,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
       ),
     );
   }

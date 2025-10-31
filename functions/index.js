@@ -1,5 +1,6 @@
 // Firebase Cloud Functions for NextWave Music Sim v2.0
 // Enhanced with weekly charts, leaderboards, achievements, anti-cheat, and NPC artists
+// REFACTORED: Daily update functions moved to modules/dailyUpdates.js
 
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
@@ -9,6 +10,9 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 
 const db = admin.firestore();
+
+// Import modular functions
+const { dailyGameUpdate, triggerDailyUpdate } = require('./modules/dailyUpdates');
 
 // Set global options for all v2 functions
 setGlobalOptions({
@@ -100,7 +104,13 @@ async function getCurrentGameDateServer() {
 // 1. DAILY UPDATE - Main game progression (EVERY HOUR)
 // In-game: 1 day = 1 real-world hour
 // ============================================================================
+// 🔄 REFACTORED: This function is now in modules/dailyUpdates.js
+// Keeping exports here for backward compatibility
 
+exports.dailyGameUpdate = dailyGameUpdate;
+
+// OLD IMPLEMENTATION COMMENTED OUT - See modules/dailyUpdates.js for new version
+/*
 exports.dailyGameUpdate = onSchedule({
   schedule: '0 * * * *', // Every hour (1 in-game day)
   timeZone: 'UTC',
@@ -153,6 +163,17 @@ exports.dailyGameUpdate = onSchedule({
       );
       
       console.log(`📅 Current game date: ${currentGameDate.toISOString().split('T')[0]}`);
+
+      // 📊 AUDIT LOG: Track this run for monitoring
+      const runId = `scheduled-${currentGameDate.toISOString().split('T')[0]}-${Date.now()}`;
+      const auditLogRef = db.collection('admin_logs').doc(runId);
+      await auditLogRef.set({
+        type: 'daily_update',
+        trigger: 'scheduled',
+        gameDate: admin.firestore.Timestamp.fromDate(currentGameDate),
+        realTime: admin.firestore.FieldValue.serverTimestamp(),
+        status: 'started',
+      });
 
       // Load Remote Config parameters once for this run (with safe fallbacks)
       let rcParams = {};
@@ -241,6 +262,29 @@ exports.dailyGameUpdate = onSchedule({
           }
         } catch (error) {
           console.error(`❌ Error processing player ${playerDoc.id}:`, error);
+          console.error(`   Player: ${playerData.displayName || 'Unknown'}, Songs: ${playerData.songs?.length || 0}`);
+          
+          // 🛡️ CRITICAL FIX: Even on error, preserve the player's songs array
+          // This prevents written/recorded songs from disappearing due to processing errors
+          try {
+            const fallbackUpdates = {
+              songs: playerData.songs || [], // Preserve existing songs
+              lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+              lastProcessedDate: admin.firestore.Timestamp.fromDate(currentGameDate),
+            };
+            batch.update(playerDoc.ref, fallbackUpdates);
+            batchCount++;
+            console.log(`🛡️ Applied fallback update for ${playerDoc.id} - songs preserved`);
+            
+            if (batchCount >= batchLimit) {
+              await batch.commit();
+              batch = db.batch();
+              batchCount = 0;
+            }
+          } catch (fallbackError) {
+            console.error(`❌ Failed to apply fallback update for ${playerDoc.id}:`, fallbackError);
+          }
+          
           errorCount++;
         }
       }
@@ -267,12 +311,35 @@ exports.dailyGameUpdate = onSchedule({
       console.log(`   Processed: ${processedCount} / ${playersSnapshot.size} players`);
       console.log(`   Errors: ${errorCount}`);
       
+      // 📊 AUDIT LOG: Update completion status
+      await auditLogRef.update({
+        status: 'completed',
+        playersProcessed: processedCount,
+        totalPlayers: playersSnapshot.size,
+        errors: errorCount,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      
       return null;
     } catch (error) {
       console.error('❌ Fatal error in daily update:', error);
+      
+      // 📊 AUDIT LOG: Record failure
+      try {
+        await auditLogRef.update({
+          status: 'failed',
+          error: error.message,
+          failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (logError) {
+        console.error('Failed to log error:', logError);
+      }
+      
       throw error;
     }
   });
+*/
+// END OF OLD DAILY UPDATE IMPLEMENTATION
 
 // ============================================================================
 // 2. WEEKLY LEADERBOARD UPDATE - Snapshots & historical tracking (EVERY 7 HOURS)
@@ -488,6 +555,19 @@ exports.triggerSpecialEvent = onSchedule({
 
 async function processDailyStreamsForPlayer(playerId, playerData, currentGameDate, certConfig) {
   try {
+    // 🛡️ DUPLICATE PROTECTION: Check if already processed for this game day
+    const lastProcessedDate = toDateSafe(playerData.lastProcessedDate);
+    if (lastProcessedDate) {
+      const isSameDay = lastProcessedDate.getFullYear() === currentGameDate.getFullYear() &&
+                        lastProcessedDate.getMonth() === currentGameDate.getMonth() &&
+                        lastProcessedDate.getDate() === currentGameDate.getDate();
+      
+      if (isSameDay) {
+        console.log(`⏭️ Skipping ${playerData.displayName || playerId} - already processed for ${currentGameDate.toDateString()}`);
+        return null; // Already processed this game day
+      }
+    }
+    
     const songs = playerData.songs || [];
     
     // ✅ CHECK IF SIDE HUSTLE CONTRACT EXPIRED (even when player offline)
@@ -543,6 +623,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
       // Only return updates if there's something to update
       if (Object.keys(updates).length > 0) {
         updates.lastUpdated = admin.firestore.FieldValue.serverTimestamp();
+        updates.lastProcessedDate = admin.firestore.Timestamp.fromDate(currentGameDate);
         return updates;
       }
       
@@ -796,6 +877,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, currentGameDat
         currentMoney: (playerData.currentMoney || 0) + totalNewIncome,
         regionalFanbase: updatedRegionalFanbase, // ✅ UPDATE REGIONAL FANBASE
         lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        lastProcessedDate: admin.firestore.Timestamp.fromDate(currentGameDate), // 🛡️ Track processing date
       };
       
       // Apply fanbase growth
@@ -3102,7 +3184,12 @@ function selectRandomRegion() {
 // ============================================================================
 // MANUAL TESTING FUNCTIONS (Keep from v1)
 // ============================================================================
+// 🔄 REFACTORED: This function is now in modules/dailyUpdates.js
 
+exports.triggerDailyUpdate = triggerDailyUpdate;
+
+// OLD IMPLEMENTATION COMMENTED OUT - See modules/dailyUpdates.js for new version
+/*
 exports.triggerDailyUpdate = onCall(async (request) => {
   const data = request.data;
   if (!request.auth) {
@@ -3115,6 +3202,17 @@ exports.triggerDailyUpdate = onCall(async (request) => {
     // Run the same logic as scheduled function
     const gameTimeRef = db.collection('game_state').doc('global_time');
     const gameTimeDoc = await gameTimeRef.get();
+    
+    // 📊 AUDIT LOG: Track manual trigger
+    const runId = `manual-${request.auth.uid}-${Date.now()}`;
+    const auditLogRef = db.collection('admin_logs').doc(runId);
+    await auditLogRef.set({
+      type: 'daily_update',
+      trigger: 'manual',
+      triggeredBy: request.auth.uid,
+      realTime: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'started',
+    });
     
     // Initialize game time if it doesn't exist
     if (!gameTimeDoc.exists) {
@@ -3142,25 +3240,52 @@ exports.triggerDailyUpdate = onCall(async (request) => {
     
     const playersSnapshot = await db.collection('players').get();
     let processedCount = 0;
+    let errorCount = 0;
     
     const batch = db.batch();
     let batchCount = 0;
     
     for (const playerDoc of playersSnapshot.docs) {
-      const updates = await processDailyStreamsForPlayer(
-        playerDoc.id,
-        playerDoc.data(),
-        newGameDate
-      );
-      
-      if (updates) {
-        batch.update(playerDoc.ref, updates);
-        batchCount++;
-        processedCount++;
+      try {
+        const playerData = playerDoc.data();
+        const updates = await processDailyStreamsForPlayer(
+          playerDoc.id,
+          playerData,
+          newGameDate
+        );
         
-        if (batchCount >= 500) {
-          await batch.commit();
-          batchCount = 0;
+        if (updates) {
+          batch.update(playerDoc.ref, updates);
+          batchCount++;
+          processedCount++;
+          
+          if (batchCount >= 500) {
+            await batch.commit();
+            batchCount = 0;
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error in manual trigger for player ${playerDoc.id}:`, error);
+        errorCount++;
+        
+        // 🛡️ CRITICAL FIX: Preserve songs even on error
+        try {
+          const playerData = playerDoc.data();
+          const fallbackUpdates = {
+            songs: playerData.songs || [],
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            lastProcessedDate: admin.firestore.Timestamp.fromDate(newGameDate),
+          };
+          batch.update(playerDoc.ref, fallbackUpdates);
+          batchCount++;
+          console.log(`🛡️ Applied fallback update for ${playerDoc.id} - songs preserved`);
+          
+          if (batchCount >= 500) {
+            await batch.commit();
+            batchCount = 0;
+          }
+        } catch (fallbackError) {
+          console.error(`❌ Failed to apply fallback for ${playerDoc.id}:`, fallbackError);
         }
       }
     }
@@ -3169,17 +3294,42 @@ exports.triggerDailyUpdate = onCall(async (request) => {
       await batch.commit();
     }
     
+    // 📊 AUDIT LOG: Update completion
+    await auditLogRef.update({
+      status: 'completed',
+      gameDate: admin.firestore.Timestamp.fromDate(newGameDate),
+      playersProcessed: processedCount,
+      totalPlayers: playersSnapshot.size,
+      errors: errorCount,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
     return {
       success: true,
       playersProcessed: processedCount,
       totalPlayers: playersSnapshot.size,
+      errors: errorCount,
       newGameDate: newGameDate.toISOString(),
     };
   } catch (error) {
     console.error('❌ Error in manual trigger:', error);
+    
+    // 📊 AUDIT LOG: Record failure
+    try {
+      await auditLogRef.update({
+        status: 'failed',
+        error: error.message,
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
+    }
+    
     throw new HttpsError('internal', error.message);
   }
 });
+*/
+// END OF OLD TRIGGER DAILY UPDATE IMPLEMENTATION
 
 exports.catchUpMissedDays = onCall(async (request) => {
   const data = request.data;

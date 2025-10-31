@@ -623,4 +623,220 @@ class AdminService {
       return '\$${value.toStringAsFixed(0)}';
     }
   }
+
+  // ===================================================================
+  // CHAT MODERATION METHODS (Admin Only)
+  // ===================================================================
+
+  /// Get all chat conversations (Admin only)
+  Future<List<Map<String, dynamic>>> getAllConversations(
+      {int limit = 100}) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection('chat_conversations')
+          .orderBy('lastMessageTime', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'participants': data['participants'] ?? [],
+          'participantNames': data['participantNames'] ?? {},
+          'lastMessage': data['lastMessage'],
+          'lastMessageTime': data['lastMessageTime'],
+          'isBlocked': data['isBlocked'] ?? false,
+          'blockedBy': data['blockedBy'],
+          'totalMessageCount': data['totalMessageCount'] ?? 0,
+        };
+      }).toList();
+    } catch (e) {
+      print('Error getting conversations: $e');
+      return [];
+    }
+  }
+
+  /// Get reported messages (Admin only)
+  Future<List<Map<String, dynamic>>> getReportedMessages() async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection('reported_messages')
+          .orderBy('reportedAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'conversationId': data['conversationId'],
+          'messageId': data['messageId'],
+          'reportedBy': data['reportedBy'],
+          'reportedByName': data['reportedByName'],
+          'reportedUser': data['reportedUser'],
+          'reportedUserName': data['reportedUserName'],
+          'messageContent': data['messageContent'],
+          'reportedAt': data['reportedAt'],
+          'reason': data['reason'],
+        };
+      }).toList();
+    } catch (e) {
+      print('Error getting reported messages: $e');
+      return [];
+    }
+  }
+
+  /// Delete a conversation (Admin only)
+  Future<bool> deleteConversation(String conversationId) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      // Delete conversation document
+      await _firestore
+          .collection('chat_conversations')
+          .doc(conversationId)
+          .delete();
+
+      // Delete all messages in archive
+      final messagesSnapshot = await _firestore
+          .collection('chat_conversations')
+          .doc(conversationId)
+          .collection('messagesArchive')
+          .get();
+
+      final batch = _firestore.batch();
+      for (var doc in messagesSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+
+      return true;
+    } catch (e) {
+      print('Error deleting conversation: $e');
+      return false;
+    }
+  }
+
+  /// Delete a specific message (Admin only)
+  Future<bool> deleteMessage({
+    required String conversationId,
+    required String messageId,
+  }) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      // Delete from archive
+      await _firestore
+          .collection('chat_conversations')
+          .doc(conversationId)
+          .collection('messagesArchive')
+          .doc(messageId)
+          .delete();
+
+      // Note: Message might still appear in recentMessages cache
+      // Consider adding logic to remove from recentMessages array if needed
+
+      return true;
+    } catch (e) {
+      print('Error deleting message: $e');
+      return false;
+    }
+  }
+
+  /// Ban user from chat (Admin only)
+  Future<bool> banUserFromChat(String userId, {String? reason}) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      await _firestore.collection('players').doc(userId).update({
+        'chatBanned': true,
+        'chatBanReason': reason ?? 'Violation of community guidelines',
+        'chatBannedAt': FieldValue.serverTimestamp(),
+        'chatBannedBy': _auth.currentUser?.uid,
+      });
+
+      return true;
+    } catch (e) {
+      print('Error banning user from chat: $e');
+      return false;
+    }
+  }
+
+  /// Unban user from chat (Admin only)
+  Future<bool> unbanUserFromChat(String userId) async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      await _firestore.collection('players').doc(userId).update({
+        'chatBanned': false,
+        'chatBanReason': FieldValue.delete(),
+        'chatBannedAt': FieldValue.delete(),
+        'chatBannedBy': FieldValue.delete(),
+      });
+
+      return true;
+    } catch (e) {
+      print('Error unbanning user from chat: $e');
+      return false;
+    }
+  }
+
+  /// Get chat statistics (Admin only)
+  Future<Map<String, dynamic>> getChatStats() async {
+    if (!await isAdmin()) {
+      throw Exception('Admin access required');
+    }
+
+    try {
+      final conversationsSnapshot =
+          await _firestore.collection('chat_conversations').get();
+
+      int totalConversations = conversationsSnapshot.size;
+      int blockedConversations = 0;
+      int totalMessages = 0;
+
+      for (var doc in conversationsSnapshot.docs) {
+        final data = doc.data();
+        if (data['isBlocked'] == true) {
+          blockedConversations++;
+        }
+        totalMessages += (data['totalMessageCount'] as int?) ?? 0;
+      }
+
+      final reportedSnapshot =
+          await _firestore.collection('reported_messages').get();
+
+      final bannedUsersSnapshot = await _firestore
+          .collection('players')
+          .where('chatBanned', isEqualTo: true)
+          .get();
+
+      return {
+        'totalConversations': totalConversations,
+        'blockedConversations': blockedConversations,
+        'totalMessages': totalMessages,
+        'reportedMessages': reportedSnapshot.size,
+        'bannedUsers': bannedUsersSnapshot.size,
+        'lastUpdated': DateTime.now().toIso8601String(),
+      };
+    } catch (e) {
+      throw Exception('Failed to get chat stats: $e');
+    }
+  }
 }

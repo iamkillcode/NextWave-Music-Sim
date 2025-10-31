@@ -16,6 +16,17 @@ class ChatService {
   // Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;
 
+  /// Get a conversation by ID
+  Future<ChatConversation?> getConversation(String conversationId) async {
+    final doc = await _firestore
+        .collection('chat_conversations')
+        .doc(conversationId)
+        .get();
+
+    if (!doc.exists) return null;
+    return ChatConversation.fromJson(doc.data()!);
+  }
+
   /// Start or get existing conversation with another user
   /// Requires mutual pokes to create new conversations
   Future<ChatConversation?> startConversation({
@@ -32,7 +43,7 @@ class ChatService {
         currentUserId!,
         otherUserId,
       );
-      
+
       if (!haveMutualPokes) {
         // No mutual pokes - return null to indicate conversation not allowed
         return null;
@@ -87,6 +98,13 @@ class ChatService {
   }) async {
     if (currentUserId == null || content.trim().isEmpty) return null;
 
+    // Check if user is banned from chat
+    final userDoc =
+        await _firestore.collection('players').doc(currentUserId).get();
+    if (userDoc.exists && userDoc.data()?['chatBanned'] == true) {
+      throw Exception('You are banned from using chat');
+    }
+
     try {
       final currentUser = _auth.currentUser!;
       final conversationRef =
@@ -124,14 +142,17 @@ class ChatService {
       batch.set(messageRef, sanitizeForFirestore(message.toJson()));
 
       // 2. Update conversation
-      batch.update(conversationRef, sanitizeForFirestore({
-        'lastMessage': content.trim(),
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'recentMessages': updatedRecentMessages.map((m) => m.toJson()).toList(),
-        'totalMessageCount': FieldValue.increment(1),
-        'unreadCount.$otherUserId': FieldValue.increment(1),
-        'isTyping.$currentUserId': false, // Stop typing indicator
-      }));
+      batch.update(
+          conversationRef,
+          sanitizeForFirestore({
+            'lastMessage': content.trim(),
+            'lastMessageTime': FieldValue.serverTimestamp(),
+            'recentMessages':
+                updatedRecentMessages.map((m) => m.toJson()).toList(),
+            'totalMessageCount': FieldValue.increment(1),
+            'unreadCount.$otherUserId': FieldValue.increment(1),
+            'isTyping.$currentUserId': false, // Stop typing indicator
+          }));
 
       await batch.commit();
       return message;
@@ -283,6 +304,40 @@ class ChatService {
     // In a real implementation, you might want to add a 'deletedBy' array
     // For now, we'll just block it
     await blockUser(conversationId, currentUserId!);
+  }
+
+  /// Report a user/message to moderators
+  Future<bool> reportUser({
+    required String conversationId,
+    required String reportedUserId,
+    required String reportedUserName,
+    String? messageId,
+    String? messageContent,
+    String? reason,
+  }) async {
+    if (currentUserId == null) return false;
+
+    try {
+      final currentUser = _auth.currentUser!;
+
+      await _firestore.collection('reported_messages').add({
+        'conversationId': conversationId,
+        'messageId': messageId,
+        'messageContent': messageContent,
+        'reportedBy': currentUserId,
+        'reportedByName': currentUser.displayName ?? 'Unknown',
+        'reportedUser': reportedUserId,
+        'reportedUserName': reportedUserName,
+        'reason': reason ?? 'Inappropriate content',
+        'reportedAt': FieldValue.serverTimestamp(),
+        'status': 'pending', // pending, reviewed, dismissed
+      });
+
+      return true;
+    } catch (e) {
+      print('Error reporting user: $e');
+      return false;
+    }
   }
 
   /// Get total unread count across all conversations

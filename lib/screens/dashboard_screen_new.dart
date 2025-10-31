@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:math' as math;
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/side_hustle.dart';
@@ -104,7 +103,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             5000, // Starting money - enough to get started with side hustles!
         energy: 100,
         creativity: 0, // No hype yet - you're just starting!
-        fanbase: 100, // Start with 100 fans minimum
+        fanbase: 0, // Will load actual fanbase from Firebase
         albumsSold: 0,
         songsWritten: 0,
         concertsPerformed: 0,
@@ -478,8 +477,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             energy: safeParseInt(data['energy'],
                 fallback: 100), // Load actual energy from Firebase
             creativity: safeParseInt(data['inspirationLevel'], fallback: 0),
-            fanbase: math.max(100,
-                safeParseInt(data['fanbase'] ?? data['level'], fallback: 100)),
+            fanbase:
+                safeParseInt(data['fanbase'] ?? data['level'], fallback: 0),
             loyalFanbase: safeParseInt(data['loyalFanbase'], fallback: 0),
             albumsSold: safeParseInt(data['albumsReleased'], fallback: 0),
             songsWritten: safeParseInt(data['songsPublished'], fallback: 0),
@@ -601,8 +600,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Song.fromJson(Map<String, dynamic>.from(songData)))
                 .toList();
           } catch (e, stackTrace) {
-            AppLogger.warning('Error loading songs in real-time update', 
-              error: e, stackTrace: stackTrace);
+            AppLogger.warning('Error loading songs in real-time update',
+                error: e, stackTrace: stackTrace);
           }
         }
 
@@ -619,11 +618,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Song.fromJson(Map<String, dynamic>.from(d.data() as Map)))
                 .toList();
             if (loadedSongs.isNotEmpty) {
-              AppLogger.info('[RT] Loaded ${loadedSongs.length} songs from subcollection');
+              AppLogger.info(
+                  '[RT] Loaded ${loadedSongs.length} songs from subcollection');
             }
           } catch (e, stackTrace) {
-            AppLogger.warning('[RT] Fallback songs subcollection load failed', 
-              error: e, stackTrace: stackTrace);
+            AppLogger.warning('[RT] Fallback songs subcollection load failed',
+                error: e, stackTrace: stackTrace);
           }
         }
 
@@ -637,8 +637,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Album.fromJson(Map<String, dynamic>.from(albumData)))
                 .toList();
           } catch (e, stackTrace) {
-            AppLogger.warning('Error loading albums in real-time update', 
-              error: e, stackTrace: stackTrace);
+            AppLogger.warning('Error loading albums in real-time update',
+                error: e, stackTrace: stackTrace);
           }
         }
 
@@ -1773,7 +1773,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [AppTheme.errorRed, AppTheme.errorRed.withOpacity(0.8)],
+                      colors: [
+                        AppTheme.errorRed,
+                        AppTheme.errorRed.withOpacity(0.8)
+                      ],
                     ),
                   ),
                   child: Row(
@@ -1836,9 +1839,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTopStatusBar() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isSmallScreen = constraints.maxWidth < 450; // Increased from 400 to 450
-        final isTinyScreen = constraints.maxWidth < 380; // For very small screens
-        
+        final isSmallScreen =
+            constraints.maxWidth < 450; // Increased from 400 to 450
+        final isTinyScreen =
+            constraints.maxWidth < 380; // For very small screens
+
         return Container(
           padding: EdgeInsets.symmetric(
             horizontal: isTinyScreen ? 6 : (isSmallScreen ? 8 : 12),
@@ -1868,15 +1873,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: AppTheme.primaryCyan,
                           size: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16),
                         ),
-                        SizedBox(width: isTinyScreen ? 3 : (isSmallScreen ? 4 : 6)),
+                        SizedBox(
+                            width: isTinyScreen ? 3 : (isSmallScreen ? 4 : 6)),
                         Flexible(
                           child: Text(
                             currentGameDate != null
-                                ? _gameTimeService.formatGameDate(currentGameDate!)
+                                ? _gameTimeService
+                                    .formatGameDate(currentGameDate!)
                                 : 'Syncing...',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isTinyScreen ? 11 : (isSmallScreen ? 12 : 15),
+                              fontSize:
+                                  isTinyScreen ? 11 : (isSmallScreen ? 12 : 15),
                               fontWeight: FontWeight.w600,
                             ),
                             overflow: TextOverflow.ellipsis,
@@ -1897,15 +1905,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Icon(
                               Icons.access_time,
                               color: AppTheme.warningOrange,
-                              size: isTinyScreen ? 9 : (isSmallScreen ? 10 : 12),
+                              size:
+                                  isTinyScreen ? 9 : (isSmallScreen ? 10 : 12),
                             ),
                             const SizedBox(width: 2),
                             Flexible(
                               child: Text(
-                                isTinyScreen ? _timeUntilNextDay : (isSmallScreen ? _timeUntilNextDay : 'Next: $_timeUntilNextDay'),
+                                isTinyScreen
+                                    ? _timeUntilNextDay
+                                    : (isSmallScreen
+                                        ? _timeUntilNextDay
+                                        : 'Next: $_timeUntilNextDay'),
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.6),
-                                  fontSize: isTinyScreen ? 8 : (isSmallScreen ? 9 : 11),
+                                  fontSize: isTinyScreen
+                                      ? 8
+                                      : (isSmallScreen ? 9 : 11),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1929,7 +1944,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.successGreen.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(isTinyScreen ? 7 : (isSmallScreen ? 8 : 10)),
+                      borderRadius: BorderRadius.circular(
+                          isTinyScreen ? 7 : (isSmallScreen ? 8 : 10)),
                       border: Border.all(
                         color: AppTheme.successGreen,
                         width: isSmallScreen ? 1 : 1.5,
@@ -1948,7 +1964,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           _formatMoney(artistStats.money.toDouble()),
                           style: TextStyle(
                             color: AppTheme.successGreen,
-                            fontSize: isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
+                            fontSize:
+                                isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1964,7 +1981,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: AppTheme.errorRed.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(isTinyScreen ? 7 : (isSmallScreen ? 8 : 10)),
+                      borderRadius: BorderRadius.circular(
+                          isTinyScreen ? 7 : (isSmallScreen ? 8 : 10)),
                       border: Border.all(
                         color: AppTheme.errorRed,
                         width: isSmallScreen ? 1 : 1.5,
@@ -1983,7 +2001,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           '${artistStats.energy}',
                           style: TextStyle(
                             color: AppTheme.errorRed,
-                            fontSize: isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
+                            fontSize:
+                                isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -2007,7 +2026,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       tooltip: 'Admin Tools',
                       onPressed: _openAdminQuickActions,
-                      padding: EdgeInsets.all(isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                      padding: EdgeInsets.all(
+                          isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
                       constraints: const BoxConstraints(),
                     ),
                   // Notification Button with Badge
@@ -2021,7 +2041,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           size: isTinyScreen ? 18 : (isSmallScreen ? 20 : 22),
                         ),
                         onPressed: _showNotifications,
-                        padding: EdgeInsets.all(isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                        padding: EdgeInsets.all(
+                            isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
                         constraints: const BoxConstraints(),
                       ),
                       if (_unreadNotificationCount > 0)
@@ -2076,7 +2097,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       );
                     },
-                    padding: EdgeInsets.all(isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                    padding: EdgeInsets.all(
+                        isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
                     constraints: const BoxConstraints(),
                   ),
                 ],
@@ -2504,7 +2526,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.trending_up, color: AppTheme.primaryCyan, size: 18),
+                    Icon(Icons.trending_up,
+                        color: AppTheme.primaryCyan, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'Skills & Experience',

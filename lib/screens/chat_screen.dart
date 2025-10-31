@@ -117,7 +117,19 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _showOptionsMenu() {
+  void _showOptionsMenu() async {
+    // Get current conversation status
+    final conversation =
+        await _chatService.getConversation(widget.conversationId);
+
+    if (conversation == null || !mounted) return;
+
+    final currentUserId = _chatService.currentUserId;
+    final isBlocked = conversation.isBlocked;
+    final blockedByMe = isBlocked && conversation.blockedBy == currentUserId;
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.surfaceDark,
@@ -127,17 +139,35 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (blockedByMe)
+            ListTile(
+              leading:
+                  const Icon(Icons.check_circle, color: AppTheme.neonGreen),
+              title: const Text('Unblock User',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                'Allow messages from ${widget.otherUserName}',
+                style: TextStyle(color: Colors.white.withOpacity(0.5)),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmUnblock();
+              },
+            )
+          else
+            ListTile(
+              leading: const Icon(Icons.block, color: AppTheme.errorRed),
+              title: const Text('Block User',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmBlock();
+              },
+            ),
           ListTile(
-            leading: Icon(Icons.block, color: AppTheme.errorRed),
-            title: const Text('Block User', style: TextStyle(color: Colors.white)),
-            onTap: () {
-              Navigator.pop(context);
-              _confirmBlock();
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.flag, color: Colors.orange),
-            title: const Text('Report User', style: TextStyle(color: Colors.white)),
+            leading: const Icon(Icons.flag, color: Colors.orange),
+            title: const Text('Report User',
+                style: TextStyle(color: Colors.white)),
             onTap: () {
               Navigator.pop(context);
               _showReportDialog();
@@ -162,17 +192,66 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+            child: Text('Cancel',
+                style: TextStyle(color: Colors.white.withOpacity(0.5))),
           ),
           TextButton(
             onPressed: () async {
-              await _chatService.blockUser(widget.conversationId, widget.otherUserId);
+              await _chatService.blockUser(
+                  widget.conversationId, widget.otherUserId);
               if (mounted) {
                 Navigator.pop(context); // Close dialog
                 Navigator.pop(context); // Return to conversation list
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('🚫 Blocked ${widget.otherUserName}'),
+                    backgroundColor: AppTheme.errorRed,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
             },
-            child: Text('Block', style: TextStyle(color: AppTheme.errorRed)),
+            child:
+                const Text('Block', style: TextStyle(color: AppTheme.errorRed)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmUnblock() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        title:
+            const Text('Unblock User', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Unblock ${widget.otherUserName}? You will be able to receive messages from them again.',
+          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel',
+                style: TextStyle(color: Colors.white.withOpacity(0.5))),
+          ),
+          TextButton(
+            onPressed: () async {
+              await _chatService.unblockUser(widget.conversationId);
+              if (mounted) {
+                Navigator.pop(context); // Close dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('✅ Unblocked ${widget.otherUserName}'),
+                    backgroundColor: AppTheme.neonGreen,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: const Text('Unblock',
+                style: TextStyle(color: AppTheme.neonGreen)),
           ),
         ],
       ),
@@ -180,33 +259,71 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showReportDialog() {
+    final TextEditingController reasonController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.surfaceDark,
         title: const Text('Report User', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Report ${widget.otherUserName} to moderators?',
-          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Report ${widget.otherUserName} to moderators?',
+              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: 'Reason (optional)',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                filled: true,
+                fillColor: AppTheme.backgroundDark,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: const TextStyle(color: Colors.white),
+              maxLines: 3,
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+            child: Text('Cancel',
+                style: TextStyle(color: Colors.white.withOpacity(0.5))),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: Implement reporting to moderation system
+            onPressed: () async {
+              final reason = reasonController.text.trim();
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('User reported to moderators'),
-                  backgroundColor: AppTheme.neonGreen,
-                  behavior: SnackBarBehavior.floating,
-                ),
+
+              final success = await _chatService.reportUser(
+                conversationId: widget.conversationId,
+                reportedUserId: widget.otherUserId,
+                reportedUserName: widget.otherUserName,
+                reason: reason.isEmpty ? 'Inappropriate behavior' : reason,
               );
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success
+                        ? '✅ Report submitted to moderators'
+                        : '❌ Failed to submit report'),
+                    backgroundColor:
+                        success ? AppTheme.neonGreen : AppTheme.errorRed,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
-            child: Text('Report', style: TextStyle(color: Colors.orange)),
+            child: const Text('Report', style: TextStyle(color: Colors.orange)),
           ),
         ],
       ),
@@ -282,11 +399,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, size: 64, color: AppTheme.errorRed),
+                        Icon(Icons.error_outline,
+                            size: 64, color: AppTheme.errorRed),
                         const SizedBox(height: 16),
                         Text(
                           'Error loading messages',
-                          style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                          style:
+                              TextStyle(color: Colors.white.withOpacity(0.7)),
                         ),
                       ],
                     ),
@@ -380,7 +499,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      hintStyle:
+                          TextStyle(color: Colors.white.withOpacity(0.5)),
                       filled: true,
                       fillColor: AppTheme.backgroundDark,
                       border: OutlineInputBorder(
@@ -433,7 +553,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[

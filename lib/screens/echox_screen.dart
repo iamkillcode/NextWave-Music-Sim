@@ -61,53 +61,6 @@ class EchoPost {
   }
 }
 
-class EchoComment {
-  final String id;
-  final String postId;
-  final String authorId;
-  final String authorName;
-  final String content;
-  final DateTime timestamp;
-  final int likes;
-  final List<String> likedBy;
-
-  EchoComment({
-    required this.id,
-    required this.postId,
-    required this.authorId,
-    required this.authorName,
-    required this.content,
-    required this.timestamp,
-    this.likes = 0,
-    this.likedBy = const [],
-  });
-
-  factory EchoComment.fromFirestore(Map<String, dynamic> data, String id) {
-    return EchoComment(
-      id: id,
-      postId: data['postId'] ?? '',
-      authorId: data['authorId'] ?? '',
-      authorName: data['authorName'] ?? 'Unknown Artist',
-      content: data['content'] ?? '',
-      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      likes: data['likes'] ?? 0,
-      likedBy: List<String>.from(data['likedBy'] ?? []),
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'postId': postId,
-      'authorId': authorId,
-      'authorName': authorName,
-      'content': content,
-      'timestamp': Timestamp.fromDate(timestamp),
-      'likes': likes,
-      'likedBy': likedBy,
-    };
-  }
-}
-
 class EchoXScreen extends StatefulWidget {
   final ArtistStats artistStats;
   final Function(ArtistStats) onStatsUpdated;
@@ -180,7 +133,8 @@ class _EchoXScreenState extends State<EchoXScreen>
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.bolt, color: Colors.white, size: 22),
+                    child:
+                        const Icon(Icons.bolt, color: Colors.white, size: 22),
                   ),
                   const SizedBox(width: 12),
                   const Column(
@@ -563,7 +517,10 @@ class _EchoXScreenState extends State<EchoXScreen>
                       gradient: LinearGradient(
                         colors: isMyPost
                             ? [const Color(0xFF00CED1), const Color(0xFF20B2AA)]
-                            : [const Color(0xFF2C3440), const Color(0xFF1C2128)],
+                            : [
+                                const Color(0xFF2C3440),
+                                const Color(0xFF1C2128)
+                              ],
                       ),
                       shape: BoxShape.circle,
                       boxShadow: isMyPost
@@ -718,7 +675,7 @@ class _EchoXScreenState extends State<EchoXScreen>
     required VoidCallback onTap,
   }) {
     final displayColor = isActive && activeColor != null ? activeColor : color;
-    
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -757,7 +714,8 @@ class _EchoXScreenState extends State<EchoXScreen>
         builder: (context) => EchoXComposerScreen(
           artistStats: _currentStats,
           onPost: (content, {trackId, albumId}) async {
-            await _createPostWithContent(content, trackId: trackId, albumId: albumId);
+            await _createPostWithContent(content,
+                trackId: trackId, albumId: albumId);
           },
         ),
         fullscreenDialog: true,
@@ -765,7 +723,8 @@ class _EchoXScreenState extends State<EchoXScreen>
     );
   }
 
-  Future<void> _createPostWithContent(String content, {String? trackId, String? albumId}) async {
+  Future<void> _createPostWithContent(String content,
+      {String? trackId, String? albumId}) async {
     if (content.isEmpty) {
       _showMessage('❌ Post cannot be empty!');
       return;
@@ -797,9 +756,7 @@ class _EchoXScreenState extends State<EchoXScreen>
       if (trackId != null) postData['attachedTrackId'] = trackId;
       if (albumId != null) postData['attachedAlbumId'] = albumId;
 
-      await FirebaseFirestore.instance
-          .collection('echox_posts')
-          .add(postData);
+      await FirebaseFirestore.instance.collection('echox_posts').add(postData);
 
       // Update stats
       final hypeGain = _currentStats.hypeFromPost; // 8 hype per post
@@ -807,7 +764,8 @@ class _EchoXScreenState extends State<EchoXScreen>
         energy: _currentStats.energy - 5,
         fame: _currentStats.fame + 1,
         creativity: _currentStats.creativity + hypeGain, // Update old field too
-        inspirationLevel: (_currentStats.inspirationLevel + hypeGain).clamp(0, 150), // 🔥 Add hype
+        inspirationLevel: (_currentStats.inspirationLevel + hypeGain)
+            .clamp(0, 150), // 🔥 Add hype
         lastActivityDate: DateTime.now(), // ✅ Update activity for fame decay
       );
       widget.onStatsUpdated(_currentStats);
@@ -894,11 +852,11 @@ class _EchoXScreenState extends State<EchoXScreen>
 
   Widget _buildPostContentWithMentions(String content) {
     const mentionColor = Color(0xFF00CED1);
-    
+
     final spans = <TextSpan>[];
     final mentionRegex = RegExp(r'(@\w+)');
     int lastMatchEnd = 0;
-    
+
     for (final match in mentionRegex.allMatches(content)) {
       // Add text before the mention
       if (match.start > lastMatchEnd) {
@@ -912,7 +870,7 @@ class _EchoXScreenState extends State<EchoXScreen>
           ),
         ));
       }
-      
+
       // Add the @ mention with glow effect
       final mentionText = match.group(0)!;
       spans.add(TextSpan(
@@ -934,10 +892,10 @@ class _EchoXScreenState extends State<EchoXScreen>
         // recognizer: TapGestureRecognizer()
         //   ..onTap = () => _navigateToPlayer(mentionText.substring(1)),
       ));
-      
+
       lastMatchEnd = match.end;
     }
-    
+
     // Add remaining text after last mention
     if (lastMatchEnd < content.length) {
       spans.add(TextSpan(
@@ -950,7 +908,7 @@ class _EchoXScreenState extends State<EchoXScreen>
         ),
       ));
     }
-    
+
     return RichText(
       text: TextSpan(children: spans),
     );
@@ -1094,8 +1052,7 @@ class _EchoXScreenState extends State<EchoXScreen>
                 ),
                 const SizedBox(height: 16),
                 ListTile(
-                  leading:
-                      Icon(Icons.music_note, color: AppTheme.successGreen),
+                  leading: Icon(Icons.music_note, color: AppTheme.successGreen),
                   title: const Text('Tunify',
                       style: TextStyle(color: Colors.white)),
                   subtitle: Text('Spotify-style profile',

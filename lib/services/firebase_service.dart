@@ -425,7 +425,7 @@ class FirebaseService {
         money: safeParseInt(data['currentMoney'], fallback: 5000),
         energy: safeParseInt(data['energy'], fallback: 100),
         creativity: safeParseInt(data['inspirationLevel'], fallback: 0),
-        fanbase: safeParseInt(data['fanbase'], fallback: 100),
+        fanbase: safeParseInt(data['fanbase'], fallback: 0),
         loyalFanbase: safeParseInt(data['loyalFanbase'], fallback: 0),
         albumsSold: safeParseInt(data['albumsReleased'], fallback: 0),
         songsWritten: safeParseInt(data['songsPublished'], fallback: 0),

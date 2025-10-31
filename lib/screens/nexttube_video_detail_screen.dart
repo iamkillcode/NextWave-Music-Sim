@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/nexttube_video.dart';
+import '../widgets/comment_section.dart';
 
 class NextTubeVideoDetailScreen extends StatelessWidget {
   final NextTubeVideo video;
@@ -13,52 +14,68 @@ class NextTubeVideoDetailScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF21262D),
         title: const Text('Video Details'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF30363D),
-                  borderRadius: BorderRadius.circular(8),
-                  image: video.thumbnailUrl != null
-                      ? DecorationImage(
-                          image: NetworkImage(video.thumbnailUrl!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: video.thumbnailUrl == null
-                    ? const Icon(Icons.image, color: Colors.white38, size: 48)
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(video.title,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text('${video.ownerName} • ${_typeLabel(video.type)}',
-                style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Video details section
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _chip('${_viewsLabel(video.totalViews)}'),
-                _chip(video.isMonetized ? 'Monetized' : 'Not monetized'),
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF30363D),
+                      borderRadius: BorderRadius.circular(8),
+                      image: video.thumbnailUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(video.thumbnailUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: video.thumbnailUrl == null
+                        ? const Icon(Icons.image,
+                            color: Colors.white38, size: 48)
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(video.title,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text('${video.ownerName} • ${_typeLabel(video.type)}',
+                    style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _chip('${_viewsLabel(video.totalViews)}'),
+                    _chip(video.isMonetized ? 'Monetized' : 'Not monetized'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (video.description != null && video.description!.isNotEmpty)
+                  Text(video.description!,
+                      style: const TextStyle(color: Colors.white)),
               ],
             ),
-            const SizedBox(height: 12),
-            if (video.description != null && video.description!.isNotEmpty)
-              Text(video.description!,
-                  style: const TextStyle(color: Colors.white)),
-          ],
-        ),
+          ),
+          const Divider(color: Colors.white24, height: 1),
+          // Comments section
+          Expanded(
+            child: CommentSection(
+              contextType: 'video',
+              contextId: video.id,
+              contextTitle: video.title,
+            ),
+          ),
+        ],
       ),
     );
   }

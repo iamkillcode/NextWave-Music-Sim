@@ -444,6 +444,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 12),
           _buildActionButton(
+            icon: Icons.chat,
+            label: 'Chat Moderation',
+            description: 'View reported messages and manage chat',
+            color: const Color(0xFF00D9FF),
+            onPressed: _showChatModeration,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
+            icon: Icons.comment,
+            label: 'Comment Moderation',
+            description: 'View reported comments and manage content',
+            color: const Color(0xFF7C3AED),
+            onPressed: _showCommentModeration,
+          ),
+          const SizedBox(height: 12),
+          _buildActionButton(
             icon: Icons.cleaning_services,
             label: 'Clear Old Notifications',
             description: 'Delete notifications older than 30 days',
@@ -1115,6 +1131,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _triggerDailyUpdate() async {
+    // ⚠️ WARNING: Prevent duplicate processing
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: Row(
+          children: const [
+            Icon(Icons.warning, color: Colors.orange, size: 28),
+            SizedBox(width: 12),
+            Text('⚠️ WARNING', style: TextStyle(color: Colors.orange)),
+          ],
+        ),
+        content: const Text(
+          'This will process ALL players and add streams/money/stats.\n\n'
+          '⚠️ If the scheduled function already ran this hour, this will be IGNORED (duplicate protection is active).\n\n'
+          'Only use if:\n'
+          '• The scheduled function failed\n'
+          '• You need to manually advance the game\n'
+          '• You\'re testing with duplicate protection\n\n'
+          'Players already processed today will be automatically skipped.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'I Understand - Proceed',
+              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     _showLoadingDialog('Triggering daily update...');
 
     try {
@@ -1123,10 +1179,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _safePopNavigator();
 
       if (mounted) {
+        final processed = result['playersProcessed'] ?? 0;
+        final skipped = (result['totalPlayers'] ?? 0) - processed;
+        
         _showSuccessDialog(
           'Update Complete!',
           'Daily update completed successfully.\n\n'
-              'Players updated: ${result['playersUpdated'] ?? 0}',
+              'Players processed: $processed\n'
+              'Players skipped (duplicate): $skipped',
         );
         await _loadData();
       }
@@ -4071,6 +4131,879 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // CHAT MODERATION
+  // ════════════════════════════════════════════════════════════════
+
+  void _showChatModeration() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.chat, color: Color(0xFF00D9FF), size: 28),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Chat Moderation',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: DefaultTabController(
+                  length: 3,
+                  child: Column(
+                    children: [
+                      const TabBar(
+                        labelColor: Color(0xFF00D9FF),
+                        unselectedLabelColor: Colors.white54,
+                        indicatorColor: Color(0xFF00D9FF),
+                        tabs: [
+                          Tab(text: 'Reported'),
+                          Tab(text: 'Stats'),
+                          Tab(text: 'Banned Users'),
+                        ],
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _buildReportedMessagesTab(),
+                            _buildChatStatsTab(),
+                            _buildBannedUsersTab(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportedMessagesTab() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _adminService.getReportedMessages(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00D9FF)));
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final reports = snapshot.data ?? [];
+
+        if (reports.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 64),
+                SizedBox(height: 16),
+                Text(
+                  'No reported messages',
+                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: reports.length,
+          itemBuilder: (context, index) {
+            final report = reports[index];
+            final reportedAt = report['reportedAt'] as Timestamp?;
+            final timeAgo = reportedAt != null
+                ? _formatTimeAgo(reportedAt.toDate())
+                : 'Unknown';
+
+            return Card(
+              color: const Color(0xFF16213E),
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.flag, color: Colors.orange, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Reported by ${report['reportedByName']}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          timeAgo,
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: Colors.white24, height: 24),
+                    Text(
+                      'Reported user: ${report['reportedUserName']}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    if (report['messageContent'] != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          report['messageContent'],
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                    if (report['reason'] != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Reason: ${report['reason']}',
+                        style: const TextStyle(color: Colors.orange),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _banUserFromChat(
+                              report['reportedUser'],
+                              report['reportedUserName']),
+                          icon: const Icon(Icons.block, size: 18),
+                          label: const Text('Ban User'),
+                          style:
+                              TextButton.styleFrom(foregroundColor: Colors.red),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () =>
+                              _deleteConversation(report['conversationId']),
+                          icon: const Icon(Icons.delete, size: 18),
+                          label: const Text('Delete Chat'),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.orange),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildChatStatsTab() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _adminService.getChatStats(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00D9FF)));
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final stats = snapshot.data ?? {};
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _buildStatCard(
+              'Total Conversations',
+              '${stats['totalConversations'] ?? 0}',
+              Icons.chat_bubble,
+              const Color(0xFF00D9FF),
+            ),
+            const SizedBox(height: 12),
+            _buildStatCard(
+              'Blocked Conversations',
+              '${stats['blockedConversations'] ?? 0}',
+              Icons.block,
+              Colors.orange,
+            ),
+            const SizedBox(height: 12),
+            _buildStatCard(
+              'Total Messages',
+              '${stats['totalMessages'] ?? 0}',
+              Icons.message,
+              Colors.green,
+            ),
+            const SizedBox(height: 12),
+            _buildStatCard(
+              'Reported Messages',
+              '${stats['reportedMessages'] ?? 0}',
+              Icons.flag,
+              Colors.red,
+            ),
+            const SizedBox(height: 12),
+            _buildStatCard(
+              'Banned Users',
+              '${stats['bannedUsers'] ?? 0}',
+              Icons.person_off,
+              Colors.red,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBannedUsersTab() {
+    return FutureBuilder<QuerySnapshot>(
+      future: _firestore
+          .collection('players')
+          .where('chatBanned', isEqualTo: true)
+          .get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00D9FF)));
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final bannedUsers = snapshot.data?.docs ?? [];
+
+        if (bannedUsers.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 64),
+                SizedBox(height: 16),
+                Text(
+                  'No banned users',
+                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: bannedUsers.length,
+          itemBuilder: (context, index) {
+            final user = bannedUsers[index].data() as Map<String, dynamic>;
+            final userId = bannedUsers[index].id;
+            final bannedAt = user['chatBannedAt'] as Timestamp?;
+            final timeAgo = bannedAt != null
+                ? _formatTimeAgo(bannedAt.toDate())
+                : 'Unknown';
+
+            return Card(
+              color: const Color(0xFF16213E),
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: const Icon(Icons.person_off, color: Colors.red),
+                title: Text(
+                  user['displayName'] ?? 'Unknown User',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Banned $timeAgo',
+                      style: const TextStyle(color: Colors.white54),
+                    ),
+                    if (user['chatBanReason'] != null)
+                      Text(
+                        'Reason: ${user['chatBanReason']}',
+                        style: const TextStyle(color: Colors.orange),
+                      ),
+                  ],
+                ),
+                trailing: TextButton(
+                  onPressed: () =>
+                      _unbanUserFromChat(userId, user['displayName']),
+                  child: const Text('Unban',
+                      style: TextStyle(color: Color(0xFF00D9FF))),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16213E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 32),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  void _banUserFromChat(String userId, String userName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text('Ban User from Chat',
+            style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Ban $userName from using chat?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Banning user...');
+
+              final success = await _adminService.banUserFromChat(userId);
+
+              _safePopNavigator();
+              if (success) {
+                _showSuccessDialog(
+                    'Banned', '$userName has been banned from chat');
+              } else {
+                _showError('Error', 'Failed to ban user');
+              }
+            },
+            child: const Text('Ban', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _unbanUserFromChat(String userId, String? userName) async {
+    _showLoadingDialog('Unbanning user...');
+
+    final success = await _adminService.unbanUserFromChat(userId);
+
+    _safePopNavigator();
+    if (success) {
+      _showSuccessDialog(
+          'Unbanned', '${userName ?? 'User'} can now use chat again');
+    } else {
+      _showError('Error', 'Failed to unban user');
+    }
+  }
+
+  void _deleteConversation(String conversationId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title: const Text('Delete Conversation',
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Permanently delete this conversation and all messages?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Deleting conversation...');
+
+              final success =
+                  await _adminService.deleteConversation(conversationId);
+
+              _safePopNavigator();
+              if (success) {
+                _showSuccessDialog('Deleted', 'Conversation has been deleted');
+              } else {
+                _showError('Error', 'Failed to delete conversation');
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // COMMENT MODERATION
+  // ════════════════════════════════════════════════════════════════
+
+  void _showCommentModeration() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.comment, color: Color(0xFF7C3AED), size: 28),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Comment Moderation',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: _buildReportedCommentsTab(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportedCommentsTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('comments')
+          .where('reportCount', isGreaterThan: 0)
+          .orderBy('reportCount', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF7C3AED)),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        final comments = snapshot.data?.docs ?? [];
+
+        if (comments.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 64),
+                SizedBox(height: 16),
+                Text(
+                  'No reported comments',
+                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: comments.length,
+          itemBuilder: (context, index) {
+            final doc = comments[index];
+            final data = doc.data() as Map<String, dynamic>;
+            final commentId = doc.id;
+            final content = data['content'] ?? '';
+            final authorName = data['authorName'] ?? 'Unknown';
+            final reportCount = data['reportCount'] ?? 0;
+            final contextType = data['contextType'] ?? '';
+            final contextId = data['contextId'] ?? '';
+            final isHidden = data['isHidden'] ?? false;
+            final createdAt = data['createdAt'] as Timestamp?;
+            final timeAgo = createdAt != null
+                ? _formatTimeAgo(createdAt.toDate())
+                : 'Unknown';
+
+            return Card(
+              color:
+                  isHidden ? const Color(0xFF2E1616) : const Color(0xFF16213E),
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isHidden ? Icons.visibility_off : Icons.flag,
+                          color: isHidden ? Colors.grey : Colors.orange,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$reportCount ${reportCount == 1 ? 'report' : 'reports'}',
+                            style: TextStyle(
+                              color: isHidden ? Colors.grey : Colors.orange,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (isHidden)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'HIDDEN',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const Divider(color: Colors.white24, height: 24),
+                    Text(
+                      'By: $authorName',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        content,
+                        style: TextStyle(
+                          color: isHidden ? Colors.grey : Colors.white,
+                          decoration:
+                              isHidden ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'On $contextType',
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 12),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          timeAgo,
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!isHidden) ...[
+                          TextButton.icon(
+                            onPressed: () => _hideComment(commentId, content),
+                            icon: const Icon(Icons.visibility_off, size: 18),
+                            label: const Text('Hide'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: Colors.orange),
+                          ),
+                          const SizedBox(width: 8),
+                        ] else ...[
+                          TextButton.icon(
+                            onPressed: () => _unhideComment(commentId),
+                            icon: const Icon(Icons.visibility, size: 18),
+                            label: const Text('Unhide'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: Colors.green),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        TextButton.icon(
+                          onPressed: () =>
+                              _deleteComment(commentId, contextType, contextId),
+                          icon: const Icon(Icons.delete, size: 18),
+                          label: const Text('Delete'),
+                          style:
+                              TextButton.styleFrom(foregroundColor: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _hideComment(String commentId, String content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title:
+            const Text('Hide Comment', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will hide the comment from public view but keep it in the database.',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                content,
+                style: const TextStyle(color: Colors.white54),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Hiding comment...');
+
+              try {
+                await FirebaseFirestore.instance
+                    .collection('comments')
+                    .doc(commentId)
+                    .update({'isHidden': true});
+
+                _safePopNavigator();
+                _showSuccessDialog(
+                    'Hidden', 'Comment has been hidden from public view');
+              } catch (e) {
+                _safePopNavigator();
+                _showError('Error', 'Failed to hide comment: $e');
+              }
+            },
+            child: const Text('Hide', style: TextStyle(color: Colors.orange)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _unhideComment(String commentId) async {
+    _showLoadingDialog('Unhiding comment...');
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('comments')
+          .doc(commentId)
+          .update({'isHidden': false});
+
+      _safePopNavigator();
+      _showSuccessDialog('Unhidden', 'Comment is now visible again');
+    } catch (e) {
+      _safePopNavigator();
+      _showError('Error', 'Failed to unhide comment: $e');
+    }
+  }
+
+  void _deleteComment(String commentId, String contextType, String contextId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        title:
+            const Text('Delete Comment', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Permanently delete this comment? This cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              _showLoadingDialog('Deleting comment...');
+
+              try {
+                // Delete the comment
+                await FirebaseFirestore.instance
+                    .collection('comments')
+                    .doc(commentId)
+                    .delete();
+
+                // Update comment count on parent (video or post)
+                if (contextType == 'video') {
+                  await FirebaseFirestore.instance
+                      .collection('nexttube_videos')
+                      .doc(contextId)
+                      .update({'comments': FieldValue.increment(-1)});
+                } else if (contextType == 'post') {
+                  await FirebaseFirestore.instance
+                      .collection('echox_posts')
+                      .doc(contextId)
+                      .update({'comments': FieldValue.increment(-1)});
+                }
+
+                _safePopNavigator();
+                _showSuccessDialog(
+                    'Deleted', 'Comment has been permanently deleted');
+              } catch (e) {
+                _safePopNavigator();
+                _showError('Error', 'Failed to delete comment: $e');
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
