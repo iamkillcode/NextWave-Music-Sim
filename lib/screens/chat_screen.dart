@@ -351,7 +351,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
               child: widget.otherUserAvatar == null
                   ? Text(
-                      widget.otherUserName[0].toUpperCase(),
+                      widget.otherUserName.isNotEmpty
+                          ? widget.otherUserName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -566,7 +568,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
               child: message.senderAvatar == null
                   ? Text(
-                      message.senderName[0].toUpperCase(),
+                      message.senderName.isNotEmpty
+                          ? message.senderName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,

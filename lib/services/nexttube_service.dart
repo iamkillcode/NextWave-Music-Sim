@@ -37,7 +37,7 @@ class NextTubeService {
     }
 
     final docRef = _videosCol.doc();
-    
+
     // Determine status based on release date
     String status;
     if (releaseDate != null) {
@@ -45,11 +45,12 @@ class NextTubeService {
     } else {
       status = 'published';
     }
-    
+
     final video = NextTubeVideo(
       id: docRef.id,
       ownerId: userId,
       ownerName: stats.name,
+      ownerAvatarUrl: stats.avatarUrl,
       songId: song.id,
       songTitle: song.title,
       type: type,
@@ -184,7 +185,7 @@ class NextTubeService {
   }) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return false;
-    
+
     final snap = await _videosCol
         .where('ownerId', isEqualTo: userId)
         .where('songId', isEqualTo: songId)

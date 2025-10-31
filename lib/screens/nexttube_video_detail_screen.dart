@@ -48,9 +48,65 @@ class NextTubeVideoDetailScreen extends StatelessWidget {
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text('${video.ownerName} • ${_typeLabel(video.type)}',
-                    style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 12),
+                // Channel info with avatar
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: video.ownerAvatarUrl != null
+                            ? Colors.grey[800]
+                            : const Color(0xFFFF0000).withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        image: video.ownerAvatarUrl != null
+                            ? DecorationImage(
+                                image: NetworkImage(video.ownerAvatarUrl!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: video.ownerAvatarUrl == null
+                          ? Center(
+                              child: Text(
+                                video.ownerName.isNotEmpty
+                                    ? video.ownerName[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Color(0xFFFF0000),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            video.ownerName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            _typeLabel(video.type),
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,

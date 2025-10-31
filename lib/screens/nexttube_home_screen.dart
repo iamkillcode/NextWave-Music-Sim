@@ -192,11 +192,21 @@ class _NextTubeHomeScreenState extends State<NextTubeHomeScreen>
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppTheme.errorRed.withOpacity(0.2),
+                  color: widget.artistStats.avatarUrl != null
+                      ? Colors.grey[800]
+                      : AppTheme.errorRed.withOpacity(0.2),
                   shape: BoxShape.circle,
                   border: Border.all(color: AppTheme.errorRed, width: 2),
+                  image: widget.artistStats.avatarUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(widget.artistStats.avatarUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Icon(Icons.person, color: AppTheme.errorRed, size: 28),
+                child: widget.artistStats.avatarUrl == null
+                    ? Icon(Icons.person, color: AppTheme.errorRed, size: 28)
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -225,14 +235,16 @@ class _NextTubeHomeScreenState extends State<NextTubeHomeScreen>
                         Text(' • ', style: TextStyle(color: Colors.white38)),
                         Icon(
                           monetized ? Icons.monetization_on : Icons.lock,
-                          color: monetized ? AppTheme.neonGreen : Colors.white38,
+                          color:
+                              monetized ? AppTheme.neonGreen : Colors.white38,
                           size: 14,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           monetized ? 'Monetized' : 'Not monetized',
                           style: TextStyle(
-                            color: monetized ? AppTheme.neonGreen : Colors.white38,
+                            color:
+                                monetized ? AppTheme.neonGreen : Colors.white38,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -357,14 +369,53 @@ class _NextTubeHomeScreenState extends State<NextTubeHomeScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-                  // Metadata
-                  Text(
-                    v.ownerName,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  // Channel info with avatar
+                  Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: v.ownerAvatarUrl != null
+                              ? Colors.grey[800]
+                              : AppTheme.errorRed.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                          image: v.ownerAvatarUrl != null
+                              ? DecorationImage(
+                                  image: NetworkImage(v.ownerAvatarUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: v.ownerAvatarUrl == null
+                            ? Center(
+                                child: Text(
+                                  v.ownerName.isNotEmpty
+                                      ? v.ownerName[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    color: AppTheme.errorRed,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          v.ownerName,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Row(
@@ -458,7 +509,7 @@ class _NextTubeHomeScreenState extends State<NextTubeHomeScreen>
   Widget _buildTypeChip(NextTubeVideoType type) {
     Color color;
     IconData icon;
-    
+
     switch (type) {
       case NextTubeVideoType.official:
         color = AppTheme.errorRed;

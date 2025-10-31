@@ -80,12 +80,35 @@ class _EchoXCommentsScreenState extends State<EchoXCommentsScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF00D9FF), Color(0xFF7C3AED)],
-                  ),
+                  gradient: widget.post.avatarUrl == null
+                      ? const LinearGradient(
+                          colors: [Color(0xFF00D9FF), Color(0xFF7C3AED)],
+                        )
+                      : null,
+                  color:
+                      widget.post.avatarUrl != null ? Colors.grey[800] : null,
                   borderRadius: BorderRadius.circular(20),
+                  image: widget.post.avatarUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(widget.post.avatarUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: const Icon(Icons.person, color: Colors.white, size: 24),
+                child: widget.post.avatarUrl == null
+                    ? Center(
+                        child: Text(
+                          widget.post.authorName.isNotEmpty
+                              ? widget.post.authorName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(

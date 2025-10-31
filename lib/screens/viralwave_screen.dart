@@ -397,7 +397,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(isTinyScreen ? 8 : (isSmallScreen ? 10 : 12)),
+                padding: EdgeInsets.all(
+                    isTinyScreen ? 8 : (isSmallScreen ? 10 : 12)),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -437,11 +438,17 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           SizedBox(height: isSmallScreen ? 12 : 16),
           Row(
             children: [
-              _buildHeaderStat('💰',
-                  '\$${NumberFormat('#,###').format(widget.artistStats.money)}', isSmallScreen, isTinyScreen),
+              _buildHeaderStat(
+                  '💰',
+                  '\$${NumberFormat('#,###').format(widget.artistStats.money)}',
+                  isSmallScreen,
+                  isTinyScreen),
               SizedBox(width: isSmallScreen ? 8 : 12),
-              _buildHeaderStat('👥',
-                  NumberFormat('#,###').format(widget.artistStats.fanbase), isSmallScreen, isTinyScreen),
+              _buildHeaderStat(
+                  '👥',
+                  NumberFormat('#,###').format(widget.artistStats.fanbase),
+                  isSmallScreen,
+                  isTinyScreen),
             ],
           ),
         ],
@@ -449,7 +456,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     );
   }
 
-  Widget _buildHeaderStat(String emoji, String value, bool isSmallScreen, bool isTinyScreen) {
+  Widget _buildHeaderStat(
+      String emoji, String value, bool isSmallScreen, bool isTinyScreen) {
     return Expanded(
       child: Container(
         padding: EdgeInsets.all(isTinyScreen ? 6 : (isSmallScreen ? 8 : 10)),
@@ -460,7 +468,9 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(emoji, style: TextStyle(fontSize: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16))),
+            Text(emoji,
+                style: TextStyle(
+                    fontSize: isTinyScreen ? 12 : (isSmallScreen ? 14 : 16))),
             SizedBox(width: isTinyScreen ? 4 : 6),
             Flexible(
               child: Text(
@@ -738,7 +748,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           child: Opacity(
             opacity: isAvailable ? 1.0 : 0.4,
             child: Container(
-              padding: EdgeInsets.all(isTinyScreen ? 6 : (isSmallScreen ? 8 : 12)),
+              padding:
+                  EdgeInsets.all(isTinyScreen ? 6 : (isSmallScreen ? 8 : 12)),
               decoration: BoxDecoration(
                 color: isSelected
                     ? (data['color'] as Color).withOpacity(0.2)
@@ -758,15 +769,19 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                     children: [
                       Text(
                         data['emoji'],
-                        style: TextStyle(fontSize: isTinyScreen ? 24 : (isSmallScreen ? 28 : 32)),
+                        style: TextStyle(
+                            fontSize:
+                                isTinyScreen ? 24 : (isSmallScreen ? 28 : 32)),
                       ),
-                      SizedBox(height: isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
+                      SizedBox(
+                          height: isTinyScreen ? 4 : (isSmallScreen ? 6 : 8)),
                       Text(
                         data['name'],
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
+                          fontSize:
+                              isTinyScreen ? 10 : (isSmallScreen ? 11 : 13),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -775,7 +790,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                         '\$${NumberFormat('#,###').format(data['baseCost'])}',
                         style: TextStyle(
                           color: data['color'],
-                          fontSize: isTinyScreen ? 9 : (isSmallScreen ? 10 : 11),
+                          fontSize:
+                              isTinyScreen ? 9 : (isSmallScreen ? 10 : 11),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -813,7 +829,9 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
 
     // Limit to top 20 songs if not searching
     final displaySongs = _searchQuery.isEmpty
-        ? (filteredSongs.length > 20 ? filteredSongs.sublist(0, 20) : filteredSongs)
+        ? (filteredSongs.length > 20
+            ? filteredSongs.sublist(0, 20)
+            : filteredSongs)
         : filteredSongs;
 
     // Responsive check
@@ -926,7 +944,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppTheme.accentBlue, size: 16),
+                  Icon(Icons.info_outline,
+                      color: AppTheme.accentBlue, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1000,20 +1019,27 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                           borderRadius: BorderRadius.circular(6),
                           child: CachedNetworkImage(
                             imageUrl: song.coverArtUrl!,
-                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            width:
+                                isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height:
+                                isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
-                              width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                              height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              width:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                               color: Colors.grey[800],
                               child: const Center(
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             ),
                             errorWidget: (context, url, error) => Container(
-                              width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                              height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              width:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                               color: Colors.grey[800],
                               child: const Icon(Icons.music_note,
                                   color: Colors.white54),
@@ -1028,7 +1054,8 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                             color: Colors.grey[800],
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Icon(Icons.music_note, color: Colors.white54),
+                          child: const Icon(Icons.music_note,
+                              color: Colors.white54),
                         ),
                       SizedBox(width: isSmallScreen ? 10 : 12),
                       Expanded(
@@ -1154,15 +1181,18 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                   fillColor: AppTheme.surfaceDark,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.1)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.1)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.warningOrange, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.warningOrange, width: 2),
                   ),
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: isTinyScreen ? 10 : 14,
@@ -1199,104 +1229,111 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           )
         else
           ...filteredEPs.map<Widget>((ep) {
-          final isSelected = _selectedAlbum?.id == ep.id;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedAlbum = ep;
-                });
-              },
-              child: Container(
-                padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.accentBlue.withOpacity(0.2)
-                      : AppTheme.surfaceDark,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
+            final isSelected = _selectedAlbum?.id == ep.id;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedAlbum = ep;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
+                  decoration: BoxDecoration(
                     color: isSelected
-                        ? AppTheme.accentBlue
-                        : Colors.white.withOpacity(0.1),
-                    width: isSelected ? 2 : 1,
+                        ? AppTheme.accentBlue.withOpacity(0.2)
+                        : AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppTheme.accentBlue
+                          : Colors.white.withOpacity(0.1),
+                      width: isSelected ? 2 : 1,
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    // Cover art thumbnail
-                    if (ep.coverArtUrl != null && ep.coverArtUrl!.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: CachedNetworkImage(
-                          imageUrl: ep.coverArtUrl!,
+                  child: Row(
+                    children: [
+                      // Cover art thumbnail
+                      if (ep.coverArtUrl != null && ep.coverArtUrl!.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: ep.coverArtUrl!,
+                            width:
+                                isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height:
+                                isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              color: Colors.grey[800],
+                              child: const Icon(Icons.album,
+                                  color: Colors.white54),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
                           width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                           height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                          decoration: BoxDecoration(
                             color: Colors.grey[800],
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          errorWidget: (context, url, error) => Container(
-                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            color: Colors.grey[800],
-                            child:
-                                const Icon(Icons.album, color: Colors.white54),
-                          ),
+                          child: const Icon(Icons.album, color: Colors.white54),
                         ),
-                      )
-                    else
-                      Container(
-                        width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                        height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          borderRadius: BorderRadius.circular(6),
+                      SizedBox(width: isSmallScreen ? 10 : 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ep.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isSmallScreen ? 13 : 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'EP • ${ep.songIds.length} songs',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: isSmallScreen ? 11 : 12,
+                              ),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.album, color: Colors.white54),
                       ),
-                    SizedBox(width: isSmallScreen ? 10 : 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            ep.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: isSmallScreen ? 13 : 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'EP • ${ep.songIds.length} songs',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: isSmallScreen ? 11 : 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isSelected)
-                      Icon(
-                        Icons.check_circle,
-                        color: AppTheme.successGreen,
-                        size: isSmallScreen ? 20 : 22,
-                      ),
-                  ],
+                      if (isSelected)
+                        Icon(
+                          Icons.check_circle,
+                          color: AppTheme.successGreen,
+                          size: isSmallScreen ? 20 : 22,
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
       ],
     );
   }
@@ -1382,15 +1419,18 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
                   fillColor: AppTheme.surfaceDark,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.1)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                    borderSide:
+                        BorderSide(color: Colors.white.withOpacity(0.1)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.neonPurple, width: 2),
+                    borderSide:
+                        BorderSide(color: AppTheme.neonPurple, width: 2),
                   ),
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: isTinyScreen ? 10 : 14,
@@ -1427,105 +1467,112 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           )
         else
           ...filteredAlbums.map<Widget>((album) {
-          final isSelected = _selectedAlbum?.id == album.id;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedAlbum = album;
-                });
-              },
-              child: Container(
-                padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.accentBlue.withOpacity(0.2)
-                      : AppTheme.surfaceDark,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
+            final isSelected = _selectedAlbum?.id == album.id;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedAlbum = album;
+                  });
+                },
+                child: Container(
+                  padding: EdgeInsets.all(isSmallScreen ? 10 : 14),
+                  decoration: BoxDecoration(
                     color: isSelected
-                        ? AppTheme.accentBlue
-                        : Colors.white.withOpacity(0.1),
-                    width: isSelected ? 2 : 1,
+                        ? AppTheme.accentBlue.withOpacity(0.2)
+                        : AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppTheme.accentBlue
+                          : Colors.white.withOpacity(0.1),
+                      width: isSelected ? 2 : 1,
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    // Cover art thumbnail
-                    if (album.coverArtUrl != null &&
-                        album.coverArtUrl!.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: CachedNetworkImage(
-                          imageUrl: album.coverArtUrl!,
+                  child: Row(
+                    children: [
+                      // Cover art thumbnail
+                      if (album.coverArtUrl != null &&
+                          album.coverArtUrl!.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: CachedNetworkImage(
+                            imageUrl: album.coverArtUrl!,
+                            width:
+                                isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            height:
+                                isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              color: Colors.grey[800],
+                              child: const Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              height:
+                                  isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                              color: Colors.grey[800],
+                              child: const Icon(Icons.album,
+                                  color: Colors.white54),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
                           width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
                           height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
+                          decoration: BoxDecoration(
                             color: Colors.grey[800],
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          errorWidget: (context, url, error) => Container(
-                            width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                            color: Colors.grey[800],
-                            child:
-                                const Icon(Icons.album, color: Colors.white54),
-                          ),
+                          child: const Icon(Icons.album, color: Colors.white54),
                         ),
-                      )
-                    else
-                      Container(
-                        width: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                        height: isTinyScreen ? 40 : (isSmallScreen ? 45 : 50),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[800],
-                          borderRadius: BorderRadius.circular(6),
+                      SizedBox(width: isSmallScreen ? 10 : 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              album.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isSmallScreen ? 13 : 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Album • ${album.songIds.length} songs',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: isSmallScreen ? 11 : 12,
+                              ),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.album, color: Colors.white54),
                       ),
-                    SizedBox(width: isSmallScreen ? 10 : 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            album.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: isSmallScreen ? 13 : 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Album • ${album.songIds.length} songs',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: isSmallScreen ? 11 : 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isSelected)
-                      Icon(
-                        Icons.check_circle,
-                        color: AppTheme.successGreen,
-                        size: isSmallScreen ? 20 : 22,
-                      ),
-                  ],
+                      if (isSelected)
+                        Icon(
+                          Icons.check_circle,
+                          color: AppTheme.successGreen,
+                          size: isSmallScreen ? 20 : 22,
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
       ],
     );
   }
@@ -1647,10 +1694,22 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     final data = _promotionTypes[_selectedPromotionType]!;
     final totalCost = _totalCost;
     final potentialReach = _calculatePotentialReach();
-    final estimatedFans = (potentialReach * 0.15 * _budgetMultiplier).round();
-    final estimatedStreamsPerDay =
-        (potentialReach * 0.3 * _budgetMultiplier / _promoDays).round();
-    final totalStreams = estimatedStreamsPerDay * _promoDays;
+
+    // Show ranges for estimates (actual results vary)
+    // Reach: 80-120% of potential
+    final reachMin = (potentialReach * 0.8 * _budgetMultiplier).round();
+    final reachMax = (potentialReach * 1.2 * _budgetMultiplier).round();
+
+    // Fans: 3-6% conversion
+    final fansMin = (reachMin * 0.03).round();
+    final fansMax = (reachMax * 0.06).round();
+
+    // Daily streams: 20-40% of reach * multiplier
+    final dailyStreamsMin = (reachMin * 0.20).round();
+    final dailyStreamsMax = (reachMax * 0.40).round();
+
+    final totalStreamsMin = dailyStreamsMin * _promoDays;
+    final totalStreamsMax = dailyStreamsMax * _promoDays;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1693,22 +1752,22 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
           ),
           _buildDetailRow(
             'Potential Reach',
-            '${NumberFormat('#,###').format(potentialReach)} people',
+            '${NumberFormat('#,###').format(reachMin)}-${NumberFormat('#,###').format(reachMax)} people',
             Icons.people,
           ),
           _buildDetailRow(
             'Estimated Fans',
-            '+${NumberFormat('#,###').format(estimatedFans)} fans',
+            '+${NumberFormat('#,###').format(fansMin)}-${NumberFormat('#,###').format(fansMax)} fans',
             Icons.person_add,
           ),
           _buildDetailRow(
             'Daily Streams',
-            '+${NumberFormat('#,###').format(estimatedStreamsPerDay)} streams/day',
+            '+${NumberFormat('#,###').format(dailyStreamsMin)}-${NumberFormat('#,###').format(dailyStreamsMax)} streams/day',
             Icons.play_arrow,
           ),
           _buildDetailRow(
             'Total Streams',
-            '+${NumberFormat('#,###').format(totalStreams)} streams',
+            '+${NumberFormat('#,###').format(totalStreamsMin)}-${NumberFormat('#,###').format(totalStreamsMax)} streams',
             Icons.trending_up,
           ),
           _buildDetailRow(
@@ -1885,9 +1944,14 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     final fansGained =
         (actualReach * (0.03 + random.nextDouble() * 0.03)).round();
 
-    final totalStreamsGained =
-        (actualReach * (0.25 + random.nextDouble() * 0.1) * _budgetMultiplier)
-            .round();
+    // ✅ FIX: Calculate DAILY buffer first, then multiply by days for total
+    // This ensures more days = more TOTAL streams (not diluted)
+    // Added more randomness: 20-40% conversion rate (was 25-35%)
+    final streamConversionRate = 0.20 + random.nextDouble() * 0.20;
+    final dailyStreamsBase =
+        (actualReach * streamConversionRate * _budgetMultiplier).round();
+    final dailyBuffer = dailyStreamsBase; // This is the per-day boost
+    final totalStreamsGained = dailyBuffer * _promoDays; // Total over campaign
     final fameGain = _calculateFameGain();
 
     // Update songs
@@ -1897,7 +1961,6 @@ class _ViralWaveScreenState extends State<ViralWaveScreen> {
     final promoDurationDays = _promoDays;
     final promoEndDate =
         widget.currentGameDate.add(Duration(days: promoDurationDays));
-    final dailyBuffer = (totalStreamsGained / promoDurationDays).round();
 
     if (_selectedPromotionType == 'song' && _selectedSong != null) {
       // Promote single song with buffer

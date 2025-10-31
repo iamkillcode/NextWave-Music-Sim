@@ -22,14 +22,14 @@ class EchoXComposerScreen extends StatefulWidget {
 class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  
+
   bool _isPosting = false;
   bool _showMentionSuggestions = false;
   List<Map<String, String>> _mentionSuggestions = [];
   int _cursorPosition = 0;
-  
+
   Song? _attachedTrack;
-  
+
   // Teal/Cyan color scheme (different from Twitter blue)
   static const Color _primaryColor = Color(0xFF00CED1); // Dark Turquoise
   static const Color _accentColor = Color(0xFF20B2AA); // Light Sea Green
@@ -50,24 +50,24 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
   void _onTextChanged() {
     final text = _textController.text;
     final cursorPos = _textController.selection.baseOffset;
-    
+
     setState(() {
       _cursorPosition = cursorPos;
     });
-    
+
     // Check if we're typing a mention
     if (cursorPos > 0 && cursorPos <= text.length) {
       final beforeCursor = text.substring(0, cursorPos);
       final lastAtIndex = beforeCursor.lastIndexOf('@');
-      
+
       if (lastAtIndex != -1) {
         // Check if @ is at start or preceded by whitespace
-        final isValidMention = lastAtIndex == 0 || 
+        final isValidMention = lastAtIndex == 0 ||
             (lastAtIndex > 0 && text[lastAtIndex - 1] == ' ');
-        
+
         if (isValidMention) {
           final query = beforeCursor.substring(lastAtIndex + 1);
-          
+
           // Only show suggestions if no space after @
           if (!query.contains(' ')) {
             _searchPlayers(query);
@@ -77,7 +77,7 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
         }
       }
     }
-    
+
     // Hide suggestions if not in mention mode
     if (_showMentionSuggestions) {
       setState(() => _showMentionSuggestions = false);
@@ -92,19 +92,21 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
           .orderBy('fame', descending: true)
           .limit(5)
           .get();
-      
+
       setState(() {
         _mentionSuggestions = snapshot.docs.map((doc) {
+          final data = doc.data();
           return {
             'id': doc.id,
-            'name': doc.data()['displayName'] as String? ?? 'Unknown',
-            'fame': (doc.data()['fame'] as num? ?? 0).toString(),
+            'name': data['displayName'] as String? ?? 'Unknown',
+            'fame': (data['fame'] as num? ?? 0).toString(),
+            'avatarUrl': data['avatarUrl'] as String? ?? '',
           };
         }).toList();
       });
       return;
     }
-    
+
     // Search by display name (case-insensitive)
     final snapshot = await FirebaseFirestore.instance
         .collection('players')
@@ -112,13 +114,15 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
         .where('displayName', isLessThan: query + 'z')
         .limit(10)
         .get();
-    
+
     setState(() {
       _mentionSuggestions = snapshot.docs.map((doc) {
+        final data = doc.data();
         return {
           'id': doc.id,
-          'name': doc.data()['displayName'] as String? ?? 'Unknown',
-          'fame': (doc.data()['fame'] as num? ?? 0).toString(),
+          'name': data['displayName'] as String? ?? 'Unknown',
+          'fame': (data['fame'] as num? ?? 0).toString(),
+          'avatarUrl': data['avatarUrl'] as String? ?? '',
         };
       }).toList();
     });
@@ -127,7 +131,7 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
   void _insertMention(String username) {
     final text = _textController.text;
     final cursorPos = _cursorPosition.clamp(0, text.length);
-    
+
     // Safety check for empty text
     if (text.isEmpty || cursorPos == 0) {
       // Insert mention at the beginning
@@ -139,10 +143,10 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
       _focusNode.requestFocus();
       return;
     }
-    
+
     final beforeCursor = text.substring(0, cursorPos);
     final afterCursor = text.substring(cursorPos);
-    
+
     // Find the @ position
     final lastAtIndex = beforeCursor.lastIndexOf('@');
     if (lastAtIndex == -1) {
@@ -150,21 +154,21 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
       setState(() => _showMentionSuggestions = false);
       return;
     }
-    
+
     // Build new text: [text before @] + [@username ] + [text after cursor]
     final beforeMention = lastAtIndex > 0 ? text.substring(0, lastAtIndex) : '';
     final newText = beforeMention + '@$username ' + afterCursor;
     final newCursorPos = lastAtIndex + username.length + 2;
-    
+
     _textController.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: newCursorPos),
     );
-    
+
     setState(() {
       _showMentionSuggestions = false;
     });
-    
+
     _focusNode.requestFocus();
   }
 
@@ -172,15 +176,16 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
     final releasedTracks = widget.artistStats.songs
         .where((s) => s.state == SongState.released)
         .toList()
-      ..sort((a, b) => (b.releasedDate ?? DateTime(2020)).compareTo(a.releasedDate ?? DateTime(2020)));
-    
+      ..sort((a, b) => (b.releasedDate ?? DateTime(2020))
+          .compareTo(a.releasedDate ?? DateTime(2020)));
+
     if (releasedTracks.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('❌ No released tracks to promote')),
       );
       return;
     }
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.backgroundDark,
@@ -232,16 +237,16 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
       );
       return;
     }
-    
+
     setState(() => _isPosting = true);
-    
+
     try {
       await widget.onPost(
         content,
         trackId: _attachedTrack?.id,
         albumId: null, // TODO: Add album support
       );
-      
+
       if (mounted) {
         Navigator.pop(context);
       }
@@ -263,7 +268,7 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
     final charCount = _textController.text.length;
     final charLimit = 280;
     final isOverLimit = charCount > charLimit;
-    
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundDark,
       appBar: AppBar(
@@ -302,7 +307,8 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
               child: _isPosting
                   ? const SizedBox(
@@ -313,7 +319,8 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('POST', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : const Text('POST',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -329,15 +336,24 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                   children: [
                     CircleAvatar(
                       radius: 24,
-                      backgroundColor: _primaryColor,
-                      child: Text(
-                        widget.artistStats.name[0].toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      backgroundColor: widget.artistStats.avatarUrl != null
+                          ? Colors.grey[800]
+                          : _primaryColor,
+                      backgroundImage: widget.artistStats.avatarUrl != null
+                          ? NetworkImage(widget.artistStats.avatarUrl!)
+                          : null,
+                      child: widget.artistStats.avatarUrl == null
+                          ? Text(
+                              widget.artistStats.name.isNotEmpty
+                                  ? widget.artistStats.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -363,7 +379,7 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                   ],
                 ),
               ),
-              
+
               // Text input
               Expanded(
                 child: Padding(
@@ -383,7 +399,7 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                   ),
                 ),
               ),
-              
+
               // Attached track preview
               if (_attachedTrack != null)
                 Container(
@@ -396,7 +412,8 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.music_note, color: _primaryColor, size: 32),
+                      const Icon(Icons.music_note,
+                          color: _primaryColor, size: 32),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -411,7 +428,8 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                             ),
                             Text(
                               '${_attachedTrack!.streams.toStringAsFixed(0)} streams',
-                              style: const TextStyle(color: Colors.white60, fontSize: 12),
+                              style: const TextStyle(
+                                  color: Colors.white60, fontSize: 12),
                             ),
                           ],
                         ),
@@ -423,9 +441,9 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                     ],
                   ),
                 ),
-              
+
               const Divider(color: Colors.white12, height: 1),
-              
+
               // Bottom toolbar
               Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -438,15 +456,19 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.alternate_email, color: _primaryColor),
+                      icon: const Icon(Icons.alternate_email,
+                          color: _primaryColor),
                       onPressed: () {
                         // Insert @ at cursor
                         final text = _textController.text;
                         final cursorPos = _textController.selection.baseOffset;
-                        final newText = text.substring(0, cursorPos) + '@' + text.substring(cursorPos);
+                        final newText = text.substring(0, cursorPos) +
+                            '@' +
+                            text.substring(cursorPos);
                         _textController.value = TextEditingValue(
                           text: newText,
-                          selection: TextSelection.collapsed(offset: cursorPos + 1),
+                          selection:
+                              TextSelection.collapsed(offset: cursorPos + 1),
                         );
                         _focusNode.requestFocus();
                       },
@@ -459,13 +481,15 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                       style: TextStyle(
                         color: isOverLimit ? Colors.red : Colors.white60,
                         fontSize: 14,
-                        fontWeight: isOverLimit ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isOverLimit ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                     const SizedBox(width: 8),
                     // Energy cost
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: _primaryColor.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -474,7 +498,8 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.bolt, color: _primaryColor, size: 16),
+                          const Icon(Icons.bolt,
+                              color: _primaryColor, size: 16),
                           const SizedBox(width: 4),
                           const Text(
                             '5',
@@ -491,7 +516,7 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
               ),
             ],
           ),
-          
+
           // @ mention suggestions overlay
           if (_showMentionSuggestions && _mentionSuggestions.isNotEmpty)
             Positioned(
@@ -513,13 +538,23 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                     itemCount: _mentionSuggestions.length,
                     itemBuilder: (context, index) {
                       final player = _mentionSuggestions[index];
+                      final avatarUrl = player['avatarUrl'];
+                      final hasAvatar =
+                          avatarUrl != null && avatarUrl.isNotEmpty;
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: _accentColor,
-                          child: Text(
-                            player['name']![0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
-                          ),
+                          backgroundColor:
+                              hasAvatar ? Colors.grey[800] : _accentColor,
+                          backgroundImage:
+                              hasAvatar ? NetworkImage(avatarUrl) : null,
+                          child: !hasAvatar
+                              ? Text(
+                                  player['name']!.isNotEmpty
+                                      ? player['name']![0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(color: Colors.white),
+                                )
+                              : null,
                         ),
                         title: Text(
                           player['name']!,
@@ -527,7 +562,8 @@ class _EchoXComposerScreenState extends State<EchoXComposerScreen> {
                         ),
                         subtitle: Text(
                           '${player['fame']} Fame',
-                          style: const TextStyle(color: Colors.white60, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white60, fontSize: 12),
                         ),
                         onTap: () => _insertMention(player['name']!),
                       );

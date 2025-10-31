@@ -10,6 +10,7 @@ import 'echox_screen.dart';
 import 'player_directory_screen.dart';
 import 'nexttube_home_screen.dart';
 import 'conversation_list_screen.dart';
+import 'certifications_screen.dart';
 
 class MediaHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
@@ -313,6 +314,59 @@ class MediaHubScreen extends StatelessWidget {
                 ],
               ),
 
+              const SizedBox(height: 32),
+
+              // Misc Section
+              const Row(
+                children: [
+                  Icon(Icons.dashboard_rounded,
+                      color: AppTheme.accentBlue, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Misc',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // App Grid for Misc
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: isWideScreen ? 4 : 3,
+                mainAxisSpacing: 20,
+                crossAxisSpacing: 20,
+                children: [
+                  _buildAppIcon(
+                    context,
+                    name: 'Certifications',
+                    icon: Icons.emoji_events_rounded,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+                    ),
+                    badge: _getCertifiedSongsCount(),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CertificationsScreen(
+                            artistStats: artistStats,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 24),
             ],
           ),
@@ -429,7 +483,7 @@ class MediaHubScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final chatService = ChatService();
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -440,7 +494,7 @@ class MediaHubScreen extends StatelessWidget {
             stream: chatService.streamTotalUnreadCount(),
             builder: (context, snapshot) {
               final unreadCount = snapshot.data ?? 0;
-              
+
               return Stack(
                 children: [
                   // Main Icon Container
@@ -568,6 +622,15 @@ class MediaHubScreen extends StatelessWidget {
   int _getMapleMusicStreams() {
     // Maple Music has 65% of total streams (premium platform)
     return (_getTotalStreams() * 0.65).round();
+  }
+
+  String _getCertifiedSongsCount() {
+    final certifiedCount = artistStats.songs
+        .where((song) =>
+            song.state == SongState.released &&
+            song.highestCertification != 'none')
+        .length;
+    return certifiedCount > 0 ? certifiedCount.toString() : '';
   }
 
   String _formatNumber(int number) {

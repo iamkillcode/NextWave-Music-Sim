@@ -14,6 +14,7 @@ class EchoPost {
   final String id;
   final String authorId;
   final String authorName;
+  final String? avatarUrl;
   final String content;
   final DateTime timestamp;
   final int likes;
@@ -25,6 +26,7 @@ class EchoPost {
     required this.id,
     required this.authorId,
     required this.authorName,
+    this.avatarUrl,
     required this.content,
     required this.timestamp,
     this.likes = 0,
@@ -38,6 +40,7 @@ class EchoPost {
       id: id,
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? 'Unknown Artist',
+      avatarUrl: data['avatarUrl'] as String?,
       content: data['content'] ?? '',
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       likes: data['likes'] ?? 0,
@@ -51,6 +54,7 @@ class EchoPost {
     return {
       'authorId': authorId,
       'authorName': authorName,
+      'avatarUrl': avatarUrl,
       'content': content,
       'timestamp': Timestamp.fromDate(timestamp),
       'likes': likes,
@@ -514,14 +518,20 @@ class _EchoXScreenState extends State<EchoXScreen>
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isMyPost
-                            ? [const Color(0xFF00CED1), const Color(0xFF20B2AA)]
-                            : [
-                                const Color(0xFF2C3440),
-                                const Color(0xFF1C2128)
-                              ],
-                      ),
+                      gradient: post.avatarUrl == null
+                          ? LinearGradient(
+                              colors: isMyPost
+                                  ? [
+                                      const Color(0xFF00CED1),
+                                      const Color(0xFF20B2AA)
+                                    ]
+                                  : [
+                                      const Color(0xFF2C3440),
+                                      const Color(0xFF1C2128)
+                                    ],
+                            )
+                          : null,
+                      color: post.avatarUrl != null ? Colors.grey[800] : null,
                       shape: BoxShape.circle,
                       boxShadow: isMyPost
                           ? [
@@ -532,17 +542,27 @@ class _EchoXScreenState extends State<EchoXScreen>
                               ),
                             ]
                           : [],
+                      image: post.avatarUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(post.avatarUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
-                    child: Center(
-                      child: Text(
-                        post.authorName[0].toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    child: post.avatarUrl == null
+                        ? Center(
+                            child: Text(
+                              post.authorName.isNotEmpty
+                                  ? post.authorName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -746,6 +766,7 @@ class _EchoXScreenState extends State<EchoXScreen>
         id: '',
         authorId: user.uid,
         authorName: _currentStats.name,
+        avatarUrl: _currentStats.avatarUrl,
         content: content,
         timestamp: DateTime.now(),
       );

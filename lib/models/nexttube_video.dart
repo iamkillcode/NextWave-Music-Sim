@@ -6,6 +6,7 @@ class NextTubeVideo {
   final String id;
   final String ownerId;
   final String ownerName;
+  final String? ownerAvatarUrl;
   final String songId;
   final String songTitle;
   final NextTubeVideoType type;
@@ -25,6 +26,7 @@ class NextTubeVideo {
     required this.id,
     required this.ownerId,
     required this.ownerName,
+    this.ownerAvatarUrl,
     required this.songId,
     required this.songTitle,
     required this.type,
@@ -51,6 +53,7 @@ class NextTubeVideo {
     String? id,
     String? ownerId,
     String? ownerName,
+    String? ownerAvatarUrl,
     String? songId,
     String? songTitle,
     NextTubeVideoType? type,
@@ -70,6 +73,7 @@ class NextTubeVideo {
       id: id ?? this.id,
       ownerId: ownerId ?? this.ownerId,
       ownerName: ownerName ?? this.ownerName,
+      ownerAvatarUrl: ownerAvatarUrl ?? this.ownerAvatarUrl,
       songId: songId ?? this.songId,
       songTitle: songTitle ?? this.songTitle,
       type: type ?? this.type,
@@ -92,6 +96,7 @@ class NextTubeVideo {
       'id': id,
       'ownerId': ownerId,
       'ownerName': ownerName,
+      'ownerAvatarUrl': ownerAvatarUrl,
       'songId': songId,
       'songTitle': songTitle,
       'type': typeId,
@@ -99,7 +104,8 @@ class NextTubeVideo {
       'description': description,
       'thumbnailUrl': thumbnailUrl,
       'createdAt': Timestamp.fromDate(createdAt),
-      'releaseDate': releaseDate != null ? Timestamp.fromDate(releaseDate!) : null,
+      'releaseDate':
+          releaseDate != null ? Timestamp.fromDate(releaseDate!) : null,
       'status': status,
       'totalViews': totalViews,
       'dailyViews': dailyViews,
@@ -121,6 +127,7 @@ class NextTubeVideo {
       id: (json['id'] ?? '').toString(),
       ownerId: (json['ownerId'] ?? '').toString(),
       ownerName: (json['ownerName'] ?? '').toString(),
+      ownerAvatarUrl: json['ownerAvatarUrl'] as String?,
       songId: (json['songId'] ?? '').toString(),
       songTitle: (json['songTitle'] ?? '').toString(),
       type: parsedType,
