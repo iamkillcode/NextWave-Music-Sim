@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import '../models/artist_stats.dart';
 import '../models/world_region.dart';
@@ -342,9 +344,8 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                     Text(
                       '\$${_formatNumber(travelCost)}',
                       style: TextStyle(
-                        color: canAfford
-                            ? AppTheme.neonPurple
-                            : Colors.redAccent,
+                        color:
+                            canAfford ? AppTheme.neonPurple : Colors.redAccent,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -352,8 +353,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
                     const SizedBox(height: 4),
                     Icon(
                       Icons.flight_takeoff,
-                      color:
-                          canAfford ? AppTheme.accentBlue : Colors.white30,
+                      color: canAfford ? AppTheme.accentBlue : Colors.white30,
                       size: 20,
                     ),
                   ],
@@ -548,24 +548,51 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
     );
   }
 
-  void _travelToRegion(WorldRegion region, int cost) {
-    setState(() {
-      _currentStats = _currentStats.copyWith(
-        money: _currentStats.money - cost,
-        currentRegion: region.id,
-      );
-    });
+  Future<void> _travelToRegion(WorldRegion region, int cost) async {
+    try {
+      // Update Firestore first
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('players')
+            .doc(user.uid)
+            .update({
+          'currentMoney': _currentStats.money - cost,
+          'homeRegion': region.id,
+        });
+      }
 
-    widget.onStatsUpdated(_currentStats);
+      // Then update local state
+      setState(() {
+        _currentStats = _currentStats.copyWith(
+          money: _currentStats.money - cost,
+          currentRegion: region.id,
+        );
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✈️ Welcome to ${region.name}!'),
-        backgroundColor: AppTheme.accentBlue,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      widget.onStatsUpdated(_currentStats);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✈️ Welcome to ${region.name}!'),
+            backgroundColor: AppTheme.accentBlue,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error traveling: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   String _formatNumber(int number) {

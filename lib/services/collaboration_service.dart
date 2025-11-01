@@ -14,6 +14,7 @@ class CollaborationService {
 
   /// Search for players to collaborate with
   Future<List<PlayerArtist>> searchPlayers({
+    String? query,
     String? genre,
     String? region,
     int? minFame,
@@ -21,38 +22,48 @@ class CollaborationService {
     int limit = 20,
   }) async {
     try {
-      Query query = _firestore.collection('users');
-
-      // Filter by genre
-      if (genre != null && genre != 'All') {
-        query = query.where('primaryGenre', isEqualTo: genre);
-      }
-
-      // Filter by region
-      if (region != null && region != 'All') {
-        query = query.where('currentRegion', isEqualTo: region);
-      }
-
-      // Filter by fame
-      if (minFame != null) {
-        query = query.where('currentFame', isGreaterThanOrEqualTo: minFame);
-      }
-      if (maxFame != null) {
-        query = query.where('currentFame', isLessThanOrEqualTo: maxFame);
-      }
-
-      // Exclude current user
       final currentUserId = _auth.currentUser?.uid;
-      if (currentUserId != null) {
-        query = query.where(FieldPath.documentId, isNotEqualTo: currentUserId);
-      }
 
-      query = query.limit(limit);
+      // Fetch all players without ordering to avoid missing index errors
+      final snapshot = await _firestore.collection('players').limit(500).get();
 
-      final snapshot = await query.get();
-      return snapshot.docs
+      final filtered = snapshot.docs.where((doc) {
+        if (doc.id == currentUserId) return false;
+        final data = doc.data();
+
+        final fame = (data['fame'] as num?)?.toInt() ?? 0;
+        if (minFame != null && fame < minFame) return false;
+        if (maxFame != null && fame > maxFame) return false;
+
+        if (genre != null && genre != 'All') {
+          final docGenre = (data['genre'] as String?) ?? '';
+          if (docGenre.toLowerCase() != genre.toLowerCase()) {
+            return false;
+          }
+        }
+
+        if (region != null && region != 'All') {
+          final docRegion = (data['homeRegion'] as String?) ?? '';
+          if (docRegion.toLowerCase() != region.toLowerCase()) {
+            return false;
+          }
+        }
+
+        if (query != null && query.trim().isNotEmpty) {
+          final name = (data['displayName'] as String?) ??
+              (data['name'] as String?) ??
+              '';
+          if (!name.toLowerCase().contains(query.toLowerCase())) {
+            return false;
+          }
+        }
+
+        return true;
+      }).take(limit);
+
+      return filtered
           .map((doc) => PlayerArtist.fromJson({
-                ...doc.data() as Map<String, dynamic>,
+                ...doc.data(),
                 'id': doc.id,
               }))
           .toList();
@@ -68,40 +79,42 @@ class CollaborationService {
     String playerRegion,
   ) async {
     try {
-      // Get players in same genre
-      final sameGenre = await _firestore
-          .collection('users')
-          .where('primaryGenre', isEqualTo: playerGenre)
-          .limit(10)
-          .get();
-
-      // Get players in same region
-      final sameRegion = await _firestore
-          .collection('users')
-          .where('currentRegion', isEqualTo: playerRegion)
-          .limit(10)
-          .get();
-
       final currentUserId = _auth.currentUser?.uid;
+
+      // Fetch all players and filter client-side to avoid index requirements
+      final snapshot = await _firestore.collection('players').limit(100).get();
+
       final results = <PlayerArtist>[];
       final seenIds = <String>{};
 
       // Add same genre players first
-      for (var doc in sameGenre.docs) {
-        if (doc.id != currentUserId && !seenIds.contains(doc.id)) {
+      for (var doc in snapshot.docs) {
+        if (doc.id == currentUserId || seenIds.contains(doc.id)) continue;
+
+        final data = doc.data();
+        final docGenre = (data['genre'] as String?) ?? '';
+
+        if (docGenre.toLowerCase() == playerGenre.toLowerCase()) {
           results.add(PlayerArtist.fromJson({
-            ...doc.data(),
+            ...data,
             'id': doc.id,
           }));
           seenIds.add(doc.id);
+          if (results.length >= 15) break;
         }
       }
 
       // Then add same region players
-      for (var doc in sameRegion.docs) {
-        if (doc.id != currentUserId && !seenIds.contains(doc.id)) {
+      for (var doc in snapshot.docs) {
+        if (doc.id == currentUserId || seenIds.contains(doc.id)) continue;
+        if (results.length >= 15) break;
+
+        final data = doc.data();
+        final docRegion = (data['homeRegion'] as String?) ?? '';
+
+        if (docRegion.toLowerCase() == playerRegion.toLowerCase()) {
           results.add(PlayerArtist.fromJson({
-            ...doc.data(),
+            ...data,
             'id': doc.id,
           }));
           seenIds.add(doc.id);
@@ -132,7 +145,7 @@ class CollaborationService {
 
       // Get current user's data
       final userDoc =
-          await _firestore.collection('users').doc(currentUser.uid).get();
+          await _firestore.collection('players').doc(currentUser.uid).get();
       final userData = userDoc.data();
       if (userData == null) return false;
 
@@ -218,8 +231,8 @@ class CollaborationService {
 
       // Get featuring artist's region
       final userDoc =
-          await _firestore.collection('users').doc(currentUser.uid).get();
-      final featuringRegion = userDoc.data()?['currentRegion'] as String?;
+          await _firestore.collection('players').doc(currentUser.uid).get();
+      final featuringRegion = userDoc.data()?['homeRegion'] as String?;
 
       await _firestore
           .collection('collaborations')
@@ -399,7 +412,7 @@ class CollaborationService {
   /// Get player by ID
   Future<PlayerArtist?> getPlayerById(String playerId) async {
     try {
-      final doc = await _firestore.collection('users').doc(playerId).get();
+      final doc = await _firestore.collection('players').doc(playerId).get();
       if (!doc.exists) return null;
 
       return PlayerArtist.fromJson({

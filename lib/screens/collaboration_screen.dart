@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/collaboration.dart';
 import '../services/collaboration_service.dart';
 import '../models/song.dart';
+import '../utils/genres.dart';
 
 class CollaborationScreen extends StatefulWidget {
   const CollaborationScreen({super.key});
@@ -47,7 +48,7 @@ class _CollaborationScreenState extends State<CollaborationScreen>
       if (currentUser == null) return;
 
       final userData = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('players')
           .doc(currentUser.uid)
           .get();
 
@@ -55,8 +56,8 @@ class _CollaborationScreenState extends State<CollaborationScreen>
 
       final data = userData.data()!;
       final recommended = await _collabService.getRecommendedPlayers(
-        data['primaryGenre'] as String? ?? 'Pop',
-        data['currentRegion'] as String? ?? 'usa',
+        data['genre'] as String? ?? 'Pop',
+        data['homeRegion'] as String? ?? 'usa',
       );
       setState(() {
         _searchResults = recommended;
@@ -75,6 +76,7 @@ class _CollaborationScreenState extends State<CollaborationScreen>
       if (currentUser == null) return;
 
       final results = await _collabService.searchPlayers(
+        query: _searchQuery,
         genre: _selectedGenre,
         region: _selectedRegion,
         minFame: _minFame.toInt(),
@@ -976,16 +978,8 @@ class _CollaborationScreenState extends State<CollaborationScreen>
                 ),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('Any Genre')),
-                  ...[
-                    'Pop',
-                    'Hip Hop',
-                    'Rock',
-                    'R&B',
-                    'Country',
-                    'Electronic',
-                    'Jazz',
-                    'Reggae'
-                  ].map((g) => DropdownMenuItem(value: g, child: Text(g))),
+                  ...Genres.all
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g))),
                 ],
                 onChanged: (value) => setState(() => _selectedGenre = value),
               ),
@@ -1212,36 +1206,46 @@ class _CollaborationScreenState extends State<CollaborationScreen>
 
     if (currentUser == null) return;
 
-    // Check if user has enough money for travel
-    if (travelCost != null) {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-      final currentMoney = userDoc.data()?['currentMoney'] ?? 0;
+    try {
+      // Check if user has enough money for travel
+      if (travelCost != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('players')
+            .doc(currentUser.uid)
+            .get();
+        final currentMoney = userDoc.data()?['currentMoney'] ?? 0;
 
-      if (currentMoney < travelCost) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text('Not enough money! Need \$${_formatMoney(travelCost)}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+        if (currentMoney < travelCost) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    'Not enough money! Need \$${_formatMoney(travelCost)}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
         }
-        return;
       }
 
-      // Deduct travel cost
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update({'currentMoney': currentMoney - travelCost});
-    }
-
-    try {
+      // Record together first
       await _collabService.recordTogether(collab.id);
+
+      // Only deduct money after successful recording
+      if (travelCost != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('players')
+            .doc(currentUser.uid)
+            .get();
+        final currentMoney = userDoc.data()?['currentMoney'] ?? 0;
+
+        await FirebaseFirestore.instance
+            .collection('players')
+            .doc(currentUser.uid)
+            .update({'currentMoney': currentMoney - travelCost});
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1257,7 +1261,10 @@ class _CollaborationScreenState extends State<CollaborationScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error recording: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -1368,10 +1375,31 @@ class _SendCollabRequestDialogState extends State<_SendCollabRequestDialog> {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      // TODO: Load user's written (not recorded) songs from Firestore
-      // For now, using placeholder
+      final playerDoc = await FirebaseFirestore.instance
+          .collection('players')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!playerDoc.exists) {
+        setState(() {
+          _writtenSongs = [];
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final data = playerDoc.data()!;
+      final songs =
+          (data['songs'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+
+      // Filter for written songs only (not recorded yet)
+      final writtenSongs = songs
+          .where((songData) => songData['state'] == 'written')
+          .map((songData) => Song.fromJson(songData))
+          .toList();
+
       setState(() {
-        _writtenSongs = [];
+        _writtenSongs = writtenSongs;
         _isLoading = false;
       });
     } catch (e) {

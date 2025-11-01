@@ -1,9 +1,19 @@
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const { sanitizeForFirestore, formatDate, getCurrentGameDate, logAdminAction, toDateSafe } = require('./utils');
 
 const db = admin.firestore();
+
+const DAILY_UPDATE_STATUS_REF = db.collection('game_state').doc('dailyUpdateStatus');
+const DAILY_UPDATE_BATCH_SIZE = Number(process.env.DAILY_UPDATE_BATCH_SIZE || 120);
+const DAILY_UPDATE_MAX_BATCHES = Number(process.env.DAILY_UPDATE_MAX_BATCHES || 10);
+const DAILY_UPDATE_LOCK_TIMEOUT_MS = Number(
+  process.env.DAILY_UPDATE_LOCK_TIMEOUT_MS || 8 * 60 * 1000,
+);
 
 /**
  * Calculate daily stream growth with decay
@@ -47,8 +57,8 @@ async function processDailyStreamsForPlayer(playerId, playerData, batch) {
     if (lastProcessed) {
       const lastProcessedString = formatDate(lastProcessed);
       if (lastProcessedString === gameDateString) {
-        console.log(`⏭️ Skipping ${playerData.artistName || playerId} - already processed for ${gameDateString}`);
-        return { skipped: true, reason: 'duplicate' };
+    console.log(`⏭️ Skipping ${playerData.artistName || playerId} - already processed for ${gameDateString}`);
+    return { skipped: true, reason: 'duplicate', wroteBatch: false };
       }
     }
 
@@ -116,6 +126,20 @@ async function processDailyStreamsForPlayer(playerId, playerData, batch) {
       lastProcessedDate: admin.firestore.Timestamp.now(), // 🛡️ Mark as processed
     };
 
+    // 💡 INSPIRATION RESTORATION - restore creative energy each game day
+    try {
+      const currentInspiration = Number(playerData.inspirationLevel || 0);
+    const inspirationGain = 10; // +10 inspiration per game day (configurable)
+    const newInspiration = Math.min(100, currentInspiration + inspirationGain);
+      if (newInspiration !== currentInspiration) {
+        updates.inspirationLevel = newInspiration;
+        updates.creativity = newInspiration; // keep legacy field in sync
+        console.log(`💡 ${playerData.artistName || playerId}: Inspiration ${currentInspiration} → ${newInspiration} (+${inspirationGain})`);
+      }
+    } catch (e) {
+      console.warn('Failed to compute inspiration restoration for', playerId, e && e.message ? e.message : e);
+    }
+
     // Apply sanitization
     const sanitizedUpdates = sanitizeForFirestore(updates);
     batch.update(playerRef, sanitizedUpdates);
@@ -124,6 +148,7 @@ async function processDailyStreamsForPlayer(playerId, playerData, batch) {
       success: true,
       newStreams: totalNewStreams,
       newIncome: totalNewIncome,
+      wroteBatch: true,
     };
 
   } catch (error) {
@@ -138,12 +163,299 @@ async function processDailyStreamsForPlayer(playerId, playerData, batch) {
       };
       batch.update(db.collection('players').doc(playerId), fallbackUpdate);
       console.log(`🛡️ Applied fallback update for ${playerData.artistName || playerId} - songs preserved (${(playerData.songs || []).length} songs)`);
-      return { success: false, error: error.message, fallbackApplied: true };
+      return {
+        success: false,
+        error: error.message,
+        fallbackApplied: true,
+        wroteBatch: true,
+      };
     } catch (fallbackError) {
       console.error(`❌ Fallback also failed for ${playerId}:`, fallbackError);
-      return { success: false, error: error.message, fallbackApplied: false };
+      return {
+        success: false,
+        error: error.message,
+        fallbackApplied: false,
+        wroteBatch: false,
+      };
     }
   }
+}
+
+async function claimDailyUpdateBatch({ forceRestart = false } = {}) {
+  const now = new Date();
+  const todayKey = formatDate(now);
+
+  return db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(DAILY_UPDATE_STATUS_REF);
+    let state = snapshot.exists ? snapshot.data() : null;
+
+    const beginNewRun = () => {
+      const runId = `${todayKey}-${now.getTime()}`;
+      state = {
+        runId,
+        runDate: todayKey,
+        lastPlayerId: null,
+        processedCount: 0,
+        skippedCount: 0,
+        errorCount: 0,
+        completed: false,
+      };
+
+      tx.set(DAILY_UPDATE_STATUS_REF, {
+        ...state,
+        processing: true,
+        lockedAt: admin.firestore.FieldValue.serverTimestamp(),
+        startedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { canProcess: true, state };
+    };
+
+    if (forceRestart || !state) {
+      return beginNewRun();
+    }
+
+    if (state.runDate !== todayKey) {
+      return beginNewRun();
+    }
+
+    if (state.completed && !forceRestart) {
+      return { canProcess: false, reason: 'completed', state };
+    }
+
+    const lockedAtDate = toDateSafe(state.lockedAt);
+    if (state.processing && lockedAtDate && now - lockedAtDate.getTime() < DAILY_UPDATE_LOCK_TIMEOUT_MS) {
+      return { canProcess: false, reason: 'locked', state };
+    }
+
+    tx.set(
+      DAILY_UPDATE_STATUS_REF,
+      {
+        runId: state.runId,
+        runDate: state.runDate,
+        processing: true,
+        lockedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        startedAt: state.startedAt || admin.firestore.FieldValue.serverTimestamp(),
+        lastPlayerId: state.lastPlayerId || null,
+        processedCount: typeof state.processedCount === 'number' ? state.processedCount : 0,
+        skippedCount: typeof state.skippedCount === 'number' ? state.skippedCount : 0,
+        errorCount: typeof state.errorCount === 'number' ? state.errorCount : 0,
+        completed: false,
+      },
+      { merge: true },
+    );
+
+    state = {
+      runId: state.runId,
+      runDate: state.runDate,
+      lastPlayerId: state.lastPlayerId || null,
+      processedCount: Number(state.processedCount || 0),
+      skippedCount: Number(state.skippedCount || 0),
+      errorCount: Number(state.errorCount || 0),
+    };
+
+    return { canProcess: true, state };
+  });
+}
+
+async function finalizeDailyUpdateBatch({
+  state,
+  lastPlayerId,
+  processed = 0,
+  skipped = 0,
+  errors = 0,
+  isComplete = false,
+  trigger = 'manual',
+}) {
+  const update = {
+    runId: state.runId,
+    runDate: state.runDate,
+    processing: false,
+    lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (typeof lastPlayerId !== 'undefined') {
+    update.lastPlayerId = lastPlayerId;
+  }
+
+  if (processed > 0) {
+    update.processedCount = admin.firestore.FieldValue.increment(processed);
+  }
+
+  if (skipped > 0) {
+    update.skippedCount = admin.firestore.FieldValue.increment(skipped);
+  }
+
+  if (errors > 0) {
+    update.errorCount = admin.firestore.FieldValue.increment(errors);
+  }
+
+  update.lastBatch = sanitizeForFirestore({
+    trigger,
+    processed,
+    skipped,
+    errors,
+    completed: isComplete,
+    recordedAt: new Date().toISOString(),
+  });
+
+  if (isComplete) {
+    update.completed = true;
+    update.completedAt = admin.firestore.FieldValue.serverTimestamp();
+    update.lastPlayerId = null;
+  }
+
+  await DAILY_UPDATE_STATUS_REF.set(update, { merge: true });
+}
+
+async function releaseDailyUpdateLock(state, errorMessage) {
+  if (!state) return;
+
+  const update = {
+    runId: state.runId,
+    runDate: state.runDate,
+    processing: false,
+    lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (errorMessage) {
+    update.lastError = errorMessage;
+    update.lastErrorAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  await DAILY_UPDATE_STATUS_REF.set(update, { merge: true });
+}
+
+async function runDailyUpdateBatch({
+  trigger = 'manual',
+  batchSize = DAILY_UPDATE_BATCH_SIZE,
+  forceRestart = false,
+} = {}) {
+  const claim = await claimDailyUpdateBatch({ forceRestart });
+
+  if (!claim.canProcess) {
+    return {
+      status: claim.reason === 'completed' ? 'idle' : 'locked',
+      reason: claim.reason,
+      runId: claim.state?.runId || null,
+      runDate: claim.state?.runDate || null,
+      processed: 0,
+      skipped: 0,
+      errors: 0,
+    };
+  }
+
+  const state = claim.state;
+  let query = db
+    .collection('players')
+    .orderBy(admin.firestore.FieldPath.documentId())
+    .limit(batchSize);
+
+  if (state.lastPlayerId) {
+    query = query.startAfter(state.lastPlayerId);
+  }
+
+  let snapshot;
+
+  try {
+    snapshot = await query.get();
+  } catch (error) {
+    await releaseDailyUpdateLock(state, error.message);
+    throw error;
+  }
+
+  if (snapshot.empty) {
+    console.log('ℹ️ No players found for daily update batch; marking run as complete.');
+    await finalizeDailyUpdateBatch({
+      state,
+      lastPlayerId: null,
+      processed: 0,
+      skipped: 0,
+      errors: 0,
+      isComplete: true,
+      trigger,
+    });
+
+    return {
+      status: 'complete',
+      reason: 'no_players',
+      processed: 0,
+      skipped: 0,
+      errors: 0,
+      fetched: 0,
+      runId: state.runId,
+      runDate: state.runDate,
+    };
+  }
+
+  const batch = db.batch();
+  let processed = 0;
+  let skipped = 0;
+  let errors = 0;
+  let writes = 0;
+
+  for (const doc of snapshot.docs) {
+    try {
+      const result = await processDailyStreamsForPlayer(doc.id, doc.data(), batch);
+
+      if (result?.skipped) {
+        skipped += 1;
+      } else if (result?.success) {
+        processed += 1;
+      } else {
+        errors += 1;
+      }
+
+      if (result?.wroteBatch) {
+        writes += 1;
+      }
+    } catch (playerError) {
+      errors += 1;
+      console.error(`❌ Error processing player ${doc.id}:`, playerError);
+    }
+  }
+
+  try {
+    if (writes > 0) {
+      await batch.commit();
+    } else {
+      console.log('ℹ️ Daily update batch produced no writes; commit skipped.');
+    }
+  } catch (commitError) {
+    await releaseDailyUpdateLock(state, commitError.message);
+    throw commitError;
+  }
+
+  const lastDocId = snapshot.docs[snapshot.docs.length - 1].id;
+  const isComplete = snapshot.size < batchSize;
+
+  await finalizeDailyUpdateBatch({
+    state,
+    lastPlayerId: isComplete ? null : lastDocId,
+    processed,
+    skipped,
+    errors,
+    isComplete,
+    trigger,
+  });
+
+  console.log(
+    `🧮 Daily update batch (${trigger}) runId=${state.runId} processed=${processed} skipped=${skipped} errors=${errors} fetched=${snapshot.size} nextCursor=${isComplete ? 'DONE' : lastDocId}`,
+  );
+
+  return {
+    status: isComplete ? 'complete' : 'partial',
+    reason: isComplete ? 'processed_all' : 'pending_players',
+    processed,
+    skipped,
+    errors,
+    fetched: snapshot.size,
+    runId: state.runId,
+    runDate: state.runDate,
+    lastPlayerId: isComplete ? null : lastDocId,
+  };
 }
 
 /**
@@ -155,117 +467,145 @@ exports.dailyGameUpdate = onSchedule({
   memory: '1GiB',
   timeoutSeconds: 540,
   region: 'us-central1',
-}, async (event) => {
-  console.log('⏰ Starting scheduled daily game update...');
+}, async () => {
+  console.log('⏰ Starting scheduled daily game update (paginated)...');
   const startTime = Date.now();
+  const stats = { processed: 0, skipped: 0, errors: 0, batches: 0 };
+  let lastResult = null;
 
-  try {
-    const playersSnapshot = await db.collection('players').get();
-    const batch = db.batch();
-    
-    let processed = 0;
-    let skipped = 0;
-    let errors = 0;
+  for (let i = 0; i < DAILY_UPDATE_MAX_BATCHES; i++) {
+    lastResult = await runDailyUpdateBatch({ trigger: 'scheduled' });
 
-    for (const doc of playersSnapshot.docs) {
-      const result = await processDailyStreamsForPlayer(doc.id, doc.data(), batch);
-      
-      if (result.skipped) {
-        skipped++;
-      } else if (result.success) {
-        processed++;
-      } else {
-        errors++;
-      }
+    if (lastResult.status === 'locked') {
+      console.log('🔒 Daily update is locked by another worker. Exiting.');
+      break;
     }
 
-    await batch.commit();
-    
-    const duration = Date.now() - startTime;
-    const logDetails = {
-      type: 'scheduled',
-      playersProcessed: processed,
-      playersSkipped: skipped,
-      errorsEncountered: errors,
-      duration: `${duration}ms`,
-      timestamp: new Date().toISOString(),
-    };
+    if (lastResult.status === 'idle') {
+      console.log('✅ Daily update already completed for this game day.');
+      break;
+    }
 
-    await logAdminAction('daily_game_update', logDetails);
-    
-    console.log(`✅ Daily update complete: ${processed} processed, ${skipped} skipped, ${errors} errors (${duration}ms)`);
-    return { success: true, ...logDetails };
+    stats.processed += lastResult.processed || 0;
+    stats.skipped += lastResult.skipped || 0;
+    stats.errors += lastResult.errors || 0;
+    if (lastResult.status === 'partial' || lastResult.status === 'complete') {
+      stats.batches += 1;
+    }
 
-  } catch (error) {
-    console.error('❌ Daily game update failed:', error);
-    await logAdminAction('daily_game_update_error', {
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-    });
-    throw error;
+    if (lastResult.status === 'partial') {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 480_000) { // 8 minutes safety buffer
+        console.log('⏳ Time budget nearly exhausted; remaining batches will continue on the next invocation.');
+        break;
+      }
+      continue;
+    }
+
+    if (lastResult.status === 'complete') {
+      console.log('✅ Daily update batches completed in this invocation.');
+      break;
+    }
   }
+
+  const duration = Date.now() - startTime;
+
+  await logAdminAction('daily_game_update_paginated', {
+    trigger: 'scheduled',
+    batchesExecuted: stats.batches,
+    processedPlayers: stats.processed,
+    skippedPlayers: stats.skipped,
+    errorCount: stats.errors,
+    finalStatus: lastResult ? lastResult.status : 'no-op',
+    finalReason: lastResult ? lastResult.reason : 'none',
+    durationMs: duration,
+  });
+
+  return {
+    success: lastResult ? lastResult.status !== 'locked' : true,
+    durationMs: duration,
+    finalStatus: lastResult ? lastResult.status : 'no-op',
+    finalReason: lastResult ? lastResult.reason : 'none',
+    ...stats,
+  };
 });
 
 /**
- * Manual trigger: admin can force a daily update
+ * Manual trigger: admin can force additional batches
  */
 exports.triggerDailyUpdate = onCall({
   region: 'us-central1',
   memory: '512MiB',
   timeoutSeconds: 540,
 }, async (request) => {
-  console.log('🔧 Manual daily update triggered by:', request.auth?.uid || 'unknown');
+  const triggerInfo = request.auth?.uid || 'unknown';
+  console.log('🔧 Manual daily update triggered by:', triggerInfo);
+
   const startTime = Date.now();
+  const payload = request.data || {};
+  const requestedMax = Number(payload.maxBatches || 25);
+  const maxBatches = Math.max(1, Math.min(requestedMax, 100));
+  const batchSize = Math.max(25, Math.min(Number(payload.batchSize || DAILY_UPDATE_BATCH_SIZE), 500));
+  let forceRestart = payload.reset === true;
 
-  try {
-    const playersSnapshot = await db.collection('players').get();
-    const batch = db.batch();
-    
-    let processed = 0;
-    let skipped = 0;
-    let errors = 0;
+  const stats = { processed: 0, skipped: 0, errors: 0, batches: 0 };
+  let lastResult = null;
 
-    for (const doc of playersSnapshot.docs) {
-      const result = await processDailyStreamsForPlayer(doc.id, doc.data(), batch);
-      
-      if (result.skipped) {
-        skipped++;
-      } else if (result.success) {
-        processed++;
-      } else {
-        errors++;
-      }
+  for (let i = 0; i < maxBatches; i++) {
+    lastResult = await runDailyUpdateBatch({
+      trigger: 'manual',
+      batchSize,
+      forceRestart,
+    });
+
+    forceRestart = false;
+
+    if (lastResult.status === 'locked') {
+      console.log('🔒 Daily update is locked by another worker. Manual run stopping.');
+      break;
     }
 
-    await batch.commit();
-    
-    const duration = Date.now() - startTime;
-    const logDetails = {
-      type: 'manual',
-      triggeredBy: request.auth?.uid || 'unknown',
-      playersProcessed: processed,
-      playersSkipped: skipped,
-      errorsEncountered: errors,
-      duration: `${duration}ms`,
-      timestamp: new Date().toISOString(),
-    };
+    if (lastResult.status === 'idle') {
+      console.log('✅ Daily update already completed for this game day (manual trigger).');
+      break;
+    }
 
-    await logAdminAction('manual_daily_update', logDetails);
-    
-    console.log(`✅ Manual update complete: ${processed} processed, ${skipped} skipped, ${errors} errors (${duration}ms)`);
-    return { success: true, ...logDetails };
+    stats.processed += lastResult.processed || 0;
+    stats.skipped += lastResult.skipped || 0;
+    stats.errors += lastResult.errors || 0;
+    if (lastResult.status === 'partial' || lastResult.status === 'complete') {
+      stats.batches += 1;
+    }
 
-  } catch (error) {
-    console.error('❌ Manual daily update failed:', error);
-    await logAdminAction('manual_daily_update_error', {
-      triggeredBy: request.auth?.uid || 'unknown',
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-    });
-    throw new HttpsError('internal', error.message);
+    if (lastResult.status === 'partial') {
+      continue;
+    }
+
+    if (lastResult.status === 'complete') {
+      break;
+    }
   }
+
+  const duration = Date.now() - startTime;
+
+  await logAdminAction('manual_daily_update_paginated', {
+    trigger: triggerInfo,
+    batchesExecuted: stats.batches,
+    processedPlayers: stats.processed,
+    skippedPlayers: stats.skipped,
+    errorCount: stats.errors,
+    finalStatus: lastResult ? lastResult.status : 'no-op',
+    finalReason: lastResult ? lastResult.reason : 'none',
+    durationMs: duration,
+  });
+
+  return {
+    success: lastResult ? lastResult.status !== 'locked' : true,
+    durationMs: duration,
+    finalStatus: lastResult ? lastResult.status : 'no-op',
+    finalReason: lastResult ? lastResult.reason : 'none',
+    ...stats,
+  };
 });
 
 module.exports = {
@@ -273,4 +613,5 @@ module.exports = {
   triggerDailyUpdate: exports.triggerDailyUpdate,
   processDailyStreamsForPlayer,
   calculateDailyStreamGrowth,
+  runDailyUpdateBatch,
 };
