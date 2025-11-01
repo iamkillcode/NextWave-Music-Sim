@@ -2,7 +2,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
 
 /// Service for managing Firebase Cloud Messaging push notifications
 class PushNotificationService {
@@ -27,7 +26,7 @@ class PushNotificationService {
 
     try {
       // Request notification permissions
-      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+      if (!kIsWeb) {
         final settings = await _messaging.requestPermission(
           alert: true,
           badge: true,
@@ -44,6 +43,8 @@ class PushNotificationService {
           print('❌ Push notification permissions denied');
           return;
         }
+      } else {
+        print('📱 Push notifications on web - using browser notifications');
       }
 
       // Get FCM token
@@ -86,13 +87,7 @@ class PushNotificationService {
       await _firestore.collection('players').doc(user.uid).update({
         'fcmToken': token,
         'fcmTokenUpdated': FieldValue.serverTimestamp(),
-        'platform': kIsWeb
-            ? 'web'
-            : Platform.isIOS
-                ? 'ios'
-                : Platform.isAndroid
-                    ? 'android'
-                    : 'unknown',
+        'platform': kIsWeb ? 'web' : 'mobile',
       });
       print('✅ FCM token saved to Firestore');
     } catch (e) {

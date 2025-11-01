@@ -1582,13 +1582,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }).toList();
 
         setState(() {
+          // 🌍 REALISTIC CAPS: World population is 8B
+          // - Maximum possible fanbase: 3B (entire streaming population)
+          // - Even Taylor Swift, Drake, etc. have ~100M dedicated fans
+          // - Loyal fanbase should be much smaller (10-20% of total)
+          const int MAX_FANBASE = 3000000000; // 3 billion
+          const int MAX_LOYAL_FANBASE = 600000000; // 600 million (20% of max)
+
+          final cappedFanbase =
+              (artistStats.fanbase + fanbaseGain).clamp(0, MAX_FANBASE);
+          final cappedLoyalFanbase =
+              (artistStats.loyalFanbase + totalLoyalFanbaseGrowth)
+                  .clamp(0, MAX_LOYAL_FANBASE);
+
           artistStats = artistStats.copyWith(
             songs: allSongs,
             fame: artistStats.fame + fameGain,
-            fanbase: artistStats.fanbase + fanbaseGain,
-            loyalFanbase: (artistStats.loyalFanbase + totalLoyalFanbaseGrowth)
-                .clamp(0, 1e12)
-                .toInt(),
+            fanbase: cappedFanbase,
+            loyalFanbase: cappedLoyalFanbase,
             regionalFanbase: updatedRegionalFanbase,
           );
         });

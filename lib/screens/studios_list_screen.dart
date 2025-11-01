@@ -3,6 +3,7 @@ import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../models/studio.dart';
 import '../models/world_region.dart';
+import 'sound_mixing_minigame.dart';
 
 class StudiosListScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -39,7 +40,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
     _studios = Studio.getStudiosByRegion(_currentStats.currentRegion);
   }
 
-  List<Song> get writtenSongs => _currentStats.songs.where((s) => s.state == SongState.written).toList();
+  List<Song> get writtenSongs =>
+      _currentStats.songs.where((s) => s.state == SongState.written).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -123,9 +125,14 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
     final meetsRequirements = studio.meetsRequirements(_currentStats);
     final attitude = studio.getAttitude(_currentStats);
     final baseCost = studio.getAdjustedPrice(false, regionMultiplier, attitude);
-    final producerCost = studio.getAdjustedPrice(true, regionMultiplier, attitude);
-    final canAffordBasic = _currentStats.money >= baseCost && _currentStats.energy >= 30 && meetsRequirements;
-    final canAffordProducer = _currentStats.money >= producerCost && _currentStats.energy >= 30 && meetsRequirements;
+    final producerCost =
+        studio.getAdjustedPrice(true, regionMultiplier, attitude);
+    final canAffordBasic = _currentStats.money >= baseCost &&
+        _currentStats.energy >= 30 &&
+        meetsRequirements;
+    final canAffordProducer = _currentStats.money >= producerCost &&
+        _currentStats.energy >= 30 &&
+        meetsRequirements;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -141,7 +148,7 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: meetsRequirements 
+          color: meetsRequirements
               ? studio.getTierColor().withOpacity(0.5)
               : Colors.red.withOpacity(0.3),
           width: 2,
@@ -184,7 +191,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                     Text(
                       studio.name,
                       style: TextStyle(
-                        color: meetsRequirements ? Colors.white : Colors.white54,
+                        color:
+                            meetsRequirements ? Colors.white : Colors.white54,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -192,7 +200,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                     Text(
                       studio.location,
                       style: TextStyle(
-                        color: meetsRequirements ? Colors.white60 : Colors.white30,
+                        color:
+                            meetsRequirements ? Colors.white60 : Colors.white30,
                         fontSize: 14,
                       ),
                     ),
@@ -203,7 +212,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: studio.getTierColor(),
                       borderRadius: BorderRadius.circular(12),
@@ -219,7 +229,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: studio.getAttitudeColor(attitude),
                       borderRadius: BorderRadius.circular(12),
@@ -245,21 +256,21 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
               fontSize: 13,
             ),
           ),
-          
+
           // Requirements Section
-          if (studio.requirements.minFame > 0 || 
-              studio.requirements.minAlbums > 0 || 
+          if (studio.requirements.minFame > 0 ||
+              studio.requirements.minAlbums > 0 ||
               studio.requirements.minSongsReleased > 0) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: meetsRequirements 
+                color: meetsRequirements
                     ? Colors.green.withOpacity(0.1)
                     : Colors.red.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: meetsRequirements 
+                  color: meetsRequirements
                       ? Colors.green.withOpacity(0.3)
                       : Colors.red.withOpacity(0.3),
                 ),
@@ -297,21 +308,25 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                     _buildRequirementRow(
                       'Albums',
                       studio.requirements.minAlbums,
-                      _currentStats.albumsSold > 0 ? (_currentStats.albumsSold / 1000).ceil() : 0,
+                      _currentStats.albumsSold > 0
+                          ? (_currentStats.albumsSold / 1000).ceil()
+                          : 0,
                       Icons.album,
                     ),
                   if (studio.requirements.minSongsReleased > 0)
                     _buildRequirementRow(
                       'Released Songs',
                       studio.requirements.minSongsReleased,
-                      _currentStats.songs.where((s) => s.state == SongState.released).length,
+                      _currentStats.songs
+                          .where((s) => s.state == SongState.released)
+                          .length,
                       Icons.music_note,
                     ),
                 ],
               ),
             ),
           ],
-          
+
           // Attitude Description
           const SizedBox(height: 12),
           Container(
@@ -341,7 +356,7 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
               ],
             ),
           ),
-          
+
           // Exclusive Note
           if (studio.exclusiveNote.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -375,7 +390,7 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
               ),
             ),
           ],
-          
+
           // Connection Benefits
           if (studio.hasConnectionBenefits()) ...[
             const SizedBox(height: 8),
@@ -406,7 +421,7 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
               ),
             ),
           ],
-          
+
           const SizedBox(height: 16),
           Row(
             children: [
@@ -414,7 +429,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
               const SizedBox(width: 8),
               _buildStatChip('Rep', '${studio.reputation}%', Icons.trending_up),
               const SizedBox(width: 8),
-              _buildStatChip('Fame', '+${studio.getFameBonus()}', Icons.whatshot),
+              _buildStatChip(
+                  'Fame', '+${studio.getFameBonus()}', Icons.whatshot),
             ],
           ),
           if (studio.specialties.isNotEmpty) ...[
@@ -424,7 +440,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
               runSpacing: 6,
               children: studio.specialties.map((specialty) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -445,7 +462,9 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: canAffordBasic ? () => _showSongSelectionDialog(studio, false) : null,
+                  onPressed: canAffordBasic
+                      ? () => _showSongSelectionDialog(studio, false)
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00D9FF),
                     disabledBackgroundColor: Colors.grey.shade700,
@@ -479,7 +498,9 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: canAffordProducer ? () => _showSongSelectionDialog(studio, true) : null,
+                    onPressed: canAffordProducer
+                        ? () => _showSongSelectionDialog(studio, true)
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF9B59B6),
                       disabledBackgroundColor: Colors.grey.shade700,
@@ -619,20 +640,47 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
     );
   }
 
-  void _recordSongAtStudio(Song song, Studio studio, bool useProducer) {
+  void _recordSongAtStudio(Song song, Studio studio, bool useProducer) async {
+    // If Self Produce, launch Sound Mixing Minigame first
+    int qualityBonus = 0;
+    if (!useProducer) {
+      final result = await showDialog<int>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => SoundMixingMinigame(
+          song: song,
+          onComplete: (bonus) => Navigator.pop(context, bonus),
+        ),
+      );
+
+      // If user cancelled the minigame
+      if (result == null) return;
+      qualityBonus = result;
+    }
+
     final regionMultiplier = _currentRegion?.costOfLivingMultiplier ?? 1.0;
     final attitude = studio.getAttitude(_currentStats);
-    final cost = studio.getAdjustedPrice(useProducer, regionMultiplier, attitude);
+    final cost =
+        studio.getAdjustedPrice(useProducer, regionMultiplier, attitude);
 
     // Calculate recording quality with attitude modifier
     final studioQuality = studio.qualityRating;
     final studioRepBonus = (studio.reputation / 100.0) * 10;
     final producerBonus = useProducer ? (studio.producerSkill / 100.0) * 15 : 0;
-    final specialtyBonus = studio.specialties.any((s) => s.toLowerCase() == song.genre.toLowerCase()) ? 10 : 0;
+    final specialtyBonus = studio.specialties
+            .any((s) => s.toLowerCase() == song.genre.toLowerCase())
+        ? 10
+        : 0;
     final attitudeModifier = studio.getAttitudeQualityModifier(attitude);
-    
-    final baseQuality = studioQuality + studioRepBonus + producerBonus + specialtyBonus;
-    final recordingQuality = (baseQuality * attitudeModifier).clamp(1, 100).round();
+
+    // Apply mixing quality bonus/penalty (only for Self Produce)
+    final baseQuality = studioQuality +
+        studioRepBonus +
+        producerBonus +
+        specialtyBonus +
+        qualityBonus;
+    final recordingQuality =
+        (baseQuality * attitudeModifier).clamp(1, 100).round();
 
     final updatedSongs = _currentStats.songs.map((s) {
       if (s.id == song.id) {
@@ -657,14 +705,25 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
 
     widget.onStatsUpdated(_currentStats);
 
+    // Build success message
     String producerText = useProducer ? '\n🎛️ With studio producer!' : '';
-    String attitudeText = attitude != StudioAttitude.neutral 
+    String mixingText = '';
+    if (!useProducer) {
+      if (qualityBonus > 0) {
+        mixingText = '\n🎛️ Excellent mix! +$qualityBonus quality bonus';
+      } else if (qualityBonus < 0) {
+        mixingText = '\n🎛️ Poor mix. $qualityBonus quality penalty';
+      } else {
+        mixingText = '\n🎛️ Decent mix. No quality change';
+      }
+    }
+    String attitudeText = attitude != StudioAttitude.neutral
         ? '\n${_getAttitudeEmoji(attitude)} Studio Attitude: ${attitude.name}'
         : '';
     _showMessage('🎤 Recorded "${song.title}" at ${studio.name}!\n'
-                'Recording Quality: $recordingQuality%'
-                '$producerText$attitudeText\n'
-                '+${studio.getFameBonus()} Fame');
+        'Recording Quality: $recordingQuality%'
+        '$producerText$mixingText$attitudeText\n'
+        '+${studio.getFameBonus()} Fame');
   }
 
   void _showMessage(String message) {
@@ -687,7 +746,8 @@ class _StudiosListScreenState extends State<StudiosListScreen> {
     return number.toString();
   }
 
-  Widget _buildRequirementRow(String label, int required, int current, IconData icon) {
+  Widget _buildRequirementRow(
+      String label, int required, int current, IconData icon) {
     final met = current >= required;
     return Padding(
       padding: const EdgeInsets.only(top: 4),

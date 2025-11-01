@@ -39,16 +39,20 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
   }
 
   List<Song> get releasedSongs => _currentStats.songs
-    .where(
-    (s) =>
-      s.state == SongState.released &&
-      (s.streamingPlatforms.contains('maple_music') || s.streamingPlatforms.isEmpty),
-    )
-    .toList();
+      .where(
+        (s) =>
+            s.state == SongState.released &&
+            (s.streamingPlatforms.contains('maple_music') ||
+                s.streamingPlatforms.isEmpty),
+      )
+      .toList();
 
   List<Album> get releasedAlbums => _currentStats.albums
-    .where((a) => a.state == AlbumState.released && (a.streamingPlatforms.contains('maple_music') || a.streamingPlatforms.isEmpty))
-    .toList();
+      .where((a) =>
+          a.state == AlbumState.released &&
+          (a.streamingPlatforms.contains('maple_music') ||
+              a.streamingPlatforms.isEmpty))
+      .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -58,12 +62,23 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
       0,
       (sum, song) => sum + song.last7DaysStreams,
     );
+
+    // 🌍 REALISTIC CAP: World population is 8B, but not everyone listens to music
+    // - ~75% of world has internet access (6B people)
+    // - ~50% of those use streaming platforms (3B people)
+    // - Even the biggest artists (Drake, Taylor Swift) peak at ~100M monthly listeners
+    // - Absolute theoretical max: 3B monthly listeners (entire streaming population)
+    const int MAX_MONTHLY_LISTENERS = 3000000000; // 3 billion
+
+    final rawMonthlyListeners = (last7DaysStreams * 4.3).round();
     final monthlyListeners =
-        (last7DaysStreams * 4.3).round(); // Based on recent weekly activity
+        rawMonthlyListeners.clamp(0, MAX_MONTHLY_LISTENERS);
 
     // Followers is a separate metric (40% of fanbase on this platform)
-    final followers =
-        (_currentStats.fanbase * 0.4).round(); // 40% of fanbase on Maple Music
+    // Cap at 1.5B (half of streaming population would be absurdly high)
+    const int MAX_FOLLOWERS = 1500000000; // 1.5 billion
+    final rawFollowers = (_currentStats.fanbase * 0.4).round();
+    final followers = rawFollowers.clamp(0, MAX_FOLLOWERS);
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
@@ -418,7 +433,7 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
 
   // Songs Tab - Show released songs on Maple Music
   Widget _buildSongsTab() {
-  if (releasedSongs.isEmpty) {
+    if (releasedSongs.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         child: Column(
@@ -686,22 +701,22 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
             ),
           ),
           const SizedBox(height: 16),
-            // Grid of released albums
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: releasedAlbums.length,
-              itemBuilder: (context, index) {
-                final album = releasedAlbums[index];
-                return _buildAlbumTile(album);
-              },
+          // Grid of released albums
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.75,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
             ),
+            itemCount: releasedAlbums.length,
+            itemBuilder: (context, index) {
+              final album = releasedAlbums[index];
+              return _buildAlbumTile(album);
+            },
+          ),
         ],
       ),
     );
@@ -724,7 +739,10 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [const Color(0xFFFC3C44).withOpacity(0.8), const Color(0xFFFC3C44).withOpacity(0.4)],
+                  colors: [
+                    const Color(0xFFFC3C44).withOpacity(0.8),
+                    const Color(0xFFFC3C44).withOpacity(0.4)
+                  ],
                 ),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(8),
@@ -734,7 +752,8 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
               child: Center(
                 child: cover != null
                     ? Image.network(cover, fit: BoxFit.cover)
-                    : const Icon(Icons.album_rounded, size: 48, color: Colors.white30),
+                    : const Icon(Icons.album_rounded,
+                        size: 48, color: Colors.white30),
               ),
             ),
           ),
@@ -1048,5 +1067,16 @@ class _MapleMusicScreenState extends State<MapleMusicScreen>
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
     return number.toString();
+  }
+
+  String _formatMoney(int amount) {
+    if (amount >= 1000000000) {
+      return '\$${(amount / 1000000000).toStringAsFixed(2)}B';
+    } else if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(2)}M';
+    } else if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(2)}K';
+    }
+    return '\$${amount.toStringAsFixed(2)}';
   }
 }

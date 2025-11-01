@@ -1066,14 +1066,24 @@ class _ReleaseSongScreenState extends State<ReleaseSongScreen> {
 
       // Update artist stats with loyal fanbase growth and regional fanbase
       // Note: Royalty payments are calculated daily, not on release
+      // 🌍 Apply realistic population caps
+      const int MAX_FANBASE =
+          3000000000; // 3 billion (entire streaming population)
+      const int MAX_LOYAL_FANBASE = 600000000; // 600 million (20% of max)
+
+      final cappedFanbase =
+          (widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0))
+              .clamp(0, MAX_FANBASE);
+      final cappedLoyalFanbase =
+          (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
+              .clamp(0, MAX_LOYAL_FANBASE);
+
       final updatedStats = widget.artistStats.copyWith(
         money: widget
             .artistStats.money, // No immediate payment - royalties paid daily
         fame: widget.artistStats.fame + (_releaseNow ? fameGain : 0),
-        fanbase: widget.artistStats.fanbase + (_releaseNow ? fanbaseGain : 0),
-        loyalFanbase: (widget.artistStats.loyalFanbase + loyalFanbaseGrowth)
-            .clamp(0, 1e12)
-            .toInt(),
+        fanbase: cappedFanbase,
+        loyalFanbase: cappedLoyalFanbase,
         regionalFanbase: updatedRegionalFanbase,
         songs: widget.artistStats.songs
             .map((s) => s.id == updatedSong.id ? updatedSong : s)

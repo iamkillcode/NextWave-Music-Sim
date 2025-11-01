@@ -79,7 +79,16 @@ async function processDailyStreamsForPlayer(playerId, playerData, batch) {
       }
 
       // Calculate daily streams with decay
-      const dailyStreams = calculateDailyStreamGrowth(song, playerData, gameDate);
+      let dailyStreams = calculateDailyStreamGrowth(song, playerData, gameDate);
+      
+      // 🌍 REALISTIC DAILY STREAM CAP
+      // Even viral mega-hits don't get 100M+ streams per day
+      // - Taylor Swift's biggest day: ~20M streams (Spotify record)
+      // - Maximum realistic daily streams: 50M per song per day
+      const MAX_DAILY_STREAMS = 50000000; // 50 million
+      if (dailyStreams > MAX_DAILY_STREAMS) {
+        dailyStreams = MAX_DAILY_STREAMS;
+      }
 
       // Calculate income ($0.003 per stream)
       const dailyIncome = dailyStreams * 0.003;

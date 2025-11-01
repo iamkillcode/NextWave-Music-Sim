@@ -1,8 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/artist_stats.dart';
 import '../models/song.dart';
 import '../services/game_time_service.dart';
 import 'release_manager_screen.dart';
+import 'sound_mixing_minigame.dart';
 
 class StudioScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -435,14 +437,45 @@ class _StudioScreenState extends State<StudioScreen>
     );
   }
 
-  void _recordSong(Song song) {
-    // Calculate recording quality based on current stats and random factors
+  void _recordSong(Song song) async {
+    print('🎵 Recording song: ${song.title}');
+
+    // Launch Sound Mixing Minigame
+    int? qualityBonus;
+    try {
+      qualityBonus = await showDialog<int>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          print('🎛️ Building Sound Mixing Minigame dialog');
+          return SoundMixingMinigame(
+            song: song,
+            onComplete: (bonus) {
+              print('✅ Minigame completed with bonus: $bonus');
+              Navigator.pop(context, bonus);
+            },
+          );
+        },
+      );
+    } catch (e) {
+      print('❌ Error showing minigame: $e');
+      // Fallback: use random quality adjustment if dialog fails
+      qualityBonus = (Random().nextInt(21) - 10); // -10 to +10
+    }
+
+    // If user cancelled the minigame
+    if (qualityBonus == null) {
+      print('⚠️ Minigame cancelled by user');
+      return;
+    }
+
+    // Calculate base recording quality from skills
     final baseQuality =
         ((_currentStats.songwritingSkill + _currentStats.compositionSkill) / 2)
             .round();
-    final randomFactor =
-        (DateTime.now().millisecondsSinceEpoch % 21) - 10; // -10 to +10
-    final recordingQuality = (baseQuality + randomFactor).clamp(1, 100);
+
+    // Apply mixing quality bonus/penalty
+    final recordingQuality = (baseQuality + qualityBonus).clamp(1, 100);
 
     final updatedSongs = _currentStats.songs.map((s) {
       if (s.id == song.id) {
@@ -466,8 +499,18 @@ class _StudioScreenState extends State<StudioScreen>
 
     widget.onStatsUpdated(_currentStats);
 
+    // Show result message with mixing feedback
+    String mixingFeedback = '';
+    if (qualityBonus > 0) {
+      mixingFeedback = '\n🎛️ Excellent mix! +$qualityBonus% quality bonus';
+    } else if (qualityBonus < 0) {
+      mixingFeedback = '\n🎛️ Poor mix. $qualityBonus% quality penalty';
+    } else {
+      mixingFeedback = '\n🎛️ Decent mix. No quality change';
+    }
+
     _showMessage(
-        '🎤 Successfully recorded "${song.title}"!\nRecording Quality: $recordingQuality%');
+        '🎤 Successfully recorded "${song.title}"!\nRecording Quality: $recordingQuality%$mixingFeedback');
   }
 
   void _releaseSong(Song song) {

@@ -39,12 +39,18 @@ class _TunifyScreenState extends State<TunifyScreen>
   }
 
   List<Song> get releasedSongs => _currentStats.songs
-    .where((s) => s.state == SongState.released && (s.streamingPlatforms.contains('tunify') || s.streamingPlatforms.isEmpty))
-    .toList();
+      .where((s) =>
+          s.state == SongState.released &&
+          (s.streamingPlatforms.contains('tunify') ||
+              s.streamingPlatforms.isEmpty))
+      .toList();
 
   List<Album> get releasedAlbums => _currentStats.albums
-    .where((a) => a.state == AlbumState.released && (a.streamingPlatforms.contains('tunify') || a.streamingPlatforms.isEmpty))
-    .toList();
+      .where((a) =>
+          a.state == AlbumState.released &&
+          (a.streamingPlatforms.contains('tunify') ||
+              a.streamingPlatforms.isEmpty))
+      .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -54,8 +60,17 @@ class _TunifyScreenState extends State<TunifyScreen>
       0,
       (sum, song) => sum + song.last7DaysStreams,
     );
+
+    // 🌍 REALISTIC CAP: World population is 8B, but not everyone listens to music
+    // - ~75% of world has internet access (6B people)
+    // - ~50% of those use streaming platforms (3B people)
+    // - Even the biggest artists (Drake, Taylor Swift) peak at ~100M monthly listeners
+    // - Absolute theoretical max: 3B monthly listeners (entire streaming population)
+    const int MAX_MONTHLY_LISTENERS = 3000000000; // 3 billion
+
+    final rawMonthlyListeners = (last7DaysStreams * 4.3).round();
     final monthlyListeners =
-        (last7DaysStreams * 4.3).round(); // Based on recent weekly activity
+        rawMonthlyListeners.clamp(0, MAX_MONTHLY_LISTENERS);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -632,7 +647,7 @@ class _TunifyScreenState extends State<TunifyScreen>
 
   // Popular Tracks List (Enhanced Spotify-style)
   Widget _buildPopularTracksContent() {
-  if (releasedSongs.isEmpty) {
+    if (releasedSongs.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         child: Column(
@@ -1002,22 +1017,22 @@ class _TunifyScreenState extends State<TunifyScreen>
             ),
           ),
           const SizedBox(height: 16),
-            // Grid of released albums
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: releasedAlbums.length,
-              itemBuilder: (context, index) {
-                final album = releasedAlbums[index];
-                return _buildAlbumTile(album);
-              },
+          // Grid of released albums
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.75,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
             ),
+            itemCount: releasedAlbums.length,
+            itemBuilder: (context, index) {
+              final album = releasedAlbums[index];
+              return _buildAlbumTile(album);
+            },
+          ),
         ],
       ),
     );
@@ -1050,7 +1065,8 @@ class _TunifyScreenState extends State<TunifyScreen>
               child: Center(
                 child: cover != null
                     ? Image.network(cover, fit: BoxFit.cover)
-                    : const Icon(Icons.album_rounded, size: 48, color: Colors.white30),
+                    : const Icon(Icons.album_rounded,
+                        size: 48, color: Colors.white30),
               ),
             ),
           ),
@@ -1685,7 +1701,7 @@ class _TunifyScreenState extends State<TunifyScreen>
               Expanded(
                 child: _buildAnalyticsCard(
                   'Total Earnings',
-                  '\$${_formatNumber(totalEarnings)}',
+                  _formatMoney(totalEarnings),
                   Icons.attach_money,
                 ),
               ),
@@ -2160,6 +2176,17 @@ class _TunifyScreenState extends State<TunifyScreen>
       return '${(number / 1000).toStringAsFixed(1)}K';
     }
     return number.toString();
+  }
+
+  String _formatMoney(int amount) {
+    if (amount >= 1000000000) {
+      return '\$${(amount / 1000000000).toStringAsFixed(2)}B';
+    } else if (amount >= 1000000) {
+      return '\$${(amount / 1000000).toStringAsFixed(2)}M';
+    } else if (amount >= 1000) {
+      return '\$${(amount / 1000).toStringAsFixed(2)}K';
+    }
+    return '\$${amount.toStringAsFixed(2)}';
   }
 
   String _formatTimeAgo(DateTime date) {

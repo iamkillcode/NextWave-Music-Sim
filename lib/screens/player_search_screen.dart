@@ -18,7 +18,7 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final PokeService _pokeService = PokeService();
   final ChatService _chatService = ChatService();
-  
+
   List<Map<String, dynamic>> _searchResults = [];
   Map<String, String> _pokeStatuses = {}; // userId -> status
   bool _isSearching = false;
@@ -31,7 +31,8 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
   }
 
   Future<void> _searchPlayers(String query) async {
-    if (query.trim().isEmpty) {
+    final keyword = query.trim().toLowerCase();
+    if (keyword.isEmpty) {
       setState(() {
         _searchResults = [];
         _searchQuery = '';
@@ -48,12 +49,10 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
       if (currentUserId == null) return;
 
-      // Search by display name (case-insensitive)
+      // Fetch a batch of players (limit 50 for performance)
       final snapshot = await FirebaseFirestore.instance
           .collection('players')
-          .where('displayName', isGreaterThanOrEqualTo: query)
-          .where('displayName', isLessThan: query + 'z')
-          .limit(20)
+          .limit(50)
           .get();
 
       final results = <Map<String, dynamic>>[];
@@ -61,19 +60,23 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
 
       for (final doc in snapshot.docs) {
         if (doc.id == currentUserId) continue; // Skip self
-        
         final data = doc.data();
-        results.add({
-          'id': doc.id,
-          'name': data['displayName'] ?? 'Unknown',
-          'fame': data['fame'] ?? 0,
-          'region': data['currentRegion'] ?? 'Unknown',
-          'primaryGenre': data['primaryGenre'] ?? 'Unknown',
-        });
+        final displayName = (data['displayName'] ?? '').toString();
+        // Keyword and case-insensitive match
+        if (displayName.toLowerCase().contains(keyword)) {
+          results.add({
+            'id': doc.id,
+            'name': displayName,
+            'fame': data['fame'] ?? 0,
+            'region': data['currentRegion'] ?? 'Unknown',
+            'primaryGenre': data['primaryGenre'] ?? 'Unknown',
+            'avatarUrl': data['avatarUrl'],
+          });
 
-        // Get poke status for each player
-        final status = await _pokeService.getPokeStatus(doc.id);
-        statuses[doc.id] = status;
+          // Get poke status for each player
+          final status = await _pokeService.getPokeStatus(doc.id);
+          statuses[doc.id] = status;
+        }
       }
 
       setState(() {
@@ -94,7 +97,7 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
   Future<void> _handlePoke(Map<String, dynamic> player) async {
     try {
       await _pokeService.pokeUser(player['id']);
-      
+
       // Update local status
       setState(() {
         _pokeStatuses[player['id']] = 'sent';
@@ -123,7 +126,7 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
         otherUserId: player['id'],
         otherUserName: player['name'],
       );
-      
+
       if (conversation == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -366,21 +369,31 @@ class _PlayerSearchScreenState extends State<PlayerSearchScreen> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppTheme.neonGreen, AppTheme.neonPurple],
-                    ),
+                    gradient: player['avatarUrl'] == null
+                        ? const LinearGradient(
+                            colors: [AppTheme.neonGreen, AppTheme.neonPurple],
+                          )
+                        : null,
                     shape: BoxShape.circle,
+                    image: player['avatarUrl'] != null
+                        ? DecorationImage(
+                            image: NetworkImage(player['avatarUrl']),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
-                  child: Center(
-                    child: Text(
-                      player['name'][0].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  child: player['avatarUrl'] == null
+                      ? Center(
+                          child: Text(
+                            player['name'][0].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 // Player info

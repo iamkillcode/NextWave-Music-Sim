@@ -9,6 +9,7 @@ import 'studios_list_screen.dart';
 import 'release_song_screen.dart';
 import 'record_album_screen.dart';
 import 'release_manager_screen.dart';
+import 'collaboration_screen.dart';
 import '../services/game_time_service.dart';
 
 class MusicHubScreen extends StatefulWidget {
@@ -164,6 +165,15 @@ class _MusicHubScreenState extends State<MusicHubScreen>
             color: AppTheme.chartGold,
             energyCost: 0,
             onTap: () => _navigateToReleaseManager(),
+          ),
+          const SizedBox(height: 12),
+          _buildActionCard(
+            title: 'Collaborations',
+            subtitle: 'Collaborate with other players on songs',
+            icon: Icons.people,
+            color: const Color(0xFF9C27B0), // Purple
+            energyCost: 0,
+            onTap: () => _navigateToCollaborations(),
           ),
           const SizedBox(height: 24),
           _buildStatsOverview(),
@@ -925,5 +935,14 @@ class _MusicHubScreenState extends State<MusicHubScreen>
       });
       widget.onStatsUpdated(_currentStats);
     }
+  }
+
+  void _navigateToCollaborations() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CollaborationScreen(),
+      ),
+    );
   }
 }

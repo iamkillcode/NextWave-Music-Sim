@@ -13,7 +13,8 @@ import '../models/artist_stats.dart';
 class StreamGrowthService {
   final Random _random = Random();
   // Safety cap for any stream/fan calculations to avoid Infinity -> toInt() errors
-  static const double _maxStreamBound = 1e12; // 1 trillion streams is effectively unlimited
+  static const double _maxStreamBound =
+      1e12; // 1 trillion streams is effectively unlimited
 
   /// All supported regions
   static const List<String> regions = [
@@ -109,32 +110,46 @@ class StreamGrowthService {
     final variance = 0.8 + (_random.nextDouble() * 0.4);
     var finalStreams = (totalDailyStreams * variance).round();
 
-    // � BALANCED: Fanbase-dependent minimum (prevents passive income exploit)
+    // 🌍 BALANCED: Fanbase-dependent minimum (prevents passive income exploit)
     // Artists with no fans get very few streams (realistic algorithm behavior)
     final fanbase = artistStats.fanbase;
     final quality = song.finalQuality;
-    
+
     int minimumStreams;
     if (fanbase == 0) {
       // No fans = almost no streams (only viral discovery possible)
       minimumStreams = (quality / 100 * 10).round(); // 0-10 streams/day
     } else if (fanbase < 100) {
       // Small fanbase = small guarantee
-      minimumStreams = (fanbase * 0.5 + quality / 100 * 20).round(); // 20-70 range
+      minimumStreams =
+          (fanbase * 0.5 + quality / 100 * 20).round(); // 20-70 range
     } else if (fanbase < 1000) {
       // Growing fanbase = moderate guarantee
-      minimumStreams = (fanbase * 0.3 + quality / 100 * 50).round(); // 50-350 range
+      minimumStreams =
+          (fanbase * 0.3 + quality / 100 * 50).round(); // 50-350 range
     } else {
       // Established artist = quality-based guarantee
       minimumStreams = (fanbase * 0.1 + quality / 100 * 100).round();
     }
-    
+
     if (finalStreams < minimumStreams) {
       finalStreams = minimumStreams;
     }
 
-  // Safely clamp to a very large finite upper bound before converting to int
-  return finalStreams.clamp(0, _maxStreamBound).toInt();
+    // 🌍 REALISTIC DAILY STREAM CAP
+    // Even viral mega-hits don't get 100M+ streams per day
+    // - Taylor Swift's biggest day: ~20M streams (Spotify record)
+    // - Drake's "Scorpion" debut: ~10M streams/day
+    // - Maximum realistic daily streams for ANY song: 50M
+    const int MAX_DAILY_STREAMS =
+        50000000; // 50 million streams per day per song
+
+    if (finalStreams > MAX_DAILY_STREAMS) {
+      finalStreams = MAX_DAILY_STREAMS;
+    }
+
+    // Safely clamp to a very large finite upper bound before converting to int
+    return finalStreams.clamp(0, _maxStreamBound).toInt();
   }
 
   /// Calculate regional stream distribution
@@ -415,9 +430,9 @@ class StreamGrowthService {
     required int songQuality,
   }) {
     // Casual fanbase (total - loyal)
-  final casualFans = (artistStats.fanbase - artistStats.loyalFanbase)
-    .clamp(0, _maxStreamBound)
-    .toInt();
+    final casualFans = (artistStats.fanbase - artistStats.loyalFanbase)
+        .clamp(0, _maxStreamBound)
+        .toInt();
 
     // Only a fraction of casual fans stream on any given day
     final engagementRate =
@@ -547,7 +562,7 @@ class StreamGrowthService {
   int decayLast7DaysStreams(int currentLast7DaysStreams) {
     // Keep 6/7ths (85.7%) of the streams - one day drops off
     final decayed = (currentLast7DaysStreams * 0.857).round();
-  return decayed.clamp(0, _maxStreamBound).toInt();
+    return decayed.clamp(0, _maxStreamBound).toInt();
   }
 
   /// Reset daily streams to new value - replaces yesterday's streams
