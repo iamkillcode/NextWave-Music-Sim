@@ -12,6 +12,12 @@ class ArtistStats {
   final int loyalFanbase; // Dedicated fans who consistently stream your music
   final Map<String, int>
       regionalFanbase; // Fans per region (e.g., {'usa': 500, 'europe': 200})
+
+  // EchoX social media followers
+  final int echoXFollowers; // Total followers on EchoX (grows from fanbase)
+  final List<String> echoXFollowing; // Artists this player follows
+  final List<String> echoXFollowedBy; // Players who follow this artist
+
   final int albumsSold;
   final int songsWritten;
   final int concertsPerformed;
@@ -58,6 +64,9 @@ class ArtistStats {
     required this.fanbase,
     this.loyalFanbase = 0,
     this.regionalFanbase = const {},
+    this.echoXFollowers = 0,
+    this.echoXFollowing = const [],
+    this.echoXFollowedBy = const [],
     required this.albumsSold,
     required this.songsWritten,
     required this.concertsPerformed,
@@ -88,6 +97,9 @@ class ArtistStats {
     int? fanbase,
     int? loyalFanbase,
     Map<String, int>? regionalFanbase,
+    int? echoXFollowers,
+    List<String>? echoXFollowing,
+    List<String>? echoXFollowedBy,
     int? albumsSold,
     int? songsWritten,
     int? concertsPerformed,
@@ -118,6 +130,9 @@ class ArtistStats {
       fanbase: fanbase ?? this.fanbase,
       loyalFanbase: loyalFanbase ?? this.loyalFanbase,
       regionalFanbase: regionalFanbase ?? this.regionalFanbase,
+      echoXFollowers: echoXFollowers ?? this.echoXFollowers,
+      echoXFollowing: echoXFollowing ?? this.echoXFollowing,
+      echoXFollowedBy: echoXFollowedBy ?? this.echoXFollowedBy,
       albumsSold: albumsSold ?? this.albumsSold,
       songsWritten: songsWritten ?? this.songsWritten,
       concertsPerformed: concertsPerformed ?? this.concertsPerformed,
@@ -343,6 +358,7 @@ class ArtistStats {
     if (position <= 50) return 15; // Top 50 = decent buzz
     return 5; // Charted but lower
   }
+
   bool get canStreamOnAllPlatforms => fame >= 50;
 
   /// Regional unlock based on fame (expands market reach)
@@ -472,7 +488,8 @@ class ArtistStats {
       'experience': (effortLevel * 10) + (songQuality / 10).round(),
       'lyricsSkill': 0,
       'compositionSkill': 0,
-      'inspirationLevel': -10 * effortLevel, // Writing consumes inspiration (more effort = more consumption)
+      'inspirationLevel': -10 *
+          effortLevel, // Writing consumes inspiration (more effort = more consumption)
     };
     // Genre-specific skill gains
     switch (genre.toLowerCase()) {

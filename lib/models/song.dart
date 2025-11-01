@@ -64,6 +64,12 @@ class Song {
   // Scheduled release tracking
   final DateTime? scheduledReleaseDate; // Game time date for scheduled release
 
+  // Beef/Diss Track tracking
+  final bool isDissTrack; // True if this is a diss track
+  final String? beefId; // ID of the beef this track is part of
+  final String? dissTargetId; // Player ID of the target
+  final String? dissTargetName; // Name of the target artist
+
   const Song({
     required this.id,
     required this.title,
@@ -101,6 +107,10 @@ class Song {
     this.promoBuffer,
     this.promoEndDate,
     this.scheduledReleaseDate,
+    this.isDissTrack = false,
+    this.beefId,
+    this.dissTargetId,
+    this.dissTargetName,
   });
 
   Song copyWith({
@@ -141,6 +151,10 @@ class Song {
     DateTime? promoEndDate,
     DateTime? scheduledReleaseDate,
     bool clearScheduledDate = false,
+    bool? isDissTrack,
+    String? beefId,
+    String? dissTargetId,
+    String? dissTargetName,
   }) {
     return Song(
       id: id ?? this.id,
@@ -181,6 +195,10 @@ class Song {
       scheduledReleaseDate: clearScheduledDate
           ? null
           : (scheduledReleaseDate ?? this.scheduledReleaseDate),
+      isDissTrack: isDissTrack ?? this.isDissTrack,
+      beefId: beefId ?? this.beefId,
+      dissTargetId: dissTargetId ?? this.dissTargetId,
+      dissTargetName: dissTargetName ?? this.dissTargetName,
     );
   }
 
@@ -223,6 +241,10 @@ class Song {
       'promoBuffer': promoBuffer,
       'promoEndDate': promoEndDate?.toIso8601String(),
       'scheduledReleaseDate': scheduledReleaseDate?.toIso8601String(),
+      'isDissTrack': isDissTrack,
+      'beefId': beefId,
+      'dissTargetId': dissTargetId,
+      'dissTargetName': dissTargetName,
     };
   }
 
@@ -277,6 +299,10 @@ class Song {
       promoBuffer: json['promoBuffer'] as int?,
       promoEndDate: _parseDate(json['promoEndDate']),
       scheduledReleaseDate: _parseDate(json['scheduledReleaseDate']),
+      isDissTrack: json['isDissTrack'] as bool? ?? false,
+      beefId: json['beefId'] as String?,
+      dissTargetId: json['dissTargetId'] as String?,
+      dissTargetName: json['dissTargetName'] as String?,
     );
   }
 

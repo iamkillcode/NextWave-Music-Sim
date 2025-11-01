@@ -145,15 +145,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Beefs/Banter collection - read for participants, write only by Cloud Functions
+    match /beefs/{beefId} {
+      // Users can only read beefs they're involved in
+      allow read: if isSignedIn() 
+        && (request.auth.uid == resource.data.instigatorId 
+            || request.auth.uid == resource.data.targetId);
+      
+      // Beefs can only be created/updated by Cloud Functions (server-side)
+      // Prevents fame manipulation and ensures proper beef mechanics
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // Players collection - read public, write restricted
     match /players/{playerId} {
       // Anyone can read player profiles (for leaderboards, charts, etc.)
       allow read: if true;
       
-      // Players can update their own profile, but NOT money field
-      // Money can only be changed by Cloud Functions to prevent exploits
+      // Players can update their own profile, but NOT money, fame, or follower fields
+      // These can only be changed by Cloud Functions to prevent exploits
       allow update: if isOwner(playerId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['money']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['money', 'echoXFollowers', 'echoXFollowedBy']);
       
       // Allow creation (for new user registration)
       allow create: if isSignedIn() && request.auth.uid == playerId;

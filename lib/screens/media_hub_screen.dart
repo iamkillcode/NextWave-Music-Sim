@@ -12,6 +12,7 @@ import 'nexttube_home_screen.dart';
 import 'conversation_list_screen.dart';
 import 'certifications_screen.dart';
 import 'wakandazon_screen.dart';
+import 'banter_screen.dart';
 
 class MediaHubScreen extends StatelessWidget {
   final ArtistStats artistStats;
@@ -383,6 +384,25 @@ class MediaHubScreen extends StatelessWidget {
                             artistStats: artistStats,
                             onStatsUpdated: onStatsUpdated,
                           ),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildAppIcon(
+                    context,
+                    name: 'Banter',
+                    icon: Icons.whatshot_rounded,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFE94560), Color(0xFFFF4500)],
+                    ),
+                    badge: '',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BanterScreen(),
                         ),
                       );
                     },

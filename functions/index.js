@@ -6791,3 +6791,894 @@ exports.cancelListing = onCall(async (request) => {
   }
 });
 
+// ==================== BEEF/BANTER SYSTEM ====================
+
+/**
+ * Start a beef by targeting another artist with a diss track
+ * @callable
+ */
+exports.startBeef = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to start a beef');
+  }
+
+  const { targetId, dissTrackId, dissTrackTitle } = request.data;
+  
+  if (!targetId || !dissTrackId || !dissTrackTitle) {
+    throw new HttpsError('invalid-argument', 'Missing required fields: targetId, dissTrackId, dissTrackTitle');
+  }
+
+  if (targetId === userId) {
+    throw new HttpsError('invalid-argument', 'You cannot start a beef with yourself');
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Get both players
+      const instigatorRef = db.collection('players').doc(userId);
+      const targetRef = db.collection('players').doc(targetId);
+      
+      const [instigatorSnap, targetSnap] = await Promise.all([
+        transaction.get(instigatorRef),
+        transaction.get(targetRef)
+      ]);
+
+      if (!instigatorSnap.exists || !targetSnap.exists) {
+        throw new HttpsError('not-found', 'One or both players not found');
+      }
+
+      const instigator = instigatorSnap.data();
+      const target = targetSnap.data();
+
+      // 2. Check if there's already an active beef between these players
+      const existingBeefsSnap = await transaction.get(
+        db.collection('beefs')
+          .where('instigatorId', '==', userId)
+          .where('targetId', '==', targetId)
+          .where('status', '==', 'active')
+      );
+
+      if (!existingBeefsSnap.empty) {
+        throw new HttpsError('already-exists', 'You already have an active beef with this artist');
+      }
+
+      // 3. Create beef document
+      const beefRef = db.collection('beefs').doc();
+      const beefId = beefRef.id;
+      const now = admin.firestore.Timestamp.now();
+
+      const beefData = {
+        id: beefId,
+        instigatorId: userId,
+        targetId: targetId,
+        instigatorName: instigator.name || 'Unknown Artist',
+        targetName: target.name || 'Unknown Artist',
+        startedAt: now,
+        lastActivityAt: now,
+        resolvedAt: null,
+        status: 'active',
+        type: 'dissTrack',
+        dissTrackId: dissTrackId,
+        dissTrackTitle: dissTrackTitle,
+        responseDissTrackId: null,
+        responseDissTrackTitle: null,
+        instigatorStreams: 0,
+        targetStreams: 0,
+        instigatorFameGain: 0,
+        targetFameGain: 0,
+        targetResponded: false,
+        instigatorFame: instigator.fame || 0,
+        targetFame: target.fame || 0,
+        responses: [],
+        metadata: {
+          createdAt: now,
+          knockoutThreshold: 3.0, // 3x stream difference
+          resolutionDays: 42, // 42 in-game days
+        }
+      };
+
+      transaction.set(beefRef, beefData);
+
+      // 4. Send notification to target
+      const notifRef = db.collection('notifications').doc();
+      transaction.set(notifRef, {
+        userId: targetId,
+        type: 'beef_started',
+        title: '🔥 You\'ve Been Called Out!',
+        message: `${instigator.name} just dropped a diss track targeting you: "${dissTrackTitle}"`,
+        data: {
+          beefId: beefId,
+          instigatorId: userId,
+          instigatorName: instigator.name,
+          dissTrackId: dissTrackId,
+          dissTrackTitle: dissTrackTitle,
+        },
+        read: false,
+        createdAt: now,
+      });
+
+      // 5. Create news post via Gandalf
+      const newsRef = db.collection('news_posts').doc();
+      transaction.set(newsRef, {
+        authorId: 'gandalf_the_black',
+        authorName: 'Gandalf The Black',
+        title: `🔥 ${instigator.name} Drops DISS TRACK on ${target.name}!`,
+        content: `BREAKING: ${instigator.name} just released "${dissTrackTitle}" - a full-on attack aimed at ${target.name}! The music community is watching closely. Will ${target.name} respond? This could get messy... 👀🎤`,
+        timestamp: now,
+        likes: 0,
+        comments: 0,
+        type: 'beef',
+        metadata: {
+          beefId: beefId,
+          instigatorId: userId,
+          targetId: targetId,
+        }
+      });
+
+      return {
+        beefId: beefId,
+        message: 'Beef started successfully',
+        targetName: target.name,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    console.error('Error in startBeef:', error);
+    throw new HttpsError('internal', `Failed to start beef: ${error.message}`);
+  }
+});
+
+/**
+ * Respond to a beef with a diss track
+ * @callable
+ */
+exports.respondToBeef = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to respond to a beef');
+  }
+
+  const { beefId, responseDissTrackId, responseDissTrackTitle } = request.data;
+  
+  if (!beefId || !responseDissTrackId || !responseDissTrackTitle) {
+    throw new HttpsError('invalid-argument', 'Missing required fields: beefId, responseDissTrackId, responseDissTrackTitle');
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Get beef document
+      const beefRef = db.collection('beefs').doc(beefId);
+      const beefSnap = await transaction.get(beefRef);
+
+      if (!beefSnap.exists) {
+        throw new HttpsError('not-found', 'Beef not found');
+      }
+
+      const beef = beefSnap.data();
+
+      // 2. Verify user is the target
+      if (beef.targetId !== userId) {
+        throw new HttpsError('permission-denied', 'You can only respond to beefs targeting you');
+      }
+
+      // 3. Check if beef is still active
+      if (beef.status !== 'active') {
+        throw new HttpsError('failed-precondition', 'This beef is no longer active');
+      }
+
+      // 4. Check if already responded
+      if (beef.targetResponded) {
+        throw new HttpsError('already-exists', 'You have already responded to this beef');
+      }
+
+      // 5. Update beef with response
+      const now = admin.firestore.Timestamp.now();
+      const response = {
+        type: 'dissTrack',
+        trackId: responseDissTrackId,
+        trackTitle: responseDissTrackTitle,
+        responderId: userId,
+        timestamp: now,
+      };
+
+      transaction.update(beefRef, {
+        responseDissTrackId: responseDissTrackId,
+        responseDissTrackTitle: responseDissTrackTitle,
+        targetResponded: true,
+        lastActivityAt: now,
+        responses: admin.firestore.FieldValue.arrayUnion(response),
+      });
+
+      // 6. Send notification to instigator
+      const instigatorRef = db.collection('players').doc(beef.instigatorId);
+      const instigatorSnap = await transaction.get(instigatorRef);
+      const instigator = instigatorSnap.data();
+
+      const notifRef = db.collection('notifications').doc();
+      transaction.set(notifRef, {
+        userId: beef.instigatorId,
+        type: 'beef_response',
+        title: '🎤 They Clapped Back!',
+        message: `${beef.targetName} just responded to your diss with: "${responseDissTrackTitle}"`,
+        data: {
+          beefId: beefId,
+          targetId: userId,
+          targetName: beef.targetName,
+          responseDissTrackId: responseDissTrackId,
+          responseDissTrackTitle: responseDissTrackTitle,
+        },
+        read: false,
+        createdAt: now,
+      });
+
+      // 7. Create news post
+      const newsRef = db.collection('news_posts').doc();
+      transaction.set(newsRef, {
+        authorId: 'gandalf_the_black',
+        authorName: 'Gandalf The Black',
+        title: `💥 ${beef.targetName} FIRES BACK at ${beef.instigatorName}!`,
+        content: `IT'S ON! ${beef.targetName} just dropped "${responseDissTrackTitle}" in response to ${beef.instigatorName}'s diss! The beef is REAL and the fans are eating it up! Who's winning? 🔥🎵`,
+        timestamp: now,
+        likes: 0,
+        comments: 0,
+        type: 'beef_response',
+        metadata: {
+          beefId: beefId,
+          instigatorId: beef.instigatorId,
+          targetId: userId,
+        }
+      });
+
+      return {
+        beefId: beefId,
+        message: 'Response submitted successfully',
+        instigatorName: beef.instigatorName,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    console.error('Error in respondToBeef:', error);
+    throw new HttpsError('internal', `Failed to respond to beef: ${error.message}`);
+  }
+});
+
+/**
+ * Calculate beef winner based on performance metrics
+ */
+function calculateBeefWinner(beef, instigatorDissTrack, responseDissTrack) {
+  // If target never responded, instigator wins by default (minimal fame)
+  if (!beef.targetResponded || !responseDissTrack) {
+    return {
+      winnerId: beef.instigatorId,
+      winnerName: beef.instigatorName,
+      loserId: beef.targetId,
+      loserName: beef.targetName,
+      winType: 'no_response',
+      instigatorFameGain: 25,
+      targetFameGain: -10, // Penalty for ignoring
+    };
+  }
+
+  const instigatorStreams = instigatorDissTrack?.streams || 0;
+  const targetStreams = responseDissTrack?.streams || 0;
+
+  // Check for knockout (3x difference)
+  if (instigatorStreams > 0 && targetStreams > 0) {
+    if (instigatorStreams / targetStreams >= 3.0) {
+      // Instigator knockout
+      const fameDiff = Math.abs(beef.targetFame - beef.instigatorFame);
+      const multiplier = 1 + Math.min(fameDiff / 500, 3.0);
+      return {
+        winnerId: beef.instigatorId,
+        winnerName: beef.instigatorName,
+        loserId: beef.targetId,
+        loserName: beef.targetName,
+        winType: 'knockout',
+        instigatorFameGain: Math.floor(150 * multiplier),
+        targetFameGain: 40,
+      };
+    } else if (targetStreams / instigatorStreams >= 3.0) {
+      // Target knockout
+      return {
+        winnerId: beef.targetId,
+        winnerName: beef.targetName,
+        loserId: beef.instigatorId,
+        loserName: beef.instigatorName,
+        winType: 'knockout',
+        instigatorFameGain: 40,
+        targetFameGain: 120,
+      };
+    }
+  }
+
+  // Calculate performance scores (streams 50%, engagement 30%, quality 20%)
+  const instigatorEngagement = (instigatorDissTrack?.likes || 0) + (instigatorDissTrack?.comments || 0);
+  const targetEngagement = (responseDissTrack?.likes || 0) + (responseDissTrack?.comments || 0);
+  const instigatorQuality = instigatorDissTrack?.quality || 50;
+  const targetQuality = responseDissTrack?.quality || 50;
+
+  const instigatorScore = (instigatorStreams * 0.5) + (instigatorEngagement * 0.3) + (instigatorQuality * 0.2);
+  const targetScore = (targetStreams * 0.5) + (targetEngagement * 0.3) + (targetQuality * 0.2);
+
+  const scoreDiff = Math.abs(instigatorScore - targetScore);
+  const avgScore = (instigatorScore + targetScore) / 2;
+  const diffPercent = avgScore > 0 ? (scoreDiff / avgScore) : 0;
+
+  // Draw if < 10% difference
+  if (diffPercent < 0.10) {
+    return {
+      winnerId: null,
+      winnerName: null,
+      loserId: null,
+      loserName: null,
+      winType: 'draw',
+      instigatorFameGain: 60,
+      targetFameGain: 60,
+    };
+  }
+
+  // Determine winner by score
+  if (instigatorScore > targetScore) {
+    // Instigator wins - apply fame multiplier logic
+    const fameDiff = Math.abs(beef.targetFame - beef.instigatorFame);
+    const multiplier = beef.targetFame > beef.instigatorFame 
+      ? 1 + Math.min(fameDiff / 500, 3.0) 
+      : 1.0;
+    
+    return {
+      winnerId: beef.instigatorId,
+      winnerName: beef.instigatorName,
+      loserId: beef.targetId,
+      loserName: beef.targetName,
+      winType: 'performance',
+      instigatorFameGain: Math.floor(50 * multiplier * 1.5), // 1.5x for winning
+      targetFameGain: 75, // Base for responding
+    };
+  } else {
+    // Target wins
+    return {
+      winnerId: beef.targetId,
+      winnerName: beef.targetName,
+      loserId: beef.instigatorId,
+      loserName: beef.instigatorName,
+      winType: 'performance',
+      instigatorFameGain: 50, // Base for starting
+      targetFameGain: 110, // Higher for winning response
+    };
+  }
+}
+
+/**
+ * Auto-resolve beefs that have passed their resolution period
+ * Runs daily at 2 AM to check for beefs ready to resolve
+ * @scheduled
+ */
+exports.autoResolveBeefs = onSchedule('0 2 * * *', async (event) => {
+  try {
+    const now = admin.firestore.Timestamp.now();
+    const nowMillis = now.toMillis();
+    
+    // 42 in-game days = 42 * 2 real hours = 84 hours
+    const resolutionPeriodMs = 42 * 2 * 60 * 60 * 1000; // 84 hours in milliseconds
+    const resolutionThreshold = admin.firestore.Timestamp.fromMillis(nowMillis - resolutionPeriodMs);
+
+    // Find active beefs past resolution period
+    const beefsToResolve = await db.collection('beefs')
+      .where('status', '==', 'active')
+      .where('lastActivityAt', '<=', resolutionThreshold)
+      .get();
+
+    console.log(`Found ${beefsToResolve.size} beefs to auto-resolve`);
+
+    const resolutionPromises = beefsToResolve.docs.map(async (beefDoc) => {
+      const beef = beefDoc.data();
+      const beefRef = beefDoc.ref;
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          // Get diss tracks to calculate winner
+          let instigatorDissTrack = null;
+          let responseDissTrack = null;
+
+          if (beef.dissTrackId) {
+            const instigatorTrackSnap = await transaction.get(
+              db.collection('songs').doc(beef.dissTrackId)
+            );
+            instigatorDissTrack = instigatorTrackSnap.exists ? instigatorTrackSnap.data() : null;
+          }
+
+          if (beef.responseDissTrackId) {
+            const responseTrackSnap = await transaction.get(
+              db.collection('songs').doc(beef.responseDissTrackId)
+            );
+            responseDissTrack = responseTrackSnap.exists ? responseTrackSnap.data() : null;
+          }
+
+          // Calculate outcome
+          const outcome = calculateBeefWinner(beef, instigatorDissTrack, responseDissTrack);
+
+          // Update beef status
+          transaction.update(beefRef, {
+            status: 'resolved',
+            resolvedAt: now,
+            winnerId: outcome.winnerId,
+            winnerName: outcome.winnerName,
+            loserId: outcome.loserId,
+            loserName: outcome.loserName,
+            winType: outcome.winType,
+            instigatorFameGain: outcome.instigatorFameGain,
+            targetFameGain: outcome.targetFameGain,
+            instigatorStreams: instigatorDissTrack?.streams || 0,
+            targetStreams: responseDissTrack?.streams || 0,
+          });
+
+          // Award fame to both players
+          const instigatorRef = db.collection('players').doc(beef.instigatorId);
+          const targetRef = db.collection('players').doc(beef.targetId);
+
+          transaction.update(instigatorRef, {
+            fame: admin.firestore.FieldValue.increment(outcome.instigatorFameGain),
+          });
+
+          transaction.update(targetRef, {
+            fame: admin.firestore.FieldValue.increment(outcome.targetFameGain),
+          });
+
+          // Send notifications
+          const instigatorNotifRef = db.collection('notifications').doc();
+          const targetNotifRef = db.collection('notifications').doc();
+
+          let instigatorMessage = '';
+          let targetMessage = '';
+
+          if (outcome.winType === 'no_response') {
+            instigatorMessage = `Your beef with ${beef.targetName} ended. They never responded (+${outcome.instigatorFameGain} fame)`;
+            targetMessage = `Your beef with ${beef.instigatorName} ended. You lost fame for not responding (${outcome.targetFameGain} fame)`;
+          } else if (outcome.winType === 'knockout') {
+            if (outcome.winnerId === beef.instigatorId) {
+              instigatorMessage = `🏆 KNOCKOUT VICTORY over ${beef.targetName}! (+${outcome.instigatorFameGain} fame)`;
+              targetMessage = `💀 Knockout loss to ${beef.instigatorName} (+${outcome.targetFameGain} fame for participating)`;
+            } else {
+              instigatorMessage = `💀 Knockout loss to ${beef.targetName} (+${outcome.instigatorFameGain} fame for participating)`;
+              targetMessage = `🏆 KNOCKOUT VICTORY over ${beef.instigatorName}! (+${outcome.targetFameGain} fame)`;
+            }
+          } else if (outcome.winType === 'draw') {
+            instigatorMessage = `Beef with ${beef.targetName} ended in a draw! Both artists gained respect (+${outcome.instigatorFameGain} fame)`;
+            targetMessage = `Beef with ${beef.instigatorName} ended in a draw! Both artists gained respect (+${outcome.targetFameGain} fame)`;
+          } else {
+            // performance win
+            if (outcome.winnerId === beef.instigatorId) {
+              instigatorMessage = `🏆 You won the beef against ${beef.targetName}! (+${outcome.instigatorFameGain} fame)`;
+              targetMessage = `You lost the beef to ${beef.instigatorName}, but gained respect for responding (+${outcome.targetFameGain} fame)`;
+            } else {
+              instigatorMessage = `You lost the beef to ${beef.targetName}, but gained respect for starting it (+${outcome.instigatorFameGain} fame)`;
+              targetMessage = `🏆 You won the beef against ${beef.instigatorName}! (+${outcome.targetFameGain} fame)`;
+            }
+          }
+
+          transaction.set(instigatorNotifRef, {
+            userId: beef.instigatorId,
+            type: 'beef_resolved',
+            title: '🔥 Beef Resolved',
+            message: instigatorMessage,
+            data: {
+              beefId: beef.id,
+              outcome: outcome.winType,
+              fameGain: outcome.instigatorFameGain,
+            },
+            read: false,
+            createdAt: now,
+          });
+
+          transaction.set(targetNotifRef, {
+            userId: beef.targetId,
+            type: 'beef_resolved',
+            title: '🔥 Beef Resolved',
+            message: targetMessage,
+            data: {
+              beefId: beef.id,
+              outcome: outcome.winType,
+              fameGain: outcome.targetFameGain,
+            },
+            read: false,
+            createdAt: now,
+          });
+
+          // Create news post about resolution
+          const newsRef = db.collection('news_posts').doc();
+          let newsTitle = '';
+          let newsContent = '';
+
+          if (outcome.winType === 'no_response') {
+            newsTitle = `${beef.instigatorName} Wins by Default - ${beef.targetName} Never Responded`;
+            newsContent = `The beef between ${beef.instigatorName} and ${beef.targetName} has ended. ${beef.targetName} never dropped a response, giving ${beef.instigatorName} a hollow victory.`;
+          } else if (outcome.winType === 'knockout') {
+            newsTitle = `🏆 KNOCKOUT! ${outcome.winnerName} DESTROYS ${outcome.loserName}!`;
+            newsContent = `The beef is OVER! ${outcome.winnerName} absolutely demolished ${outcome.loserName} with 3x the streams! This was a complete domination! 💀🔥`;
+          } else if (outcome.winType === 'draw') {
+            newsTitle = `${beef.instigatorName} vs ${beef.targetName} Ends in a DRAW`;
+            newsContent = `After 42 days of intense back-and-forth, the beef between ${beef.instigatorName} and ${beef.targetName} has ended in a draw. Both artists put up an incredible fight and gained respect from the community. 🤝`;
+          } else {
+            newsTitle = `🏆 ${outcome.winnerName} Wins Beef Against ${outcome.loserName}!`;
+            newsContent = `After 42 days of heated competition, ${outcome.winnerName} has emerged victorious in the beef against ${outcome.loserName}! The numbers don't lie - ${outcome.winnerName} came out on top with superior performance! 🔥`;
+          }
+
+          transaction.set(newsRef, {
+            authorId: 'gandalf_the_black',
+            authorName: 'Gandalf The Black',
+            title: newsTitle,
+            content: newsContent,
+            timestamp: now,
+            likes: 0,
+            comments: 0,
+            type: 'beef_resolved',
+            metadata: {
+              beefId: beef.id,
+              outcome: outcome.winType,
+              winnerId: outcome.winnerId,
+              loserId: outcome.loserId,
+            }
+          });
+        });
+
+        console.log(`Resolved beef ${beef.id}`);
+      } catch (error) {
+        console.error(`Failed to resolve beef ${beef.id}:`, error);
+      }
+    });
+
+    await Promise.all(resolutionPromises);
+    console.log(`Auto-resolved ${resolutionPromises.length} beefs successfully`);
+    
+    return { resolved: resolutionPromises.length };
+  } catch (error) {
+    console.error('Error in autoResolveBeefs:', error);
+    throw error;
+  }
+});
+
+// ==================== ECHOX FOLLOWER & ENGAGEMENT SYSTEM ====================
+
+/**
+ * Calculate EchoX followers based on fanbase
+ * Formula: 30-60% of fanbase + loyal fanbase becomes followers
+ */
+function calculateEchoXFollowers(fanbase, loyalFanbase) {
+  const baseConversionRate = 0.3 + (Math.random() * 0.3); // 30-60% conversion
+  const baseFollowers = Math.floor(fanbase * baseConversionRate);
+  const loyalFollowers = Math.floor(loyalFanbase * 0.8); // 80% of loyal fans follow
+  
+  return baseFollowers + loyalFollowers;
+}
+
+/**
+ * Simulate realistic engagement for EchoX posts
+ * Based on followers, fame, and post quality
+ */
+function simulatePostEngagement(post, authorFollowers, authorFame, authorLoyalFans) {
+  const baseReach = authorFollowers * 0.15; // 15% of followers see the post
+  const fameBoost = 1 + (authorFame / 10000); // Up to 2x boost at 10k fame
+  const reachWithFame = Math.floor(baseReach * fameBoost);
+  
+  // Engagement rates
+  const likeRate = 0.05 + (Math.random() * 0.10); // 5-15% like rate
+  const echoRate = 0.01 + (Math.random() * 0.03); // 1-4% repost rate
+  const commentRate = 0.005 + (Math.random() * 0.015); // 0.5-2% comment rate
+  
+  // Loyal fans are 3x more likely to engage
+  const loyalReach = Math.floor(authorLoyalFans * 0.8); // 80% of loyal fans see posts
+  const loyalLikes = Math.floor(loyalReach * 0.30); // 30% like rate for loyal fans
+  const loyalEchoes = Math.floor(loyalReach * 0.08); // 8% repost rate
+  const loyalComments = Math.floor(loyalReach * 0.05); // 5% comment rate
+  
+  // Calculate total engagement
+  const casualLikes = Math.floor(reachWithFame * likeRate);
+  const casualEchoes = Math.floor(reachWithFame * echoRate);
+  const casualComments = Math.floor(reachWithFame * commentRate);
+  
+  return {
+    likes: casualLikes + loyalLikes,
+    echoes: casualEchoes + loyalEchoes,
+    comments: casualComments + loyalComments,
+    reach: reachWithFame + loyalReach,
+  };
+}
+
+/**
+ * Update player's EchoX follower count based on fanbase
+ * Runs when fanbase changes significantly
+ */
+exports.updateEchoXFollowers = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in');
+  }
+
+  try {
+    const playerRef = db.collection('players').doc(userId);
+    const playerSnap = await playerRef.get();
+    
+    if (!playerSnap.exists) {
+      throw new HttpsError('not-found', 'Player not found');
+    }
+    
+    const player = playerSnap.data();
+    const fanbase = player.fanbase || 0;
+    const loyalFanbase = player.loyalFanbase || 0;
+    
+    // Calculate new follower count
+    const newFollowers = calculateEchoXFollowers(fanbase, loyalFanbase);
+    
+    // Update player document
+    await playerRef.update({
+      echoXFollowers: newFollowers,
+    });
+    
+    console.log(`Updated ${player.name}'s EchoX followers: ${newFollowers}`);
+    
+    return {
+      success: true,
+      newFollowers: newFollowers,
+      message: `You now have ${newFollowers.toLocaleString()} EchoX followers!`,
+    };
+  } catch (error) {
+    console.error('Error updating EchoX followers:', error);
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError('internal', `Failed to update followers: ${error.message}`);
+  }
+});
+
+/**
+ * Simulate engagement on a newly created EchoX post
+ * Called after post creation to add realistic likes/echoes/comments
+ */
+exports.simulateEchoXEngagement = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in');
+  }
+
+  const { postId } = request.data;
+  if (!postId) {
+    throw new HttpsError('invalid-argument', 'Missing postId');
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // Get post
+      const postRef = db.collection('echox_posts').doc(postId);
+      const postSnap = await transaction.get(postRef);
+      
+      if (!postSnap.exists) {
+        throw new HttpsError('not-found', 'Post not found');
+      }
+      
+      const post = postSnap.data();
+      
+      // Verify ownership
+      if (post.authorId !== userId) {
+        throw new HttpsError('permission-denied', 'You can only simulate engagement for your own posts');
+      }
+      
+      // Get author stats
+      const playerRef = db.collection('players').doc(userId);
+      const playerSnap = await transaction.get(playerRef);
+      
+      if (!playerSnap.exists) {
+        throw new HttpsError('not-found', 'Player not found');
+      }
+      
+      const player = playerSnap.data();
+      const followers = player.echoXFollowers || 0;
+      const fame = player.fame || 0;
+      const loyalFans = player.loyalFanbase || 0;
+      
+      // Simulate engagement
+      const engagement = simulatePostEngagement(post, followers, fame, loyalFans);
+      
+      // Update post with simulated engagement
+      transaction.update(postRef, {
+        likes: engagement.likes,
+        echoes: engagement.echoes,
+        comments: engagement.comments,
+        simulatedReach: engagement.reach,
+        lastEngagementUpdate: admin.firestore.Timestamp.now(),
+      });
+      
+      // Add some fame based on engagement
+      const fameGain = Math.floor((engagement.likes * 0.1) + (engagement.echoes * 0.5) + (engagement.comments * 1.0));
+      if (fameGain > 0) {
+        transaction.update(playerRef, {
+          fame: admin.firestore.FieldValue.increment(fameGain),
+        });
+      }
+      
+      return {
+        likes: engagement.likes,
+        echoes: engagement.echoes,
+        comments: engagement.comments,
+        reach: engagement.reach,
+        fameGain: fameGain,
+      };
+    });
+    
+    return {
+      success: true,
+      ...result,
+      message: `Post got ${result.likes} likes, ${result.echoes} echoes, and ${result.comments} comments!`,
+    };
+  } catch (error) {
+    console.error('Error simulating engagement:', error);
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError('internal', `Failed to simulate engagement: ${error.message}`);
+  }
+});
+
+/**
+ * Follow/Unfollow another artist on EchoX
+ */
+exports.toggleEchoXFollow = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'You must be signed in');
+  }
+
+  const { targetUserId } = request.data;
+  if (!targetUserId) {
+    throw new HttpsError('invalid-argument', 'Missing targetUserId');
+  }
+
+  if (targetUserId === userId) {
+    throw new HttpsError('invalid-argument', 'You cannot follow yourself');
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('players').doc(userId);
+      const targetRef = db.collection('players').doc(targetUserId);
+      
+      const [userSnap, targetSnap] = await Promise.all([
+        transaction.get(userRef),
+        transaction.get(targetRef),
+      ]);
+      
+      if (!userSnap.exists || !targetSnap.exists) {
+        throw new HttpsError('not-found', 'User not found');
+      }
+      
+      const user = userSnap.data();
+      const target = targetSnap.data();
+      
+      const following = user.echoXFollowing || [];
+      const targetFollowers = target.echoXFollowedBy || [];
+      
+      const isFollowing = following.includes(targetUserId);
+      
+      if (isFollowing) {
+        // Unfollow
+        const newFollowing = following.filter(id => id !== targetUserId);
+        const newTargetFollowers = targetFollowers.filter(id => id !== userId);
+        
+        transaction.update(userRef, {
+          echoXFollowing: newFollowing,
+        });
+        
+        transaction.update(targetRef, {
+          echoXFollowedBy: newTargetFollowers,
+          echoXFollowers: Math.max(0, (target.echoXFollowers || 0) - 1),
+        });
+        
+        return {
+          action: 'unfollowed',
+          targetName: target.name,
+          newFollowerCount: Math.max(0, (target.echoXFollowers || 0) - 1),
+        };
+      } else {
+        // Follow
+        const newFollowing = [...following, targetUserId];
+        const newTargetFollowers = [...targetFollowers, userId];
+        
+        transaction.update(userRef, {
+          echoXFollowing: newFollowing,
+        });
+        
+        transaction.update(targetRef, {
+          echoXFollowedBy: newTargetFollowers,
+          echoXFollowers: (target.echoXFollowers || 0) + 1,
+        });
+        
+        // Send notification
+        const notifRef = db.collection('notifications').doc();
+        transaction.set(notifRef, {
+          userId: targetUserId,
+          type: 'echox_follow',
+          title: '👤 New Follower!',
+          message: `${user.name} started following you on EchoX`,
+          data: {
+            followerId: userId,
+            followerName: user.name,
+          },
+          read: false,
+          createdAt: admin.firestore.Timestamp.now(),
+        });
+        
+        return {
+          action: 'followed',
+          targetName: target.name,
+          newFollowerCount: (target.echoXFollowers || 0) + 1,
+        };
+      }
+    });
+    
+    return {
+      success: true,
+      ...result,
+      message: result.action === 'followed' 
+        ? `You're now following ${result.targetName}!`
+        : `You unfollowed ${result.targetName}`,
+    };
+  } catch (error) {
+    console.error('Error toggling follow:', error);
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError('internal', `Failed to toggle follow: ${error.message}`);
+  }
+});
+
+/**
+ * Scheduled function to update all players' EchoX followers based on fanbase growth
+ * Runs daily
+ */
+exports.dailyEchoXFollowerUpdate = onSchedule('0 3 * * *', async (event) => {
+  try {
+    const playersSnap = await db.collection('players').get();
+    console.log(`Updating EchoX followers for ${playersSnap.size} players`);
+    
+    const updatePromises = playersSnap.docs.map(async (doc) => {
+      try {
+        const player = doc.data();
+        const fanbase = player.fanbase || 0;
+        const loyalFanbase = player.loyalFanbase || 0;
+        const currentFollowers = player.echoXFollowers || 0;
+        
+        // Calculate expected followers
+        const expectedFollowers = calculateEchoXFollowers(fanbase, loyalFanbase);
+        
+        // Only update if there's a significant change (>5%)
+        const change = Math.abs(expectedFollowers - currentFollowers);
+        const changePercent = currentFollowers > 0 ? (change / currentFollowers) : 1;
+        
+        if (changePercent > 0.05) {
+          await doc.ref.update({
+            echoXFollowers: expectedFollowers,
+          });
+          console.log(`Updated ${player.name}: ${currentFollowers} → ${expectedFollowers} followers`);
+        }
+      } catch (error) {
+        console.error(`Failed to update followers for ${doc.id}:`, error);
+      }
+    });
+    
+    await Promise.all(updatePromises);
+    console.log(`Completed daily EchoX follower update`);
+    
+    return { updated: updatePromises.length };
+  } catch (error) {
+    console.error('Error in dailyEchoXFollowerUpdate:', error);
+    throw error;
+  }
+});
