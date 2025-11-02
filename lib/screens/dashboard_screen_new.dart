@@ -435,7 +435,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Load albums (EPs and Albums)
         List<Album> loadedAlbums = [];
-        if (data['albums'] != null) {
+        if (data['albums'] != null && (data['albums'] as List).isNotEmpty) {
           try {
             final albumsList = List<Map<String, dynamic>>.from(
                 (data['albums'] as List<dynamic>));
@@ -443,15 +443,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .map((albumData) =>
                     Album.fromJson(Map<String, dynamic>.from(albumData)))
                 .toList();
-            print('✅ Loaded ${loadedAlbums.length} albums/EPs');
+            print('✅ Loaded ${loadedAlbums.length} albums/EPs from document');
           } catch (e) {
             print('⚠️ Error loading albums: $e');
           }
         }
 
-        // Migration fallback: if albums array missing, load from subcollection
+        // Migration fallback: ALWAYS check subcollection if albums array is empty or missing
         if (loadedAlbums.isEmpty) {
           try {
+            print('ℹ️ Albums array empty/missing, checking subcollection...');
             final albumsSnap = await FirebaseFirestore.instance
                 .collection('players')
                 .doc(user.uid)
@@ -463,11 +464,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .toList();
             if (loadedAlbums.isNotEmpty) {
               print(
-                  'ℹ️ Loaded ${loadedAlbums.length} albums from subcollection');
+                  '✅ Loaded ${loadedAlbums.length} albums from subcollection');
+            } else {
+              print('ℹ️ No albums found in subcollection either');
             }
           } catch (e) {
             print('⚠️ Fallback subcollection albums load failed: $e');
           }
+        } else {
+          print('✅ Loaded ${loadedAlbums.length} albums from document array');
         }
 
         setState(() {
@@ -630,7 +635,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         // Load albums from the update
         List<Album> loadedAlbums = [];
-        if (data['albums'] != null) {
+        if (data['albums'] != null && (data['albums'] as List).isNotEmpty) {
           try {
             final albumsList = data['albums'] as List<dynamic>;
             loadedAlbums = albumsList
@@ -643,9 +648,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           }
         }
 
-        // Migration fallback: if albums array missing in snapshot, load from subcollection
+        // Migration fallback: ALWAYS check subcollection if albums array is empty or missing
         if (loadedAlbums.isEmpty) {
           try {
+            print(
+                'ℹ️ [RT] Albums array empty/missing, checking subcollection...');
             final albumsSnap = await FirebaseFirestore.instance
                 .collection('players')
                 .doc(user.uid)
@@ -657,11 +664,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .toList();
             if (loadedAlbums.isNotEmpty) {
               print(
-                  'ℹ️ [RT] Loaded ${loadedAlbums.length} albums from subcollection');
+                  '✅ [RT] Loaded ${loadedAlbums.length} albums from subcollection');
+            } else {
+              print('ℹ️ [RT] No albums found in subcollection either');
             }
-          } catch (e) {
-            print('⚠️ [RT] Fallback albums subcollection load failed: $e');
+          } catch (e, stackTrace) {
+            AppLogger.warning('[RT] Fallback albums subcollection load failed',
+                error: e, stackTrace: stackTrace);
           }
+        } else {
+          print(
+              'ℹ️ [RT] Loaded ${loadedAlbums.length} albums from document array');
         }
 
         // Load regional fanbase

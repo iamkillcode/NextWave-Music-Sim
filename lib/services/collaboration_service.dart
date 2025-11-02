@@ -179,25 +179,138 @@ class CollaborationService {
           .doc(collabId)
           .set(collaboration.toJson());
 
-      // Send notification via StarChat
-      await _firestore.collection('starchat_messages').add({
-        'type': 'collaboration_request',
-        'fromUserId': currentUser.uid,
-        'fromUserName': userData['displayName'] ?? 'Unknown',
-        'toUserId': featuringArtistId,
-        'collaborationId': collabId,
-        'songTitle': songTitle,
-        'featureFee': featureFee,
-        'splitPercentage': splitPercentage,
-        'message': message ?? 'wants to collaborate with you on "$songTitle"',
-        'timestamp': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      // Send notification via proper chat conversation system
+      await _sendCollabRequestViaChat(
+        currentUserId: currentUser.uid,
+        currentUserName: userData['displayName'] ?? 'Unknown',
+        targetUserId: featuringArtistId,
+        collabId: collabId,
+        songTitle: songTitle,
+        featureFee: featureFee,
+        splitPercentage: splitPercentage,
+        message: message,
+      );
 
       return true;
     } catch (e) {
       print('Error sending collaboration request: $e');
       return false;
+    }
+  }
+
+  /// Helper method to send collaboration request via proper chat system
+  Future<void> _sendCollabRequestViaChat({
+    required String currentUserId,
+    required String currentUserName,
+    required String targetUserId,
+    required String collabId,
+    required String songTitle,
+    int? featureFee,
+    required int splitPercentage,
+    String? message,
+  }) async {
+    try {
+      // Create conversation ID (sorted user IDs for consistency)
+      final userIds = [currentUserId, targetUserId]..sort();
+      final conversationId = '${userIds[0]}_${userIds[1]}';
+
+      // Create or update conversation
+      final conversationRef =
+          _firestore.collection('chat_conversations').doc(conversationId);
+      final conversationDoc = await conversationRef.get();
+
+      if (!conversationDoc.exists) {
+        // Create new conversation
+        await conversationRef.set({
+          'participants': userIds,
+          'lastMessage': 'Collaboration request',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'unreadCount': {
+            currentUserId: 0,
+            targetUserId: 1,
+          },
+        });
+      } else {
+        // Update existing conversation
+        await conversationRef.update({
+          'lastMessage': 'Collaboration request',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'unreadCount.$targetUserId': FieldValue.increment(1),
+        });
+      }
+
+      // Add collaboration request message to the conversation
+      await conversationRef.collection('messages').add({
+        'senderId': currentUserId,
+        'senderName': currentUserName,
+        'type': 'collaboration_request',
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+        'metadata': {
+          'collaborationId': collabId,
+          'songTitle': songTitle,
+          'splitPercentage': splitPercentage,
+          'featureFee': featureFee,
+          'message': message ?? 'wants to collaborate with you on "$songTitle"',
+        },
+      });
+
+      print('✅ Collaboration request sent via chat to $targetUserId');
+    } catch (e) {
+      print('❌ Error sending collab request via chat: $e');
+      rethrow;
+    }
+  }
+
+  /// Helper: Send recording notification via proper chat system
+  Future<void> _sendRecordingNotificationViaChat({
+    required String fromUserId,
+    required String fromUserName,
+    required String toUserId,
+    required String collabId,
+    required String songTitle,
+    required String recordingUrl,
+  }) async {
+    try {
+      // Create conversation ID (sorted user IDs)
+      final userIds = [fromUserId, toUserId]..sort();
+      final conversationId = '${userIds[0]}_${userIds[1]}';
+
+      // Create or update conversation document
+      await _firestore
+          .collection('chat_conversations')
+          .doc(conversationId)
+          .set({
+        'participants': userIds,
+        'lastMessage': 'sent their recording for "$songTitle"',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount': {
+          toUserId: FieldValue.increment(1),
+        },
+      }, SetOptions(merge: true));
+
+      // Add message to conversation's messages subcollection
+      await _firestore
+          .collection('chat_conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .add({
+        'type': 'recording_received',
+        'fromUserId': fromUserId,
+        'fromUserName': fromUserName,
+        'toUserId': toUserId,
+        'collaborationId': collabId,
+        'message': 'sent their recording for "$songTitle"',
+        'metadata': {
+          'songTitle': songTitle,
+          'recordingUrl': recordingUrl,
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+        'read': false,
+      });
+    } catch (e) {
+      print('Error sending recording notification via chat: $e');
+      rethrow;
     }
   }
 
@@ -372,19 +485,15 @@ class CollaborationService {
         'metadata.recordingUrl': recordingUrl,
       });
 
-      // Notify primary artist via StarChat
-      await _firestore.collection('starchat_messages').add({
-        'type': 'recording_received',
-        'fromUserId': collabData.featuringArtistId,
-        'fromUserName': collabData.featuringArtistName,
-        'toUserId': collabData.primaryArtistId,
-        'collaborationId': collaborationId,
-        'message':
-            'sent their recording for "${collabData.metadata['songTitle']}"',
-        'recordingUrl': recordingUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-        'read': false,
-      });
+      // Notify primary artist via proper chat system
+      await _sendRecordingNotificationViaChat(
+        fromUserId: collabData.featuringArtistId,
+        fromUserName: collabData.featuringArtistName,
+        toUserId: collabData.primaryArtistId,
+        collabId: collaborationId,
+        songTitle: collabData.metadata['songTitle'] ?? 'Unknown Song',
+        recordingUrl: recordingUrl,
+      );
 
       return true;
     } catch (e) {
