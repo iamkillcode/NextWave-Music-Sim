@@ -8,6 +8,7 @@ import 'admin_dashboard_screen.dart';
 import '../utils/firestore_sanitizer.dart';
 import '../utils/genres.dart';
 import '../theme/app_theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ArtistStats artistStats;
@@ -245,8 +246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _isCheckingName = false;
         _isNameAvailable = querySnapshot.docs.isEmpty;
         _nameCheckMessage = _isNameAvailable
-            ? '✓ "$name" is available!'
-            : '✗ "$name" is already taken';
+            ? '"$name" is available!'
+            : '"$name" is already taken';
       });
     } catch (e) {
       setState(() {
@@ -645,6 +646,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildPrivacyCard(),
           const SizedBox(height: 24),
 
+          // Feedback Section
+          _buildSectionHeader('Feedback & Support'),
+          _buildFeedbackCard(),
+          const SizedBox(height: 24),
+
+          // Social Media Section
+          _buildSectionHeader('Follow Us'),
+          _buildSocialMediaCard(),
+          const SizedBox(height: 24),
+
           // Danger Zone
           _buildSectionHeader('Account Actions'),
           _buildDangerZoneCard(),
@@ -815,8 +826,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
 
           // Gender options
-          _buildGenderButton(
-              'male', 'Male', Icons.male, AppTheme.accentBlue),
+          _buildGenderButton('male', 'Male', Icons.male, AppTheme.accentBlue),
           const SizedBox(height: 8),
           _buildGenderButton(
               'female', 'Female', Icons.female, AppTheme.neonPurple),
@@ -1254,6 +1264,232 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildFeedbackCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.feedback, color: AppTheme.primaryCyan),
+            title: const Text(
+              'Send Feedback',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+            subtitle: const Text(
+              'Share your thoughts, report bugs, or request features',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios,
+                color: Colors.white54, size: 16),
+            onTap: _sendFeedback,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSocialMediaCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5865F2).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child:
+                  const Icon(Icons.forum, color: Color(0xFF5865F2), size: 24),
+            ),
+            title: const Text(
+              'Discord',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+            subtitle: const Text(
+              'Join our community',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            trailing:
+                const Icon(Icons.open_in_new, color: Colors.white54, size: 16),
+            onTap: () => _launchURL('https://discord.gg/2weVx8HZ6'),
+          ),
+          const Divider(color: Colors.white10, height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.tag, color: Colors.white, size: 24),
+            ),
+            title: const Text(
+              'X (Twitter)',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+            subtitle: const Text(
+              '@nextwavesim',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            trailing:
+                const Icon(Icons.open_in_new, color: Colors.white54, size: 16),
+            onTap: () => _launchURL('https://x.com/nextwavesim?s=21'),
+          ),
+          const Divider(color: Colors.white10, height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE4405F).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.camera_alt,
+                  color: Color(0xFFE4405F), size: 24),
+            ),
+            title: const Text(
+              'Instagram',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+            subtitle: const Text(
+              '@nextwavestars',
+              style: TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            trailing:
+                const Icon(Icons.open_in_new, color: Colors.white54, size: 16),
+            onTap: () => _launchURL(
+                'https://www.instagram.com/nextwavestars?igsh=OWYxOThjaG53aTNr&utm_source=qr'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendFeedback() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        title: Row(
+          children: [
+            const Icon(Icons.feedback, color: AppTheme.primaryCyan),
+            const SizedBox(width: 12),
+            const Text('Send Feedback', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'We\'d love to hear from you!',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryCyan.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    Border.all(color: AppTheme.primaryCyan.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.email,
+                      color: AppTheme.primaryCyan, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'manueloppong14@gmail.com',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Send us your feedback, bug reports, or feature requests!',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.white70)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchURL(
+                  'mailto:manueloppong14@gmail.com?subject=NextWave%20Feedback');
+            },
+            child: const Text('Open Email',
+                style: TextStyle(color: AppTheme.primaryCyan)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchURL(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open $url'),
+            backgroundColor: AppTheme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error launching URL: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error opening link: ${e.toString()}'),
+          backgroundColor: AppTheme.errorRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Widget _buildDangerZoneCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1342,7 +1578,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: value,
           onChanged: onChanged,
           activeColor: AppTheme.accentBlue, // Thumb color when ON
-          activeTrackColor: AppTheme.accentBlue.withOpacity(0.5), // Track color when ON
+          activeTrackColor:
+              AppTheme.accentBlue.withOpacity(0.5), // Track color when ON
           inactiveThumbColor: Colors.grey.shade600, // Thumb color when OFF
           inactiveTrackColor: Colors.grey.shade800, // Track color when OFF
         ),

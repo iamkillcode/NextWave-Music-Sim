@@ -1429,6 +1429,26 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
         }
       });
     });
+
+    // ALSO add CREW songs to charts
+    const crewSongsSnapshot = await db.collection('crew_songs').get();
+    
+    crewSongsSnapshot.forEach(crewSongDoc => {
+      const crewSong = crewSongDoc.data();
+      
+      if (crewSong.status === 'released') {
+        allSongs.push({
+          ...crewSong,
+          id: crewSongDoc.id,
+          artistId: crewSong.crewId,
+          artistName: crewSong.crewName || 'Unknown Crew',
+          last7DaysStreams: crewSong.last7DaysStreams || 0,
+          regionalStreams: crewSong.regionalStreams || {},
+          isNPC: false,
+          isCrew: true, // Mark as crew song for UI differentiation
+        });
+      }
+    });
     
     // === GLOBAL CHART (by total last7DaysStreams) ===
     const globalSongs = [...allSongs];
@@ -1471,10 +1491,11 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
         artist: song.artistName,
         artistName: song.artistName,
         streams: song.last7DaysStreams,
-        totalStreams: song.streams,
+        totalStreams: song.streams || song.totalStreams,
         genre: song.genre,
         coverArtUrl: song.coverArtUrl || null,
         isNPC: song.isNPC || false,
+        isCrew: song.isCrew || false, // NEW: Flag for crew songs
         // NEW: Trending data
         movement,
         lastWeekPosition,
@@ -1538,10 +1559,11 @@ async function createSongLeaderboardSnapshot(weekId, timestamp) {
           artist: song.artistName,
           artistName: song.artistName,
           streams: song.regionStreams,
-          totalStreams: song.streams,
+          totalStreams: song.streams || song.totalStreams,
           genre: song.genre,
           coverArtUrl: song.coverArtUrl || null,
           isNPC: song.isNPC || false,
+          isCrew: song.isCrew || false, // NEW: Flag for crew songs
           // NEW: Trending data
           movement,
           lastWeekPosition,
@@ -7680,5 +7702,341 @@ exports.dailyEchoXFollowerUpdate = onSchedule('0 3 * * *', async (event) => {
   } catch (error) {
     console.error('Error in dailyEchoXFollowerUpdate:', error);
     throw error;
+  }
+});
+
+// ============================================================================
+// CREW SYSTEM FUNCTIONS
+// ============================================================================
+
+/**
+ * Crew Challenge Auto-Complete
+ * Runs every hour to check for expired challenges
+ * Distributes rewards to winning crews
+ */
+exports.checkExpiredCrewChallenges = onSchedule({
+  schedule: 'every 1 hours',
+  timeZone: 'America/New_York',
+  memory: '512MiB',
+}, async (event) => {
+  console.log('🎯 Checking expired crew challenges...');
+  
+  const now = admin.firestore.Timestamp.now();
+  const challengesSnapshot = await db.collection('crew_challenges')
+    .where('isActive', '==', true)
+    .where('endDate', '<', now)
+    .get();
+  
+  let processedCount = 0;
+  
+  for (const doc of challengesSnapshot.docs) {
+    const challenge = doc.data();
+    const challengeId = doc.id;
+    
+    try {
+      // Find crew with highest progress
+      let maxProgress = 0;
+      let winnerId = null;
+      
+      if (challenge.crewProgress) {
+        for (const [crewId, progress] of Object.entries(challenge.crewProgress)) {
+          if (progress > maxProgress) {
+            maxProgress = progress;
+            winnerId = crewId;
+          }
+        }
+      }
+      
+      if (winnerId && maxProgress > 0) {
+        // Award rewards
+        await db.collection('crews').doc(winnerId).update({
+          sharedBank: admin.firestore.FieldValue.increment(challenge.rewardMoney),
+          challengesWon: admin.firestore.FieldValue.increment(1),
+        });
+        
+        // Get crew members and award XP
+        const crewDoc = await db.collection('crews').doc(winnerId).get();
+        if (crewDoc.exists) {
+          const members = crewDoc.data().members || [];
+          const batch = db.batch();
+          
+          for (const member of members) {
+            const playerRef = db.collection('players').doc(member.userId);
+            batch.update(playerRef, {
+              experience: admin.firestore.FieldValue.increment(challenge.rewardXP || 0),
+            });
+          }
+          
+          await batch.commit();
+        }
+        
+        // Mark challenge as complete
+        await db.collection('crew_challenges').doc(challengeId).update({
+          winnerId: winnerId,
+          isActive: false,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        console.log(`✅ Challenge ${challengeId} completed. Winner: ${winnerId}`);
+      } else {
+        // No winner, just deactivate
+        await db.collection('crew_challenges').doc(challengeId).update({
+          isActive: false,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        console.log(`❌ Challenge ${challengeId} ended with no winner`);
+      }
+      
+      processedCount++;
+    } catch (error) {
+      console.error(`❌ Error processing challenge ${challengeId}:`, error);
+    }
+  }
+  
+  console.log(`✅ Processed ${processedCount} expired challenges`);
+  return { processed: processedCount };
+});
+
+/**
+ * Crew Song Stream Update
+ * Triggered when crew song streams update
+ * Updates crew totals and challenge progress
+ */
+exports.updateCrewSongStreams = onDocumentWritten({
+  document: 'crew_songs/{songId}',
+  memory: '512MiB',
+}, async (event) => {
+  const beforeData = event.data?.before?.data();
+  const afterData = event.data?.after?.data();
+  
+  if (!afterData) return; // Document deleted
+  
+  const crewId = afterData.crewId;
+  const songId = event.params.songId;
+  
+  // Calculate stream increase
+  const oldStreams = beforeData?.totalStreams || 0;
+  const newStreams = afterData.totalStreams || 0;
+  const streamIncrease = newStreams - oldStreams;
+  
+  if (streamIncrease <= 0) return; // No increase
+  
+  console.log(`🎵 Crew song ${songId} gained ${streamIncrease} streams`);
+  
+  try {
+    // Update crew totals
+    await db.collection('crews').doc(crewId).update({
+      totalStreams: admin.firestore.FieldValue.increment(streamIncrease),
+    });
+    
+    // Check active challenges
+    const challengesSnapshot = await db.collection('crew_challenges')
+      .where('participatingCrews', 'array-contains', crewId)
+      .where('isActive', '==', true)
+      .where('type', '==', 'streams')
+      .get();
+    
+    for (const challengeDoc of challengesSnapshot.docs) {
+      const challenge = challengeDoc.data();
+      const currentProgress = challenge.crewProgress?.[crewId] || 0;
+      const newProgress = currentProgress + streamIncrease;
+      
+      await db.collection('crew_challenges').doc(challengeDoc.id).update({
+        [`crewProgress.${crewId}`]: newProgress,
+      });
+      
+      // Check if challenge target reached
+      if (newProgress >= challenge.targetValue && !challenge.winnerId) {
+        console.log(`🏆 Crew ${crewId} completed challenge ${challengeDoc.id}!`);
+        // Winner will be set by checkExpiredCrewChallenges
+      }
+    }
+    
+    console.log(`✅ Updated crew ${crewId} totals and challenge progress`);
+  } catch (error) {
+    console.error('❌ Error updating crew song streams:', error);
+  }
+});
+
+/**
+ * Crew Revenue Update
+ * Triggered when crew earnings change
+ * Updates challenge progress for revenue challenges
+ */
+exports.updateCrewRevenue = onDocumentWritten({
+  document: 'crews/{crewId}',
+  memory: '512MiB',
+}, async (event) => {
+  const beforeData = event.data?.before?.data();
+  const afterData = event.data?.after?.data();
+  
+  if (!afterData) return; // Document deleted
+  
+  const crewId = event.params.crewId;
+  
+  // Calculate revenue increase
+  const oldEarnings = beforeData?.totalEarnings || 0;
+  const newEarnings = afterData.totalEarnings || 0;
+  const earningsIncrease = newEarnings - oldEarnings;
+  
+  if (earningsIncrease <= 0) return; // No increase
+  
+  console.log(`💰 Crew ${crewId} earned ${earningsIncrease} more`);
+  
+  try {
+    // Check active revenue challenges
+    const challengesSnapshot = await db.collection('crew_challenges')
+      .where('participatingCrews', 'array-contains', crewId)
+      .where('isActive', '==', true)
+      .where('type', '==', 'revenue')
+      .get();
+    
+    for (const challengeDoc of challengesSnapshot.docs) {
+      const challenge = challengeDoc.data();
+      const currentProgress = challenge.crewProgress?.[crewId] || 0;
+      const newProgress = currentProgress + earningsIncrease;
+      
+      await db.collection('crew_challenges').doc(challengeDoc.id).update({
+        [`crewProgress.${crewId}`]: newProgress,
+      });
+      
+      if (newProgress >= challenge.targetValue && !challenge.winnerId) {
+        console.log(`🏆 Crew ${crewId} completed revenue challenge ${challengeDoc.id}!`);
+      }
+    }
+    
+    console.log(`✅ Updated crew ${crewId} revenue challenge progress`);
+  } catch (error) {
+    console.error('❌ Error updating crew revenue:', error);
+  }
+});
+
+/**
+ * Crew Songs Released Counter
+ * Triggered when crew song is released
+ * Updates crew totals and song challenges
+ */
+exports.updateCrewSongsReleased = onDocumentWritten({
+  document: 'crew_songs/{songId}',
+  memory: '512MiB',
+}, async (event) => {
+  const beforeData = event.data?.before?.data();
+  const afterData = event.data?.after?.data();
+  
+  if (!afterData) return; // Document deleted
+  
+  const wasReleased = beforeData?.status === 'released';
+  const isReleased = afterData.status === 'released';
+  
+  // Only trigger when song transitions to released
+  if (wasReleased || !isReleased) return;
+  
+  const crewId = afterData.crewId;
+  const songId = event.params.songId;
+  
+  console.log(`📀 Crew song ${songId} released for crew ${crewId}`);
+  
+  try {
+    // Increment crew song count
+    await db.collection('crews').doc(crewId).update({
+      totalSongsReleased: admin.firestore.FieldValue.increment(1),
+    });
+    
+    // Check active song challenges
+    const challengesSnapshot = await db.collection('crew_challenges')
+      .where('participatingCrews', 'array-contains', crewId)
+      .where('isActive', '==', true)
+      .where('type', '==', 'songs')
+      .get();
+    
+    for (const challengeDoc of challengesSnapshot.docs) {
+      const challenge = challengeDoc.data();
+      const currentProgress = challenge.crewProgress?.[crewId] || 0;
+      const newProgress = currentProgress + 1;
+      
+      await db.collection('crew_challenges').doc(challengeDoc.id).update({
+        [`crewProgress.${crewId}`]: newProgress,
+      });
+      
+      if (newProgress >= challenge.targetValue && !challenge.winnerId) {
+        console.log(`🏆 Crew ${crewId} completed song challenge ${challengeDoc.id}!`);
+      }
+    }
+    
+    console.log(`✅ Updated crew ${crewId} song count and challenge progress`);
+  } catch (error) {
+    console.error('❌ Error updating crew songs released:', error);
+  }
+});
+
+/**
+ * Crew Leaderboard Cache Update (OPTIONAL)
+ * Pre-computes top crews for fast leaderboard queries
+ * Runs every 15 minutes
+ */
+exports.updateCrewLeaderboardCache = onSchedule({
+  schedule: 'every 15 minutes',
+  timeZone: 'America/New_York',
+  memory: '512MiB',
+}, async (event) => {
+  console.log('📊 Updating crew leaderboard cache...');
+  
+  try {
+    // Get top 100 crews by streams
+    const topByStreams = await db.collection('crews')
+      .where('status', '==', 'active')
+      .orderBy('totalStreams', 'desc')
+      .limit(100)
+      .get();
+    
+    // Get top 100 crews by earnings
+    const topByEarnings = await db.collection('crews')
+      .where('status', '==', 'active')
+      .orderBy('totalEarnings', 'desc')
+      .limit(100)
+      .get();
+    
+    // Get top 100 crews by songs
+    const topBySongs = await db.collection('crews')
+      .where('status', '==', 'active')
+      .orderBy('totalSongsReleased', 'desc')
+      .limit(100)
+      .get();
+    
+    // Store in cache collection
+    await db.collection('crew_leaderboard_cache').doc('streams').set({
+      crews: topByStreams.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+        totalStreams: doc.data().totalStreams,
+        members: doc.data().members?.length || 0,
+      })),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    await db.collection('crew_leaderboard_cache').doc('earnings').set({
+      crews: topByEarnings.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+        totalEarnings: doc.data().totalEarnings,
+        members: doc.data().members?.length || 0,
+      })),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    await db.collection('crew_leaderboard_cache').doc('songs').set({
+      crews: topBySongs.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+        totalSongsReleased: doc.data().totalSongsReleased,
+        members: doc.data().members?.length || 0,
+      })),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    
+    console.log('✅ Crew leaderboard cache updated');
+  } catch (error) {
+    console.error('❌ Error updating leaderboard cache:', error);
   }
 });

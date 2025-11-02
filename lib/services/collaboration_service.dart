@@ -36,7 +36,7 @@ class CollaborationService {
         if (maxFame != null && fame > maxFame) return false;
 
         if (genre != null && genre != 'All') {
-          final docGenre = (data['genre'] as String?) ?? '';
+          final docGenre = (data['primaryGenre'] as String?) ?? '';
           if (docGenre.toLowerCase() != genre.toLowerCase()) {
             return false;
           }
@@ -92,7 +92,7 @@ class CollaborationService {
         if (doc.id == currentUserId || seenIds.contains(doc.id)) continue;
 
         final data = doc.data();
-        final docGenre = (data['genre'] as String?) ?? '';
+        final docGenre = (data['primaryGenre'] as String?) ?? '';
 
         if (docGenre.toLowerCase() == playerGenre.toLowerCase()) {
           results.add(PlayerArtist.fromJson({
@@ -137,6 +137,7 @@ class CollaborationService {
     required String genre,
     required CollaborationType type,
     int splitPercentage = 30,
+    int? featureFee,
     String? message,
   }) async {
     try {
@@ -162,7 +163,9 @@ class CollaborationService {
         type: type,
         createdDate: DateTime.now(),
         splitPercentage: splitPercentage,
-        primaryRegion: userData['currentRegion'] as String?,
+        featureFee: featureFee,
+        feePaid: false,
+        primaryRegion: userData['homeRegion'] as String?,
         metadata: {
           'songTitle': songTitle,
           'genre': genre,
@@ -184,6 +187,8 @@ class CollaborationService {
         'toUserId': featuringArtistId,
         'collaborationId': collabId,
         'songTitle': songTitle,
+        'featureFee': featureFee,
+        'splitPercentage': splitPercentage,
         'message': message ?? 'wants to collaborate with you on "$songTitle"',
         'timestamp': FieldValue.serverTimestamp(),
         'read': false,
@@ -229,19 +234,78 @@ class CollaborationService {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return false;
 
+      // Get collaboration details
+      final collabDoc = await _firestore
+          .collection('collaborations')
+          .doc(collaborationId)
+          .get();
+
+      if (!collabDoc.exists) return false;
+
+      final collabData = Collaboration.fromJson(collabDoc.data()!);
+
       // Get featuring artist's region
       final userDoc =
           await _firestore.collection('players').doc(currentUser.uid).get();
       final featuringRegion = userDoc.data()?['homeRegion'] as String?;
 
-      await _firestore
-          .collection('collaborations')
-          .doc(collaborationId)
-          .update({
-        'status': 'accepted',
-        'acceptedDate': FieldValue.serverTimestamp(),
-        'featuringRegion': featuringRegion,
+      // Update song metadata to include featuring artist info
+      await _firestore.collection('songs').doc(collabData.songId).update({
+        'metadata.featuringArtist': collabData.featuringArtistName,
+        'metadata.featuringArtistId': collabData.featuringArtistId,
+        'metadata.isCollaboration': true,
       });
+
+      // If there's a feature fee, handle payment
+      if (collabData.featureFee != null && collabData.featureFee! > 0) {
+        // Get primary artist's money
+        final primaryDoc = await _firestore
+            .collection('players')
+            .doc(collabData.primaryArtistId)
+            .get();
+
+        final primaryMoney = primaryDoc.data()?['currentMoney'] ?? 0;
+
+        // Check if primary artist can afford the fee
+        if (primaryMoney < collabData.featureFee!) {
+          throw Exception('Primary artist cannot afford feature fee');
+        }
+
+        // Deduct from primary artist
+        await _firestore
+            .collection('players')
+            .doc(collabData.primaryArtistId)
+            .update({
+          'currentMoney': primaryMoney - collabData.featureFee!,
+        });
+
+        // Pay featuring artist
+        final featuringMoney = userDoc.data()?['currentMoney'] ?? 0;
+        await _firestore.collection('players').doc(currentUser.uid).update({
+          'currentMoney': featuringMoney + collabData.featureFee!,
+        });
+
+        // Mark fee as paid
+        await _firestore
+            .collection('collaborations')
+            .doc(collaborationId)
+            .update({
+          'status': 'accepted',
+          'acceptedDate': FieldValue.serverTimestamp(),
+          'featuringRegion': featuringRegion,
+          'feePaid': true,
+        });
+      } else {
+        // No fee, just accept
+        await _firestore
+            .collection('collaborations')
+            .doc(collaborationId)
+            .update({
+          'status': 'accepted',
+          'acceptedDate': FieldValue.serverTimestamp(),
+          'featuringRegion': featuringRegion,
+        });
+      }
 
       return true;
     } catch (e) {

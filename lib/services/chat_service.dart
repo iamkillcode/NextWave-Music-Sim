@@ -89,6 +89,102 @@ class ChatService {
     }
   }
 
+  /// Stream collaboration request messages for a conversation
+  Stream<List<ChatMessage>> streamCollabRequests(String otherUserId) {
+    if (currentUserId == null) return Stream.value([]);
+
+    // Listen for collab requests sent TO current user FROM otherUserId
+    return _firestore
+        .collection('starchat_messages')
+        .where('type', isEqualTo: 'collaboration_request')
+        .where('toUserId', isEqualTo: currentUserId)
+        .where('fromUserId', isEqualTo: otherUserId)
+        .orderBy('timestamp', descending: true)
+        .limit(10)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return ChatMessage(
+          id: doc.id,
+          senderId: data['fromUserId'] ?? '',
+          senderName: data['fromUserName'] ?? 'Unknown',
+          senderAvatar: null,
+          content: data['message'] ?? '',
+          timestamp:
+              (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          type: MessageType.collabRequest,
+          isRead: data['read'] ?? false,
+          metadata: {
+            'collaborationId': data['collaborationId'],
+            'songTitle': data['songTitle'],
+            'featureFee': data['featureFee'],
+            'splitPercentage': data['splitPercentage'],
+          },
+        );
+      }).toList();
+    });
+  }
+
+  /// Mark collaboration request as read
+  Future<void> markCollabRequestAsRead(String messageId) async {
+    try {
+      await _firestore.collection('starchat_messages').doc(messageId).update({
+        'read': true,
+      });
+    } catch (e) {
+      print('Error marking collab request as read: $e');
+    }
+  }
+
+  /// Stream crew invite messages for a conversation
+  Stream<List<ChatMessage>> streamCrewInvites(String otherUserId) {
+    if (currentUserId == null) return Stream.value([]);
+
+    // Listen for crew invites sent TO current user FROM otherUserId
+    return _firestore
+        .collection('starchat_messages')
+        .where('type', isEqualTo: 'crew_invite')
+        .where('toUserId', isEqualTo: currentUserId)
+        .where('fromUserId', isEqualTo: otherUserId)
+        .orderBy('timestamp', descending: true)
+        .limit(10)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return ChatMessage(
+          id: doc.id,
+          senderId: data['fromUserId'] ?? '',
+          senderName: data['fromUserName'] ?? 'Unknown',
+          senderAvatar: null,
+          content: data['message'] ?? '',
+          timestamp:
+              (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          type: MessageType.crewInvite,
+          isRead: data['read'] ?? false,
+          metadata: {
+            'crewId': data['crewId'],
+            'crewName': data['crewName'],
+            'crewAvatar': data['crewAvatar'],
+            'inviteId': data['inviteId'],
+          },
+        );
+      }).toList();
+    });
+  }
+
+  /// Mark crew invite as read
+  Future<void> markCrewInviteAsRead(String messageId) async {
+    try {
+      await _firestore.collection('starchat_messages').doc(messageId).update({
+        'read': true,
+      });
+    } catch (e) {
+      print('Error marking crew invite as read: $e');
+    }
+  }
+
   /// Send a message in a conversation
   Future<ChatMessage?> sendMessage({
     required String conversationId,

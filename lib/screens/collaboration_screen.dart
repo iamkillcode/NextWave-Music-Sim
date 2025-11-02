@@ -552,6 +552,32 @@ class _CollaborationScreenState extends State<CollaborationScreen>
                         fontSize: 14,
                         fontWeight: FontWeight.bold),
                   ),
+                  if (collab.featureFee != null && collab.featureFee! > 0) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.purple),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.attach_money,
+                              color: Colors.purple, size: 16),
+                          Text(
+                            'Feature Fee: \$${_formatMoney(collab.featureFee!)}',
+                            style: const TextStyle(
+                                color: Colors.purple,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1353,7 +1379,9 @@ class _SendCollabRequestDialog extends StatefulWidget {
 class _SendCollabRequestDialogState extends State<_SendCollabRequestDialog> {
   Song? _selectedSong;
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _feeFeeController = TextEditingController();
   int _splitPercentage = 30;
+  int? _featureFee;
   bool _isLoading = false;
   List<Song> _writtenSongs = [];
 
@@ -1366,6 +1394,7 @@ class _SendCollabRequestDialogState extends State<_SendCollabRequestDialog> {
   @override
   void dispose() {
     _messageController.dispose();
+    _feeFeeController.dispose();
     super.dispose();
   }
 
@@ -1427,6 +1456,7 @@ class _SendCollabRequestDialogState extends State<_SendCollabRequestDialog> {
         featuringArtistId: widget.player.id,
         featuringArtistName: widget.player.name,
         splitPercentage: _splitPercentage,
+        featureFee: _featureFee,
         message: _messageController.text.trim(),
         songTitle: _selectedSong!.title,
         genre: _selectedSong!.genre,
@@ -1543,6 +1573,37 @@ class _SendCollabRequestDialogState extends State<_SendCollabRequestDialog> {
                   Text(
                     'You: ${100 - _splitPercentage}% | ${widget.player.name}: $_splitPercentage%',
                     style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Feature Fee
+                  const Text('Feature Fee (Optional)',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _feeFeeController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., 5000',
+                      hintStyle: TextStyle(color: Colors.grey[600]),
+                      filled: true,
+                      fillColor: Colors.grey[850],
+                      prefixText: '\$ ',
+                      prefixStyle: const TextStyle(color: Colors.amber),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      helperText: 'Upfront payment they receive when accepting',
+                      helperStyle:
+                          TextStyle(color: Colors.grey[600], fontSize: 11),
+                    ),
+                    onChanged: (value) {
+                      final parsed = int.tryParse(value);
+                      setState(() => _featureFee = parsed);
+                    },
                   ),
                   const SizedBox(height: 16),
 

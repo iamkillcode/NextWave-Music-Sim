@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../models/chat_message.dart';
 import '../services/chat_service.dart';
+import '../services/collaboration_service.dart';
+import '../services/crew_service.dart';
 import '../theme/app_theme.dart';
+import 'package:intl/intl.dart';
 
 /// Real-time chat screen for DM conversations
 class ChatScreen extends StatefulWidget {
@@ -25,6 +28,8 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
+  final CollaborationService _collabService = CollaborationService();
+  final CrewService _crewService = CrewService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
@@ -389,88 +394,114 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
               stream: _chatService.streamMessages(widget.conversationId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                    child: CircularProgressIndicator(color: AppTheme.neonGreen),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline,
-                            size: 64, color: AppTheme.errorRed),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading messages',
-                          style:
-                              TextStyle(color: Colors.white.withOpacity(0.7)),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final messages = snapshot.data ?? [];
-
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 64,
-                          color: Colors.white.withOpacity(0.3),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No messages yet',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Send a message to start the conversation',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.3),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                // Update oldest message time for pagination
-                if (messages.isNotEmpty && _oldestMessageTime == null) {
-                  _oldestMessageTime = messages.last.timestamp;
-                }
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true, // Newest at bottom
-                  padding: const EdgeInsets.all(16),
-                  itemCount: messages.length + (_isLoadingOlder ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == messages.length) {
+              builder: (context, messagesSnapshot) {
+                // Also stream collaboration requests
+                return StreamBuilder<List<ChatMessage>>(
+                  stream: _chatService.streamCollabRequests(widget.otherUserId),
+                  builder: (context, collabSnapshot) {
+                    if (messagesSnapshot.connectionState ==
+                            ConnectionState.waiting &&
+                        collabSnapshot.connectionState ==
+                            ConnectionState.waiting) {
                       return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: CircularProgressIndicator(
-                            color: AppTheme.neonGreen,
-                            strokeWidth: 2,
-                          ),
+                        child: CircularProgressIndicator(
+                            color: AppTheme.neonGreen),
+                      );
+                    }
+
+                    if (messagesSnapshot.hasError && collabSnapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 64, color: AppTheme.errorRed),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error loading messages',
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7)),
+                            ),
+                          ],
                         ),
                       );
                     }
 
-                    return _buildMessageBubble(messages[index]);
+                    // Combine regular messages and collaboration requests
+                    final regularMessages = messagesSnapshot.data ?? [];
+                    final collabRequests = collabSnapshot.data ?? [];
+
+                    // Merge and sort by timestamp
+                    final allMessages = [...regularMessages, ...collabRequests];
+                    allMessages
+                        .sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+                    if (allMessages.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 64,
+                              color: Colors.white.withOpacity(0.3),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No messages yet',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Send a message to start the conversation',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Update oldest message time for pagination
+                    if (allMessages.isNotEmpty && _oldestMessageTime == null) {
+                      _oldestMessageTime = allMessages.last.timestamp;
+                    }
+
+                    return ListView.builder(
+                      controller: _scrollController,
+                      reverse: true, // Newest at bottom
+                      padding: const EdgeInsets.all(16),
+                      itemCount: allMessages.length + (_isLoadingOlder ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == allMessages.length) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(
+                                color: AppTheme.neonGreen,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          );
+                        }
+
+                        final message = allMessages[index];
+
+                        // Display differently based on message type
+                        if (message.type == MessageType.collabRequest) {
+                          return _buildCollabRequestCard(message);
+                        } else if (message.type == MessageType.crewInvite) {
+                          return _buildCrewInviteCard(message);
+                        } else {
+                          return _buildMessageBubble(message);
+                        }
+                      },
+                    );
                   },
                 );
               },
@@ -543,6 +574,582 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildCollabRequestCard(ChatMessage message) {
+    final currentUserId = _chatService.currentUserId;
+    if (currentUserId == null) return const SizedBox.shrink();
+
+    final isMe = message.isFromUser(currentUserId);
+    final songTitle = message.metadata?['songTitle'] ?? 'Unknown Song';
+    final featureFee = message.metadata?['featureFee'] as int?;
+    final splitPercentage = message.metadata?['splitPercentage'] as int? ?? 30;
+    final collaborationId = message.metadata?['collaborationId'] as String?;
+
+    final formatCurrency =
+        NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        margin: EdgeInsets.only(
+          left: isMe ? 40 : 0,
+          right: isMe ? 0 : 40,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.neonPurple.withOpacity(0.2),
+              AppTheme.neonGreen.withOpacity(0.2),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.neonGreen.withOpacity(0.5),
+            width: 2,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.neonPurple.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.music_note,
+                    color: AppTheme.neonPurple,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isMe ? 'Collab Request Sent' : 'Collab Request',
+                        style: const TextStyle(
+                          color: AppTheme.neonGreen,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        message.getFormattedTime(),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Song title
+            Text(
+              '🎵 "$songTitle"',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Message
+            Text(
+              message.content,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Details
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundDark.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Split:',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        '${100 - splitPercentage}% / $splitPercentage%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (featureFee != null && featureFee > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Feature Fee:',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          formatCurrency.format(featureFee),
+                          style: const TextStyle(
+                            color: AppTheme.neonGreen,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Action buttons (only show if not sent by me and not read)
+            if (!isMe && !message.isRead && collaborationId != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          _handleAcceptCollab(message.id, collaborationId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.neonGreen,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          _handleDeclineCollab(message.id, collaborationId),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.errorRed,
+                        side: const BorderSide(
+                            color: AppTheme.errorRed, width: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Decline',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (!isMe && message.isRead) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  '✓ Responded',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleAcceptCollab(
+      String messageId, String collaborationId) async {
+    try {
+      final success = await _collabService.acceptCollaboration(collaborationId);
+
+      if (success) {
+        // Mark message as read
+        await _chatService.markCollabRequestAsRead(messageId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  '✅ Collaboration accepted! Check your Collabs tab to record.'),
+              backgroundColor: AppTheme.neonGreen,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('❌ Failed to accept collaboration. Check your balance.'),
+              backgroundColor: AppTheme.errorRed,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppTheme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildCrewInviteCard(ChatMessage message) {
+    final currentUserId = _chatService.currentUserId;
+    if (currentUserId == null) return const SizedBox.shrink();
+
+    final isMe = message.isFromUser(currentUserId);
+    final crewName = message.metadata?['crewName'] ?? 'Unknown Crew';
+    final crewId = message.metadata?['crewId'] as String?;
+    final inviteId = message.metadata?['inviteId'] as String?;
+    final memberCount = message.metadata?['memberCount'] as int? ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        margin: EdgeInsets.only(
+          left: isMe ? 40 : 0,
+          right: isMe ? 0 : 40,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.neonPurple.withOpacity(0.3),
+              Colors.deepPurple.withOpacity(0.3),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.neonPurple.withOpacity(0.5),
+            width: 2,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.neonPurple.withOpacity(0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.group,
+                    color: AppTheme.neonPurple,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isMe ? 'Crew Invite Sent' : 'Crew Invite',
+                        style: const TextStyle(
+                          color: AppTheme.neonPurple,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        message.getFormattedTime(),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Crew name
+            Text(
+              '👥 $crewName',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Message
+            Text(
+              message.content,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Crew details
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.backgroundDark.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.people,
+                    color: Colors.white.withOpacity(0.6),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$memberCount ${memberCount == 1 ? 'Member' : 'Members'}',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Action buttons (only show if not sent by me and not read)
+            if (!isMe &&
+                !message.isRead &&
+                crewId != null &&
+                inviteId != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () =>
+                          _handleAcceptCrewInvite(message.id, inviteId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.neonPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          _handleDeclineCrewInvite(message.id, inviteId),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.errorRed,
+                        side: const BorderSide(
+                            color: AppTheme.errorRed, width: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Decline',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (!isMe && message.isRead) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  '✓ Responded',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleAcceptCrewInvite(
+      String messageId, String inviteId) async {
+    try {
+      final success = await _crewService.acceptCrewInvite(inviteId);
+
+      if (success) {
+        // Mark message as read
+        await _chatService.markCrewInviteAsRead(messageId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Joined crew! Welcome to the team!'),
+              backgroundColor: AppTheme.neonPurple,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Failed to join crew. Invite may be expired.'),
+              backgroundColor: AppTheme.errorRed,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppTheme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDeclineCrewInvite(
+      String messageId, String inviteId) async {
+    try {
+      final success = await _crewService.declineCrewInvite(inviteId);
+
+      if (success) {
+        // Mark message as read
+        await _chatService.markCrewInviteAsRead(messageId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Crew invite declined'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppTheme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDeclineCollab(
+      String messageId, String collaborationId) async {
+    try {
+      final success = await _collabService.rejectCollaboration(collaborationId);
+
+      if (success) {
+        // Mark message as read
+        await _chatService.markCollabRequestAsRead(messageId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Collaboration declined'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppTheme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildMessageBubble(ChatMessage message) {

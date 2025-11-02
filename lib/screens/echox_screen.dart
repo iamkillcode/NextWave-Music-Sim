@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/artist_stats.dart';
 import 'echox_comments_screen.dart';
 import 'echox_composer_screen.dart';
+import 'echox_profile_screen.dart';
 import '../services/firebase_service.dart';
 import 'tunify_screen.dart';
 import 'maple_music_screen.dart';
@@ -194,7 +195,7 @@ class _EchoXScreenState extends State<EchoXScreen>
                     ),
                     tabs: const [
                       Tab(text: 'For You'),
-                      Tab(text: 'My Posts'),
+                      Tab(text: 'Profile'),
                     ],
                   ),
                 ),
@@ -206,7 +207,7 @@ class _EchoXScreenState extends State<EchoXScreen>
           controller: _tabController,
           children: [
             _buildFeedTab(),
-            _buildMyPostsTab(),
+            _buildProfileTab(),
           ],
         ),
       ),
@@ -415,71 +416,27 @@ class _EchoXScreenState extends State<EchoXScreen>
     );
   }
 
-  Widget _buildMyPostsTab() {
+  Widget _buildProfileTab() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) {
       return const Center(
         child: Text(
-          'Sign in to see your posts',
+          'Sign in to see your profile',
           style: TextStyle(color: Colors.white54),
         ),
       );
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('echox_posts')
-          .where('authorId', isEqualTo: userId)
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppTheme.accentBlue),
-          );
-        }
-
-        final posts = snapshot.data?.docs
-                .map((doc) => EchoPost.fromFirestore(
-                      doc.data() as Map<String, dynamic>,
-                      doc.id,
-                    ))
-                .toList() ??
-            [];
-
-        if (posts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('📝', style: TextStyle(fontSize: 64)),
-                const SizedBox(height: 16),
-                const Text(
-                  'No posts yet',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Share your journey with fans!',
-                  style: TextStyle(color: Colors.white54, fontSize: 16),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: 80),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            return _buildPostCard(posts[index], showDelete: true);
-          },
-        );
+    return EchoXProfileScreen(
+      userId: userId,
+      artistStats: _currentStats,
+      onStatsUpdated: (updatedStats) {
+        setState(() {
+          _currentStats = updatedStats;
+        });
+        widget.onStatsUpdated(updatedStats);
       },
+      isOwnProfile: true,
     );
   }
 
@@ -1011,7 +968,21 @@ class _EchoXScreenState extends State<EchoXScreen>
               }
               if (!mounted) return;
               Navigator.pop(context); // close sheet first
-              if (platform == 'tunify') {
+              if (platform == 'echox') {
+                // Open EchoX Profile
+                // ignore: use_build_context_synchronously
+                Navigator.push(
+                  this.context,
+                  MaterialPageRoute(
+                    builder: (ctx) => EchoXProfileScreen(
+                      userId: playerId,
+                      artistStats: stats,
+                      onStatsUpdated: (s) {},
+                      isOwnProfile: false,
+                    ),
+                  ),
+                );
+              } else if (platform == 'tunify') {
                 // Open Tunify
                 // Read-only view: pass a no-op onStatsUpdated
                 // ignore: use_build_context_synchronously
@@ -1072,6 +1043,21 @@ class _EchoXScreenState extends State<EchoXScreen>
                       color: Colors.white.withOpacity(0.6), fontSize: 12),
                 ),
                 const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.bolt, color: Color(0xFF00CED1)),
+                  title: const Text('EchoX Profile',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: Text('View full profile & followers',
+                      style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  trailing: isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.chevron_right, color: Colors.white70),
+                  onTap: () => openFor('echox'),
+                ),
+                const Divider(color: Colors.white12, height: 1),
                 ListTile(
                   leading: Icon(Icons.music_note, color: AppTheme.successGreen),
                   title: const Text('Tunify',

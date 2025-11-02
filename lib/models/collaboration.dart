@@ -16,6 +16,8 @@ class Collaboration {
   final DateTime? recordedDate; // When recording was completed
   final DateTime? releasedDate;
   final int? splitPercentage; // How much the featuring artist gets (20-50%)
+  final int? featureFee; // Upfront payment to featuring artist (optional)
+  final bool feePaid; // Whether the feature fee has been paid
   final int totalEarnings; // Total money earned from this collab
   final int primaryArtistEarnings; // What primary artist earned
   final int featuringArtistEarnings; // What featuring artist earned
@@ -39,6 +41,8 @@ class Collaboration {
     this.recordedDate,
     this.releasedDate,
     this.splitPercentage = 30,
+    this.featureFee,
+    this.feePaid = false,
     this.totalEarnings = 0,
     this.primaryArtistEarnings = 0,
     this.featuringArtistEarnings = 0,
@@ -63,6 +67,8 @@ class Collaboration {
     DateTime? recordedDate,
     DateTime? releasedDate,
     int? splitPercentage,
+    int? featureFee,
+    bool? feePaid,
     int? totalEarnings,
     int? primaryArtistEarnings,
     int? featuringArtistEarnings,
@@ -87,6 +93,8 @@ class Collaboration {
       recordedDate: recordedDate ?? this.recordedDate,
       releasedDate: releasedDate ?? this.releasedDate,
       splitPercentage: splitPercentage ?? this.splitPercentage,
+      featureFee: featureFee ?? this.featureFee,
+      feePaid: feePaid ?? this.feePaid,
       totalEarnings: totalEarnings ?? this.totalEarnings,
       primaryArtistEarnings:
           primaryArtistEarnings ?? this.primaryArtistEarnings,
@@ -118,6 +126,8 @@ class Collaboration {
       'releasedDate':
           releasedDate != null ? Timestamp.fromDate(releasedDate!) : null,
       'splitPercentage': splitPercentage,
+      'featureFee': featureFee,
+      'feePaid': feePaid,
       'totalEarnings': totalEarnings,
       'primaryArtistEarnings': primaryArtistEarnings,
       'featuringArtistEarnings': featuringArtistEarnings,
@@ -156,6 +166,8 @@ class Collaboration {
           ? (json['releasedDate'] as Timestamp).toDate()
           : null,
       splitPercentage: json['splitPercentage'] as int? ?? 30,
+      featureFee: json['featureFee'] as int?,
+      feePaid: json['feePaid'] as bool? ?? false,
       totalEarnings: json['totalEarnings'] as int? ?? 0,
       primaryArtistEarnings: json['primaryArtistEarnings'] as int? ?? 0,
       featuringArtistEarnings: json['featuringArtistEarnings'] as int? ?? 0,

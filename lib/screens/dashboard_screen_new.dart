@@ -32,6 +32,7 @@ import 'dart:ui';
 import '../widgets/glassmorphic_bottom_nav.dart';
 import '../services/admin_service.dart';
 import '../services/certifications_service.dart';
+import 'crew_hub_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final dynamic initialStats;
@@ -2784,6 +2785,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                     customCostText: 'News',
                   ),
+                  _buildActionCard(
+                    'Crew Hub',
+                    Icons.groups_rounded,
+                    AppTheme.primaryCyan,
+                    energyCost: -1,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CrewHubScreen(),
+                        ),
+                      );
+                    },
+                    customCostText: 'Collaborate',
+                  ),
                 ],
               );
             },
@@ -3022,22 +3038,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _showMessage('${_getNavItemName(index)} selected!');
         }
       },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+      items: [
         BottomNavigationBarItem(
-          icon: Icon(Icons.local_activity),
+          icon: Icon(Icons.home,
+              color:
+                  _selectedIndex == 0 ? AppTheme.primaryCyan : Colors.white54),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.local_activity,
+              color:
+                  _selectedIndex == 1 ? AppTheme.primaryCyan : Colors.white54),
           label: 'Activity',
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Music'),
         BottomNavigationBarItem(
-          icon: Icon(Icons.newspaper),
+          icon: Icon(Icons.music_note,
+              color:
+                  _selectedIndex == 2 ? AppTheme.primaryCyan : Colors.white54),
+          label: 'Music',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.newspaper,
+              color:
+                  _selectedIndex == 3 ? AppTheme.primaryCyan : Colors.white54),
           label: 'The Scoop',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.camera_alt_rounded),
+          icon: Icon(Icons.camera_alt_rounded,
+              color:
+                  _selectedIndex == 4 ? AppTheme.primaryCyan : Colors.white54),
           label: 'Media',
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.public), label: 'World'),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.public,
+              color:
+                  _selectedIndex == 5 ? AppTheme.primaryCyan : Colors.white54),
+          label: 'World',
+        ),
       ],
     );
   }

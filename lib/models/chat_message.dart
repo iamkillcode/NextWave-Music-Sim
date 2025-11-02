@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum MessageType {
   text,
   collabRequest,
+  crewInvite,
   beatShare,
   systemNotification,
 }
@@ -18,7 +19,8 @@ class ChatMessage {
   final bool isRead;
   final bool isDeleted;
   final Map<String, String> reactions; // userId: emoji
-  final Map<String, dynamic>? metadata; // For collab requests, beat shares, etc.
+  final Map<String, dynamic>?
+      metadata; // For collab requests, beat shares, etc.
 
   const ChatMessage({
     required this.id,
